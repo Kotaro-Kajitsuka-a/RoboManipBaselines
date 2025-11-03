@@ -18,13 +18,19 @@ from robo_manip_baselines.common import (
 )
 
 def gripper_q_robomanip_to_maniskill(q_robomanip):
-    """Convert RoboManip gripper scalar to ManiSkill scale."""
+    """Convert RoboManip gripper position scalar to ManiSkill scale."""
 
     return (q_robomanip - 840.0) / (-1000.0)
 
 
+def gripper_qvel_robomanip_to_maniskill(qvel_robomanip):
+    """Convert RoboManip gripper velocity scalar to ManiSkill scale."""
+
+    return qvel_robomanip / (-1000.0)
+
+
 def gripper_q_maniskill_to_robomanip(q_maniskill):
-    """Convert ManiSkill gripper scalar to RoboManip scale."""
+    """Convert ManiSkill gripper position scalar to RoboManip scale."""
 
     return q_maniskill * (-1000.0) + 840.0
 
@@ -138,6 +144,8 @@ _JOINT_POSITION_HIGH = torch.tensor(
 
 
 class RolloutPpo(RolloutBase):
+
+    #RolloutMlpにはない、引数関係などの定義(重要度の低い関数)
     def set_additional_args(self, parser):
         super().set_additional_args(parser)
 
@@ -153,6 +161,19 @@ class RolloutPpo(RolloutBase):
             default=torch.cuda.is_available(),
             help="Enable CUDA for ManiSkill PPO if available (default: enabled when CUDA exists).",
         )
+        parser.add_argument(
+            "--ppo-log-tsv",
+            action=argparse.BooleanOptionalAction,
+            default=False,
+            help="Log observations and actions to TSV each step (default: False).",
+        )
+        parser.add_argument(
+            "--ppo-enable-vision",
+            action=argparse.BooleanOptionalAction,
+            default=False,
+            help="Capture camera and tactile images during rollout (default: False).",
+        )
+
     def setup_model_meta_info(self):
         checkpoint_dir = os.path.split(self.args.checkpoint)[0]
         model_meta_info_path = os.path.join(checkpoint_dir, "model_meta_info.pkl")
@@ -215,6 +236,9 @@ class RolloutPpo(RolloutBase):
         }
 
     def setup_policy(self):
+        if not self.args.ppo_enable_vision:
+            self._disable_env_vision()
+
         # Print policy information
         self.print_policy_info()
         print(
@@ -265,16 +289,35 @@ class RolloutPpo(RolloutBase):
             f"[{self.__class__.__name__}] Load ManiSkill PPO checkpoint on {self.device}"
         )
 
-        checkpoint_dir = os.path.dirname(os.path.abspath(self.args.checkpoint))
-        default_name = f"{self.__class__.__name__.lower()}_debug_log.tsv"
-        self._log_path = os.path.join(checkpoint_dir, default_name)
-        os.makedirs(os.path.dirname(self._log_path), exist_ok=True)
-        with open(self._log_path, "w", newline="") as f:
-            writer = csv.writer(f, delimiter="\t")
-            writer.writerow(["step_idx", "obs", "direct_joint_command"])
-        print(
-            f"[{self.__class__.__name__}] Logging observations and actions to {self._log_path}"
-        )
+        self._log_path = None
+        if self.args.ppo_log_tsv:
+            checkpoint_dir = os.path.dirname(os.path.abspath(self.args.checkpoint))
+            default_name = f"{self.__class__.__name__.lower()}_debug_log.tsv"
+            self._log_path = os.path.join(checkpoint_dir, default_name)
+            os.makedirs(os.path.dirname(self._log_path), exist_ok=True)
+            with open(self._log_path, "w", newline="") as f:
+                writer = csv.writer(f, delimiter="\t")
+                writer.writerow(["step_idx", "obs", "direct_joint_command"])
+            print(
+                f"[{self.__class__.__name__}] Logging observations and actions to {self._log_path}"
+            )
+
+    def _disable_env_vision(self):
+        env = self.env.unwrapped if hasattr(self.env, "unwrapped") else self.env
+
+        self._vision_backup = {
+            "cameras": getattr(env, "cameras", None),
+            "rgb_tactiles": getattr(env, "rgb_tactiles", None),
+        }
+
+        if hasattr(env, "cameras"):
+            env.cameras = {}
+        if hasattr(env, "rgb_tactiles"):
+            env.rgb_tactiles = {}
+
+        self.camera_names = []
+        if "image" in self.model_meta_info:
+            self.model_meta_info["image"]["camera_names"] = []
 
     def setup_plot(self):
         num_cols = max(len(self.camera_names), 1)
@@ -326,7 +369,7 @@ class RolloutPpo(RolloutBase):
         qpos_ms[-1] = gripper_q_robomanip_to_maniskill(qpos_ms[-1])
         qvel_ms = qvel.astype(np.float32).copy()
         if qvel_ms.size > 0:
-            qvel_ms[-1] = gripper_q_robomanip_to_maniskill(qvel_ms[-1])
+            qvel_ms[-1] = gripper_qvel_robomanip_to_maniskill(qvel_ms[-1])
         target_qpos_ms = target_qpos.copy()
         target_qpos_ms[-1] = gripper_q_robomanip_to_maniskill(target_qpos_ms[-1])
 
