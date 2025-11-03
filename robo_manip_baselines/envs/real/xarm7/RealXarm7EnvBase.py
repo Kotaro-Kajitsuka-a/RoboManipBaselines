@@ -94,7 +94,7 @@ class RealXarm7EnvBase(RealEnvBase):
         self.xarm_api.ft_sensor_set_zero()
         time.sleep(0.2)
         self.xarm_api.clean_error()
-        self.xarm_api.set_mode(6)
+        self.xarm_api.set_mode(1)
         self.xarm_api.set_state(0)
         self.xarm_api.set_collision_sensitivity(1)
         self.xarm_api.clean_gripper_error()
@@ -144,9 +144,13 @@ class RealXarm7EnvBase(RealEnvBase):
         print(
             f"[{self.__class__.__name__}] Start moving the robot to the reset position."
         )
+        self.xarm_api.set_mode(6)
+        self.xarm_api.set_state(0)
         self._set_action(
             self.init_qpos, duration=None, joint_vel_limit_scale=0.1, wait=True
         )
+        self.xarm_api.set_mode(1)
+        self.xarm_api.set_state(0)
         print(
             f"[{self.__class__.__name__}] Finish moving the robot to the reset position."
         )
@@ -164,13 +168,23 @@ class RealXarm7EnvBase(RealEnvBase):
         scaled_joint_vel_limit = (
             np.clip(joint_vel_limit_scale, 0.01, 10.0) * self.joint_vel_limit
         )
-        xarm_code = self.xarm_api.set_servo_angle(
-            angle=arm_joint_pos_command,
-            speed=scaled_joint_vel_limit,
-            mvtime=duration,
-            is_radian=True,
-            wait=False,
-        )
+
+
+        #print(f"self.xarm_api.mode:{self.xarm_api.mode}")
+        if self.xarm_api.mode==1:
+            xarm_code = self.xarm_api.set_servo_angle_j(
+                arm_joint_pos_command,
+                speed=scaled_joint_vel_limit,  # set_servo_angle_j expects deg/s
+                is_radian=True,
+            )
+        else:
+            xarm_code = self.xarm_api.set_servo_angle(
+                angle=arm_joint_pos_command,
+                speed=scaled_joint_vel_limit,
+                mvtime=duration,
+                is_radian=True,
+                wait=False,
+            )
         if xarm_code != 0:
             raise RuntimeError(
                 f"[{self.__class__.__name__}] Invalid xArm API code: {xarm_code}"
