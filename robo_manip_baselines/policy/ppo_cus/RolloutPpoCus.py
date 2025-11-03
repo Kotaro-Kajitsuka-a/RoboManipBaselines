@@ -89,12 +89,10 @@ class FrontCameraDetectionWorker:
         self,
         base_to_camera: Optional[np.ndarray],
         intrinsic_info: Optional[Dict[str, Any]] = None,
-        roi: Optional[Tuple[int, int, int, int]] = None,
         tag_size_m: float = DEFAULT_TAG_SIZE_M,
     ):
         self._base_to_camera = None if base_to_camera is None else base_to_camera.astype(np.float64)
         self._intrinsic_info: Dict[str, Any] = intrinsic_info or {}
-        self._roi = roi
         self._tag_size_m = float(tag_size_m)
         self._frame_queue: "queue.Queue[Optional[Tuple[np.ndarray, float]]]" = queue.Queue(maxsize=1)
         self._result_queue: "queue.Queue[Tuple[float, Dict[int, np.ndarray]]]" = queue.Queue(maxsize=1)
@@ -114,6 +112,8 @@ class FrontCameraDetectionWorker:
             and solve_tag_poses is not None
             and self._base_to_camera is not None
         )
+        self._frame_counter = 0
+        self._last_detection_count = None
 
     def start(self):
         if self._processing_thread and self._processing_thread.is_alive():
@@ -169,20 +169,7 @@ class FrontCameraDetectionWorker:
         if rgb_image is None or self._stop_event.is_set():
             return
 
-        frame = rgb_image
-        if self._roi is not None:
-            x, y, w, h = self._roi
-            x = max(0, int(x))
-            y = max(0, int(y))
-            w = max(1, int(w))
-            h = max(1, int(h))
-            max_y = min(y + h, frame.shape[0])
-            max_x = min(x + w, frame.shape[1])
-            frame = frame[y:max_y, x:max_x]
-            if frame.size == 0:
-                return
-
-        gray_image = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        gray_image = cv2.cvtColor(rgb_image, cv2.COLOR_BGR2GRAY)
         timestamp = time.time()
 
         with self._latest_lock:
@@ -201,6 +188,7 @@ class FrontCameraDetectionWorker:
                 self._frame_queue.put_nowait(payload)
             except queue.Full:
                 pass
+        self._frame_counter += 1
 
     def get_latest_frame(self) -> Tuple[Optional[np.ndarray], Optional[float]]:
         with self._latest_lock:
@@ -254,19 +242,32 @@ class FrontCameraDetectionWorker:
                             self._tag_size_m,
                         )
                     except Exception as exc:  # pragma: no cover - detector failure
-                        print(f"[FrontCameraDetectionWorker] solve_tag_poses failed: {exc}", flush=True)
                         poses = []
+                    if self._last_detection_count != len(poses):
+                        print(
+                            flush=True,
+                        )
+                        self._last_detection_count = len(poses)
 
                     for pose in poses:
+                        if int(pose.tag_id) == 3:
+                            continue
                         try:
                             T_cam_to_tag = build_homogeneous_transform(pose.rvec, pose.tvec)
                         except Exception as exc:  # pragma: no cover
                             print(
-                                f"[FrontCameraDetectionWorker] Failed to build transform for tag {pose.tag_id}: {exc}",
                                 flush=True,
                             )
                             continue
-                        transforms[int(pose.tag_id)] = self._base_to_camera @ T_cam_to_tag
+                        T_base_to_tag = self._base_to_camera @ T_cam_to_tag
+                        transforms[int(pose.tag_id)] = T_base_to_tag
+                        matrix_str = np.array2string(
+                            T_base_to_tag,
+                            formatter={"float_kind": lambda x: f"{x: .4f}"},
+                        )
+                        print(
+                            flush=True,
+                        )
 
             with self._latest_lock:
                 self._latest_transforms = {
@@ -317,11 +318,14 @@ class FrontCameraDetectionWorker:
             try:
                 self._detector = build_detector("tag36h11")
             except Exception as exc:
-                print(f"[FrontCameraDetectionWorker] Failed to build detector: {exc}", flush=True)
                 self._detector = None
         except Exception as exc:  # pragma: no cover - detector creation failure
-            print(f"[FrontCameraDetectionWorker] Failed to build detector: {exc}", flush=True)
             self._detector = None
+        else:
+            if self._detector is not None:
+                print(
+                    flush=True,
+                )
         return self._detector
 
     def _ensure_camera_parameters(
@@ -550,30 +554,10 @@ class RolloutPpoCus(RolloutBase):
             help="Log observations and actions to TSV each step (default: False).",
         )
         parser.add_argument(
-            "--ppo-enable-vision",
-            action=argparse.BooleanOptionalAction,
-            default=False,
-            help="Capture camera and tactile images during rollout (default: False).",
-        )
-        parser.add_argument(
             "--ppo-profile",
             action=argparse.BooleanOptionalAction,
             default=False,
             help="Measure per-step timings for debugging (default: False).",
-        )
-        parser.add_argument(
-            "--ppo-marker-enable",
-            action=argparse.BooleanOptionalAction,
-            default=True,
-            help="Enable background front-camera marker worker (default: True, disable with --no-ppo-marker-enable).",
-        )
-        parser.add_argument(
-            "--ppo-marker-roi",
-            type=int,
-            nargs=4,
-            metavar=("X", "Y", "W", "H"),
-            default=None,
-            help="Optional ROI (pixels) for front camera marker processing.",
         )
 
     def setup_model_meta_info(self):
@@ -638,14 +622,8 @@ class RolloutPpoCus(RolloutBase):
         }
 
     def setup_policy(self):
-        disable_env_vision = (
-            not self.args.ppo_enable_vision
-            and not getattr(self.args, "ppo_marker_enable", False)
-        )
-        if disable_env_vision:
-            self._disable_env_vision()
+        # Always keep vision enabled for marker detection
 
-        # Print policy information
         self.print_policy_info()
         print(
             f"  - obs steps: {self.model_meta_info['data']['n_obs_steps']}, action steps: {self.model_meta_info['data']['n_action_steps']}"
@@ -712,13 +690,12 @@ class RolloutPpoCus(RolloutBase):
         super().setup_variables()
 
         self._marker_worker = None
-        if getattr(self.args, "ppo_marker_enable", False):
-            if _GLOBAL_T_BASE_TO_CAMERA is None:
-                print(
-                    f"[{self.__class__.__name__}] T_base→camera calibration not loaded; marker worker disabled.",
-                    flush=True,
-                )
-            else:
+        if _GLOBAL_T_BASE_TO_CAMERA is None:
+            print(
+                f"[{self.__class__.__name__}] T_base→camera calibration not loaded; marker worker disabled.",
+                flush=True,
+            )
+        else:
                 env = self.env.unwrapped if hasattr(self.env, "unwrapped") else self.env
                 front_camera = getattr(env, "cameras", {}).get("front")
                 if front_camera is None:
@@ -733,21 +710,15 @@ class RolloutPpoCus(RolloutBase):
                         flush=True,
                     )
                 else:
-                    roi = (
-                        tuple(int(v) for v in self.args.ppo_marker_roi)
-                        if self.args.ppo_marker_roi
-                        else None
-                    )
                     intrinsic_info = self._extract_camera_intrinsic_info(front_camera)
                     self._marker_worker = FrontCameraDetectionWorker(
                         base_to_camera=_GLOBAL_T_BASE_TO_CAMERA,
                         intrinsic_info=intrinsic_info,
-                        roi=roi,
                         tag_size_m=DEFAULT_TAG_SIZE_M,
                     )
                     self._marker_worker.start()
                     print(
-                        f"[{self.__class__.__name__}] Started front camera marker worker with ROI={roi}.",
+                        f"[{self.__class__.__name__}] Started front camera marker worker.",
                         flush=True,
                     )
 
@@ -755,6 +726,20 @@ class RolloutPpoCus(RolloutBase):
         if self._profile_enabled:
             self._profile_data = defaultdict(list)
             self._wrap_profile_hooks()
+
+    def _submit_marker_frame(self) -> bool:
+        if getattr(self, "_marker_worker", None) is None:
+            return False
+        if not isinstance(getattr(self, "info", None), dict):
+            return False
+        rgb_images = self.info.get("rgb_images")
+        if not isinstance(rgb_images, dict):
+            return False
+        front_rgb = rgb_images.get("front")
+        if front_rgb is None:
+            return False
+        self._marker_worker.submit_frame(front_rgb.copy())
+        return True
 
     def _extract_camera_intrinsic_info(self, camera) -> Optional[Dict[str, Any]]:
         if camera is None:
@@ -903,11 +888,15 @@ class RolloutPpoCus(RolloutBase):
                     for state_key in self.state_keys
                 ]
             )
-
         marker_transforms, marker_timestamp = self.get_latest_marker_transforms(poll=True)
+        print(marker_transforms)
+        print("a")
         if marker_transforms:
             ts_str = f"{marker_timestamp:.3f}" if marker_timestamp is not None else "unknown"
-            print(f"[{self.__class__.__name__}] Latest marker transforms (t={ts_str}):", flush=True)
+            print(
+                f"[{self.__class__.__name__}] Latest marker transforms (t={ts_str}, detected={len(marker_transforms)}):",
+                flush=True,
+            )
             for tag_id, T in marker_transforms.items():
                 matrix_str = np.array2string(
                     T,
@@ -962,20 +951,10 @@ class RolloutPpoCus(RolloutBase):
 
     def get_images(self):
         # Get latest value
+        self._submit_marker_frame()
+
         if len(self.camera_names) == 0:
             return None
-
-        if (
-            self._marker_worker is not None
-            and "front" not in self.camera_names
-        ):
-            front_rgb = (
-                self.info.get("rgb_images", {}).get("front")
-                if isinstance(self.info, dict)
-                else None
-            )
-            if front_rgb is not None:
-                self._marker_worker.submit_frame(front_rgb.copy())
 
         images = []
         for camera_name in self.camera_names:
@@ -1021,6 +1000,7 @@ class RolloutPpoCus(RolloutBase):
                 total_start = timer()
                 state_start = timer()
 
+            self._submit_marker_frame()
             self.get_state()  # update buffers and logs
 
             if profile_enabled:
