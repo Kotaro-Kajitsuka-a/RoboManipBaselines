@@ -38,3 +38,7 @@
 	path = third_party/ManiFlow_Policy
 	url = https://github.com/Naoki-Shibayama/ManiFlow_Policy.git
         ignore = untracked
+
+[submodule "external/check_AprilTag"]
+	path = external/check_AprilTag
+	url = https://github.com/kotaro-kaji/check_AprilTag.git
