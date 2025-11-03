@@ -684,19 +684,6 @@ class RolloutPpoCus(RolloutBase):
                 f"[{self.__class__.__name__}] Module '{module_path}' does not expose a 'build_ppo_task' function."
             )
 
-        params = ppo_task_cfg.get("params") or {}
-        if not isinstance(params, dict):
-            raise TypeError(
-                f"[{self.__class__.__name__}] 'ppo_task.params' must be a dictionary."
-            )
-        self.ppo_task_params = dict(params)
-
-        self.ppo_task_handler = builder(self, params)
-        if self.ppo_task_handler is None:
-            raise RuntimeError(
-                f"[{self.__class__.__name__}] Task builder '{module_path}.build_ppo_task' returned None."
-            )
-
         marker_cameras = ppo_task_cfg.get("marker_cameras", [])
         if isinstance(marker_cameras, list):
             self.marker_camera_names = [str(name) for name in marker_cameras]
@@ -736,11 +723,24 @@ class RolloutPpoCus(RolloutBase):
             self.marker_name_map = {item["id"]: item["name"] for item in definitions}
             self.marker_size_map = {item["id"]: item["size_m"] for item in definitions}
 
+        params = ppo_task_cfg.get("params") or {}
+        if not isinstance(params, dict):
+            raise TypeError(
+                f"[{self.__class__.__name__}] 'ppo_task.params' must be a dictionary."
+            )
+        self.ppo_task_params = dict(params)
+
         self.extra_state_keys = extra_state_keys
         self.extra_state_dims = extra_state_dims
         self.standard_state_keys = [
             key for key in self.state_keys if key not in self.extra_state_keys
         ]
+
+        self.ppo_task_handler = builder(self, params)
+        if self.ppo_task_handler is None:
+            raise RuntimeError(
+                f"[{self.__class__.__name__}] Task builder '{module_path}.build_ppo_task' returned None."
+            )
 
         task_name = ppo_task_cfg.get("name") or module_path
         print(
@@ -878,8 +878,6 @@ class RolloutPpoCus(RolloutBase):
             self._profile_data = defaultdict(list)
             self._wrap_profile_hooks()
 
-        self._ensure_initial_marker_detection()
-
     def _submit_marker_frame(self) -> bool:
         if getattr(self, "_marker_worker", None) is None:
             return False
@@ -919,6 +917,7 @@ class RolloutPpoCus(RolloutBase):
         missing_ids = set(self.required_marker_ids)
 
         while time.time() - start_time <= timeout:
+            self._submit_marker_frame()
             transforms, _ = self.get_latest_marker_transforms(poll=True)
             if not transforms:
                 transforms, _ = self.get_latest_marker_transforms()
@@ -1196,22 +1195,24 @@ class RolloutPpoCus(RolloutBase):
         qpos = self.motion_manager.get_data(DataKey.MEASURED_JOINT_POS, self.obs)
         qvel = self.motion_manager.get_data(DataKey.MEASURED_JOINT_VEL, self.obs)
 
-        target_qpos = extra_state_arrays.get(
-            "target_joint_pos", self.default_target_joint_pos
-        )
-        target_qpos = target_qpos.astype(np.float32).copy()
-
         qpos_ms = qpos.astype(np.float32).copy()
         qpos_ms[-1] = gripper_q_robomanip_to_maniskill(qpos_ms[-1])
         qvel_ms = qvel.astype(np.float32).copy()
         if qvel_ms.size > 0:
             qvel_ms[-1] = gripper_qvel_robomanip_to_maniskill(qvel_ms[-1])
-        target_qpos_ms = target_qpos.copy()
-        target_qpos_ms[-1] = gripper_q_robomanip_to_maniskill(target_qpos_ms[-1])
+        policy_components = [qpos_ms.astype(np.float32), qvel_ms.astype(np.float32)]
 
-        self.state_for_ppo = np.concatenate([qpos_ms, qvel_ms, target_qpos_ms]).astype(
-            np.float32
-        )
+        if "target_joint_pos" in extra_state_arrays:
+            target_qpos = extra_state_arrays["target_joint_pos"].astype(np.float32).copy()
+            target_qpos_ms = target_qpos.copy()
+            target_qpos_ms[-1] = gripper_q_robomanip_to_maniskill(target_qpos_ms[-1])
+            policy_components.append(target_qpos_ms.astype(np.float32))
+
+        marker_pose = extra_state_arrays.get("target_marker_pose")
+        if marker_pose is not None:
+            policy_components.append(marker_pose.astype(np.float32))
+
+        self.state_for_ppo = np.concatenate(policy_components).astype(np.float32)
 
         norm_state = normalize_data(state_vector, self.model_meta_info["state"])
 
@@ -1358,6 +1359,19 @@ class RolloutPpoCus(RolloutBase):
 
     def reset(self):
         super().reset()
+        if self.marker_transform_cache is not None:
+            self.marker_transform_cache.clear()
+        self.marker_detection_verified = False
+
+        if self._marker_worker is not None:
+            # Submit the first frame captured during reset, if available.
+            self._submit_marker_frame()
+            try:
+                self._ensure_initial_marker_detection()
+            except RuntimeError as exc:
+                print(f"[{self.__class__.__name__}] {exc}", flush=True)
+                raise
+
         if self.ppo_task_handler and hasattr(self.ppo_task_handler, "on_reset"):
             self.ppo_task_handler.on_reset()
 
