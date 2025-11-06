@@ -19,3 +19,5 @@ GTAGS
 
 .venv
 
+
+commit_script.sh

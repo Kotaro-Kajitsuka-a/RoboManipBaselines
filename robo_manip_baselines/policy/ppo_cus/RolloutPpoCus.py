@@ -72,7 +72,6 @@ def _load_base_to_camera_transform(path: Path) -> Optional[np.ndarray]:
     matrix = matrix.reshape(4, 4)
     return matrix.astype(np.float64)
 
-
 _GLOBAL_T_BASE_TO_CAMERA = _load_base_to_camera_transform(_DEFAULT_T_BASE_TO_CAMERA_PATH)
 
 DEFAULT_TAG_SIZE_M = 0.0309
