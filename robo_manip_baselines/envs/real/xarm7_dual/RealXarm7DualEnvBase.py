@@ -2,10 +2,8 @@ import time
 from os import path
 
 import numpy as np
-import rtde_control
-import rtde_receive
 from gymnasium.spaces import Box, Dict
-
+from xarm.wrapper import XArmAPI
 
 from robo_manip_baselines.common import ArmConfig
 from robo_manip_baselines.teleop import (
@@ -51,8 +49,8 @@ class RealXarm7DualEnvBase(RealEnvBase):
     )
     observation_space = Dict(
         {
-            "joint_pos": Box(low=-np.inf, high=np.inf, shape=(14,), dtype=np.float64),
-            "joint_vel": Box(low=-np.inf, high=np.inf, shape=(14,), dtype=np.float64),
+            "joint_pos": Box(low=-np.inf, high=np.inf, shape=(16,), dtype=np.float64),
+            "joint_vel": Box(low=-np.inf, high=np.inf, shape=(16,), dtype=np.float64),
             "wrench": Box(low=-np.inf, high=np.inf, shape=(12,), dtype=np.float64),
         }
     )
@@ -74,69 +72,97 @@ class RealXarm7DualEnvBase(RealEnvBase):
         self.body_config_list = [
             ArmConfig(
                 arm_urdf_path=path.join(
-                    path.dirname(__file__), "../../assets/common/robots/ur5e/ur5e.urdf"
+                    path.dirname(__file__),
+                    "../../assets/common/robots/xarm7/xarm7.urdf",
                 ),
                 arm_root_pose=None,
-                ik_eef_joint_id=6,
-                arm_joint_idxes=np.arange(6),
-                gripper_joint_idxes=np.array([6]),
+                ik_eef_joint_id=7,
+                arm_joint_idxes=np.arange(7),
+                gripper_joint_idxes=np.array([7]),
                 gripper_joint_idxes_in_gripper_joint_pos=np.array([0]),
                 eef_idx=0,
-                init_arm_joint_pos=self.init_qpos[0:6],
+                init_arm_joint_pos=self.init_qpos[0:7],
                 init_gripper_joint_pos=np.zeros(1),
             ),
             ArmConfig(
                 arm_urdf_path=path.join(
-                    path.dirname(__file__), "../../assets/common/robots/ur5e/ur5e.urdf"
+                    path.dirname(__file__),
+                    "../../assets/common/robots/xarm7/xarm7.urdf",
                 ),
                 arm_root_pose=None,
-                ik_eef_joint_id=6,
-                arm_joint_idxes=np.arange(7, 13),
-                gripper_joint_idxes=np.array([13]),
+                ik_eef_joint_id=7,
+                arm_joint_idxes=np.arange(7, 14),
+                gripper_joint_idxes=np.array([14]),
                 gripper_joint_idxes_in_gripper_joint_pos=np.array([1]),
                 eef_idx=1,
-                init_arm_joint_pos=self.init_qpos[7:13],
+                init_arm_joint_pos=self.init_qpos[7:14],
                 init_gripper_joint_pos=np.zeros(1),
             ),
         ]
 
-        # Connect to UR5eDual
-        print(f"[{self.__class__.__name__}] Start connecting the UR5eDual.")
+        # Connect to xArm7Dual
+        print(f"[{self.__class__.__name__}] Start connecting the xArm7Dual.")
 
         self.robot_ip_left = robot_ip_left
-        self.rtde_c_left = rtde_control.RTDEControlInterface(self.robot_ip_left)
-        self.rtde_r_left = rtde_receive.RTDEReceiveInterface(self.robot_ip_left)
-        self.rtde_c_left.endFreedriveMode()
+        self.xarm_api_left = XArmAPI(self.robot_ip_left)
+        self.xarm_api_left.connect()
+        self.xarm_api_left.motion_enable(enable=True)
+        self.xarm_api_left.ft_sensor_enable(1)
+        time.sleep(0.2)
+        self.xarm_api_left.ft_sensor_set_zero()
+        time.sleep(0.2)
+        self.xarm_api_left.clean_error()
+        self.xarm_api_left.set_mode(1)
+        self.xarm_api_left.set_state(0)
+        self.xarm_api_left.set_collision_sensitivity(1)
+        self.xarm_api_left.clean_gripper_error()
+        self.xarm_api_left.set_gripper_mode(0)
+        self.xarm_api_left.set_gripper_enable(True)
+        time.sleep(0.2)
+        xarm_code, left_joint_states = self.xarm_api_left.get_joint_states(
+            is_radian=True
+        )
+        if xarm_code != 0:
+            raise RuntimeError(
+                f"[{self.__class__.__name__}] Invalid xArm API code: {xarm_code}"
+            )
 
         self.robot_ip_right = robot_ip_right
-        self.rtde_c_right = rtde_control.RTDEControlInterface(self.robot_ip_right)
-        self.rtde_r_right = rtde_receive.RTDEReceiveInterface(self.robot_ip_right)
-        self.rtde_c_right.endFreedriveMode()
-
-        self.arm_joint_pos_actual = np.concatenate(
-            [
-                np.array(self.rtde_r_left.getActualQ()),
-                np.array(self.rtde_r_right.getActualQ()),
-            ]
+        self.xarm_api_right = XArmAPI(self.robot_ip_right)
+        self.xarm_api_right.connect()
+        self.xarm_api_right.motion_enable(enable=True)
+        self.xarm_api_right.ft_sensor_enable(1)
+        time.sleep(0.2)
+        self.xarm_api_right.ft_sensor_set_zero()
+        time.sleep(0.2)
+        self.xarm_api_right.clean_error()
+        self.xarm_api_right.set_mode(1)
+        self.xarm_api_right.set_state(0)
+        self.xarm_api_right.set_collision_sensitivity(1)
+        self.xarm_api_right.clean_gripper_error()
+        self.xarm_api_right.set_gripper_mode(0)
+        self.xarm_api_right.set_gripper_enable(True)
+        time.sleep(0.2)
+        xarm_code, right_joint_states = self.xarm_api_right.get_joint_states(
+            is_radian=True
         )
-        print(f"[{self.__class__.__name__}] Finish connecting the UR5eDual.")
+        if xarm_code != 0:
+            raise RuntimeError(
+                f"[{self.__class__.__name__}] Invalid xArm API code: {xarm_code}"
+            )
+        self.arm_joint_pos_actual = np.concatenate(
+            [left_joint_states[0], right_joint_states[0]]
+        )
 
-        # Connect to Robotiq gripper
-        print(f"[{self.__class__.__name__}] Start connecting the Robotiq gripper.")
-        self.gripper_port = 63352
-
-        self.gripper_left = RobotiqGripper()
-        self.gripper_left.connect(hostname=self.robot_ip_left, port=self.gripper_port)
-
-        self.gripper_right = RobotiqGripper()
-        self.gripper_right.connect(hostname=self.robot_ip_right, port=self.gripper_port)
-
-        self._gripper_activated = False
-        print(f"[{self.__class__.__name__}] Finish connecting the Robotiq gripper.")
+        print(f"[{self.__class__.__name__}] Finish connecting the xArm7Dual.")
 
         # Connect to RealSense
         self.setup_realsense(camera_ids)
         self.setup_gelsight(gelsight_ids)
+
+    def close(self):
+        self.xarm_api_left.disconnect()
+        self.xarm_api_right.disconnect()
 
     def setup_input_device(self, input_device_name, motion_manager, overwrite_kwargs):
         if input_device_name == "spacemouse":
@@ -171,26 +197,20 @@ class RealXarm7DualEnvBase(RealEnvBase):
             f"[{self.__class__.__name__}] Start moving the robot to the reset position."
         )
         self._set_action(
-            self.init_qpos, duration=None, joint_vel_limit_scale=0.3, wait=True
+            self.init_qpos,
+            duration=None,
+            joint_vel_limit_scale=0.3,
+            wait=True,
+            reset_bool=True,
         )
+
         print(
             f"[{self.__class__.__name__}] Finish moving the robot to the reset position."
         )
 
-        if not self._gripper_activated:
-            self._gripper_activated = True
-            print(f"[{self.__class__.__name__}] Start activating the Robotiq gripper.")
-            self.gripper_left.activate()
-            self.gripper_right.activate()
-            print(f"[{self.__class__.__name__}] Finish activating the Robotiq gripper.")
-
-        # Calibrate force sensor
-        time.sleep(0.2)
-        self.rtde_c_left.zeroFtSensor()
-        self.rtde_c_right.zeroFtSensor()
-        time.sleep(0.2)
-
-    def _set_action(self, action, duration=None, joint_vel_limit_scale=0.5, wait=False):
+    def _set_action(
+        self, action, duration=None, joint_vel_limit_scale=0.5, wait=False, reset_bool=False
+    ):
         start_time = time.time()
 
         # Overwrite duration or joint_pos for safety
@@ -198,99 +218,173 @@ class RealXarm7DualEnvBase(RealEnvBase):
             action, duration, joint_vel_limit_scale
         )
 
-        # Send command to UR5eDual
-        velocity = 0.5
-        acceleration = 0.5
-        lookahead_time = 0.2  # [s]
-        gain = 100
-
-        arm_joint_pos_command = action[self.body_config_list[0].arm_joint_idxes]
-        period = self.rtde_c_left.initPeriod()
-        self.rtde_c_left.servoJ(
-            arm_joint_pos_command,
-            velocity,
-            acceleration,
-            duration,
-            lookahead_time,
-            gain,
+        # Send command to Xarm7Dual
+        left_arm_joint_pos_command = action[self.body_config_list[0].arm_joint_idxes]
+        right_arm_joint_pos_command = action[self.body_config_list[1].arm_joint_idxes]
+        scaled_joint_vel_limit = (
+            np.clip(joint_vel_limit_scale, 0.01, 10.0) * self.joint_vel_limit
         )
 
-        arm_joint_pos_command = action[self.body_config_list[1].arm_joint_idxes]
-        period = self.rtde_c_right.initPeriod()
-        self.rtde_c_right.servoJ(
-            arm_joint_pos_command,
-            velocity,
-            acceleration,
-            duration,
-            lookahead_time,
-            gain,
-        )
+        if reset_bool:
+            self.xarm_api_left.set_mode(6)
+            self.xarm_api_left.set_state(0)
+            self.xarm_api_right.set_mode(6)
+            self.xarm_api_right.set_state(0)
 
-        self.rtde_c_left.waitPeriod(period)
-        self.rtde_c_right.waitPeriod(period)
+            for _ in range(10):
+                time.sleep(0.2)
+                if (
+                    self.xarm_api_left.mode == 6
+                    and self.xarm_api_right.mode == 6
+                ):
+                    print(f"[{self.__class__.__name__}] self.xarm_api_left.mode: {self.xarm_api_left.mode}")
+                    print(f"[{self.__class__.__name__}] self.xarm_api_right.mode: {self.xarm_api_right.mode}")
+                    break
 
-        # Send command to Robotiq gripper
-        speed = 50
-        force = 10
+            # send command to the left arm
+            xarm_code = self.xarm_api_left.set_servo_angle(
+                angle=left_arm_joint_pos_command,
+                speed=scaled_joint_vel_limit,
+                mvtime=duration,
+                is_radian=True,
+                wait=False,
+            )
+            if xarm_code != 0:
+                raise RuntimeError(
+                    f"[{self.__class__.__name__}] Invalid xArm API code: {xarm_code}"
+                )
+            # send command to the right arm
+            xarm_code = self.xarm_api_right.set_servo_angle(
+                angle=right_arm_joint_pos_command,
+                speed=scaled_joint_vel_limit,
+                mvtime=duration,
+                is_radian=True,
+                wait=False,
+            )
+            if xarm_code != 0:
+                raise RuntimeError(
+                    f"[{self.__class__.__name__}] Invalid xArm API code: {xarm_code}"
+                )
 
-        gripper_pos = action[self.body_config_list[0].gripper_joint_idxes][0]
-        self.gripper_left.move(int(gripper_pos), speed, force)
+            time.sleep(5)
+            self.xarm_api_left.set_mode(1)
+            self.xarm_api_right.set_mode(1)
+            self.xarm_api_left.set_state(0)
+            self.xarm_api_right.set_state(0)
 
-        gripper_pos = action[self.body_config_list[1].gripper_joint_idxes][0]
-        self.gripper_right.move(int(gripper_pos), speed, force)
+            time.sleep(0.2)
+        elif self.xarm_api_left.mode == 1 and self.xarm_api_right.mode == 1:
+            xarm_code = self.xarm_api_left.set_servo_angle_j(
+                left_arm_joint_pos_command,
+                speed=scaled_joint_vel_limit,  # expects deg/s
+                is_radian=True,
+            )
+            if xarm_code != 0:
+                raise RuntimeError(
+                    f"[{self.__class__.__name__}] Invalid xArm API code: {xarm_code}"
+                )
+            xarm_code = self.xarm_api_right.set_servo_angle_j(
+                right_arm_joint_pos_command,
+                speed=scaled_joint_vel_limit,  # set_servo_angle_j expects deg/s
+                is_radian=True,
+            )
+            if xarm_code != 0:
+                raise RuntimeError(
+                    f"[{self.__class__.__name__}] Invalid xArm API code: {xarm_code}"
+                )
+        else:
+            raise ValueError("Unexpectedly xarm_api.mode != 1 in _set_action function")
 
+        # Send command to xArm gripper
+        left_gripper_pos = action[self.body_config_list[0].gripper_joint_idxes][0]
+        xarm_code = self.xarm_api_left.set_gripper_position(left_gripper_pos, wait=False)
+        if xarm_code != 0:
+            raise RuntimeError(
+                f"[{self.__class__.__name__}] Invalid xArm API code: {xarm_code}"
+            )
+
+        right_gripper_pos = action[self.body_config_list[1].gripper_joint_idxes][0]
+        xarm_code = self.xarm_api_right.set_gripper_position(right_gripper_pos, wait=False)
+        if xarm_code != 0:
+            raise RuntimeError(
+                f"[{self.__class__.__name__}] Invalid xArm API code: {xarm_code}"
+            )
+        
         # Wait
         elapsed_duration = time.time() - start_time
         if wait and elapsed_duration < duration:
             time.sleep(duration - elapsed_duration)
-
+        
     def _get_obs(self):
-        # Get state from UR5eDual
-        arm_joint_pos_left = np.array(self.rtde_r_left.getActualQ())
-        arm_joint_vel_left = np.array(self.rtde_r_left.getActualQd())
-        arm_joint_pos_right = np.array(self.rtde_r_right.getActualQ())
-        arm_joint_vel_right = np.array(self.rtde_r_right.getActualQd())
+        # Get state from xArm7Dual
+        xarm_code, left_joint_states = self.xarm_api_left.get_joint_states(
+            is_radian=True
+        )
+        if xarm_code != 0:
+            raise RuntimeError(
+                f"[{self.__class__.__name__}] Invalid xArm API code: {xarm_code}"
+            )
+        xarm_code, right_joint_states = self.xarm_api_right.get_joint_states(
+            is_radian=True
+        )
+        if xarm_code != 0:
+            raise RuntimeError(
+                f"[{self.__class__.__name__}] Invalid xArm API code: {xarm_code}"
+            )
+        left_arm_joint_pos = left_joint_states[0]
+        left_arm_joint_vel = left_joint_states[1]
+        right_arm_joint_pos = right_joint_states[0]
+        right_arm_joint_vel = right_joint_states[1]
+
         self.arm_joint_pos_actual = np.concatenate(
-            [arm_joint_pos_left, arm_joint_pos_right], dtype=np.float64
+            [left_arm_joint_pos, right_arm_joint_pos], dtype=np.float64
         )
 
         # Get state from Robotiq gripper
-        gripper_joint_pos_left = np.array(
-            [self.gripper_left.get_current_position()], dtype=np.float64
-        )
-        gripper_joint_vel_left = np.zeros(1)
-        gripper_joint_pos_right = np.array(
-            [self.gripper_right.get_current_position()], dtype=np.float64
-        )
-        gripper_joint_vel_right = np.zeros(1)
+        xarm_code, left_gripper_pos = self.xarm_api_left.get_gripper_position()
+        if xarm_code != 0:
+            raise RuntimeError(
+                f"[{self.__class__.__name__}] Invalid xArm API code: {xarm_code}"
+            )
+        left_gripper_joint_pos = np.array([left_gripper_pos], dtype=np.float64)
+        left_gripper_joint_vel = np.zeros(1)
+
+        xarm_code, right_gripper_pos = self.xarm_api_right.get_gripper_position()
+        if xarm_code != 0:
+            raise RuntimeError(
+                f"[{self.__class__.__name__}] Invalid xArm API code: {xarm_code}"
+            )
+        right_gripper_joint_pos = np.array([right_gripper_pos], dtype=np.float64)
+        right_gripper_joint_vel = np.zeros(1)
 
         # Get wrench from force sensor
-        wrench = np.concatenate(
-            (
-                self.rtde_r_left.getActualTCPForce(),
-                self.rtde_r_right.getActualTCPForce(),
-            ),
-            dtype=np.float64,
+        wrench_left = np.array(
+            self.xarm_api_left.get_ft_sensor_data()[1], dtype=np.float64
         )
+        wrench_right = np.array(
+            self.xarm_api_right.get_ft_sensor_data()[1], dtype=np.float64
+        )
+        force = np.concatenate((wrench_left[0:3], wrench_right[0:3]), dtype=np.float64)
+        torque = np.concatenate((wrench_left[3:6], wrench_right[3:6]), dtype=np.float64)
 
         return {
             "joint_pos": np.concatenate(
                 (
-                    arm_joint_pos_left,
-                    gripper_joint_pos_left,
-                    arm_joint_pos_right,
-                    gripper_joint_pos_right,
+                    left_arm_joint_pos,
+                    left_gripper_joint_pos,
+                    right_arm_joint_pos,
+                    right_gripper_joint_pos,
                 ),
                 dtype=np.float64,
             ),
             "joint_vel": np.concatenate(
                 (
-                    arm_joint_vel_left,
-                    gripper_joint_vel_left,
-                    arm_joint_vel_right,
-                    gripper_joint_vel_right,
+                    left_arm_joint_vel,
+                    left_gripper_joint_vel,
+                    right_arm_joint_vel,
+                    right_gripper_joint_vel,
                 ),
                 dtype=np.float64,
             ),
-            "wrench": wrench,
+            "wrench": np.concatenate((force, torque), dtype=np.float64),
         }

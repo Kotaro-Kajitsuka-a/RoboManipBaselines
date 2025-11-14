@@ -187,7 +187,7 @@ class RealXarm7EnvBase(RealEnvBase):
                 wait=False,
             )
 
-            time.sleep(10)
+            time.sleep(5)
             self.xarm_api.set_mode(1)
             self.xarm_api.set_state(0)
 
