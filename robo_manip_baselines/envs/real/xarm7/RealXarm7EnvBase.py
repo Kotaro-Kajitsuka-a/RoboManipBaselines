@@ -192,9 +192,7 @@ class RealXarm7EnvBase(RealEnvBase):
             self.xarm_api.set_state(0)
 
             time.sleep(0.2)
-            return None
-            
-        if self.xarm_api.mode==1:
+        elif self.xarm_api.mode==1:
 
             xarm_code = self.xarm_api.set_servo_angle_j(
                 arm_joint_pos_command,
