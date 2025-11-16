@@ -1,6 +1,7 @@
 import argparse
 import csv
 import importlib
+import inspect
 import json
 import os
 import sys
@@ -8,6 +9,8 @@ import time
 import types
 from collections import defaultdict
 from pathlib import Path
+import queue
+import threading
 from typing import Any, Dict, Optional, Tuple, List
 
 import cv2
@@ -18,31 +21,410 @@ import torch.nn as nn
 from torch.distributions.normal import Normal
 
 from robo_manip_baselines.common import (
-    ArmConfig,
     DataKey,
     RolloutBase,
     denormalize_data,
     normalize_data,
 )
 
-from .gripper_utils import (
-    gripper_q_maniskill_to_robomanip,
-    gripper_q_robomanip_to_maniskill,
-    gripper_qvel_robomanip_to_maniskill,
-)
-from .marker_detection import (
-    DEFAULT_TAG_SIZE_M,
-    FrontCameraDetectionWorker,
-    extract_camera_intrinsic_info,
-    load_base_to_camera_transform,
-)
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
+_APRILTAG_SRC = _REPO_ROOT / "external" / "check_AprilTag" / "src"
+if _APRILTAG_SRC.exists():
+    apriltag_src_str = str(_APRILTAG_SRC)
+    if apriltag_src_str not in sys.path:
+        sys.path.append(apriltag_src_str)
+
+try:
+    from pose_viewer import (
+        build_detector,
+        build_homogeneous_transform,
+        solve_tag_poses,
+    )
+except ImportError:  # pragma: no cover - optional dependency
+    build_detector = None  # type: ignore[assignment]
+    build_homogeneous_transform = None  # type: ignore[assignment]
+    solve_tag_poses = None  # type: ignore[assignment]
+
+
 _DEFAULT_T_BASE_TO_CAMERA_PATH = (
     _REPO_ROOT / "robo_manip_baselines" / "calib" / "T_base_to_camera.csv"
 )
-_GLOBAL_T_BASE_TO_CAMERA = load_base_to_camera_transform(_DEFAULT_T_BASE_TO_CAMERA_PATH)
 
+
+def _load_base_to_camera_transform(path: Path) -> Optional[np.ndarray]:
+    try:
+        matrix = np.loadtxt(path, delimiter=",", dtype=np.float64)
+    except FileNotFoundError:
+        print(
+            f"[RolloutPpoCus] T_base→camera transform not found at {path}. "
+            "Marker detection will be disabled.",
+            flush=True,
+        )
+        return None
+    except Exception as exc:  # pragma: no cover - I/O error
+        print(
+            f"[RolloutPpoCus] Failed to load T_base→camera transform from {path}: {exc}",
+            flush=True,
+        )
+        return None
+
+    matrix = matrix.reshape(4, 4)
+    return matrix.astype(np.float64)
+
+_GLOBAL_T_BASE_TO_CAMERA = _load_base_to_camera_transform(_DEFAULT_T_BASE_TO_CAMERA_PATH)
+
+DEFAULT_TAG_SIZE_M = 0.0309
+DEFAULT_DETECTOR_THREADS = 4
+DEFAULT_DETECTOR_DECIMATE = 1.0
+DEFAULT_DETECTOR_SIGMA = 1.0
+DEFAULT_DETECTOR_SHARPENING = 0.1
+
+DEFAULT_TARGET_JOINT_POS = np.array(
+    [
+        0.0,
+        -0.477,
+        0.0,
+        0.8571976,
+        0.0,
+        1.2771976,
+        -1.5707964,
+        40.0,
+    ],
+    dtype=np.float32,
+)
+
+
+
+class FrontCameraDetectionWorker:
+    """Process front-camera frames on a background thread to estimate AprilTag poses."""
+
+    def __init__(
+        self,
+        base_to_camera: Optional[np.ndarray],
+        intrinsic_info: Optional[Dict[str, Any]] = None,
+        tag_size_m: float = DEFAULT_TAG_SIZE_M,
+    ):
+        self._base_to_camera = None if base_to_camera is None else base_to_camera.astype(np.float64)
+        self._intrinsic_info: Dict[str, Any] = intrinsic_info or {}
+        self._tag_size_m = float(tag_size_m)
+        self._frame_queue: "queue.Queue[Optional[Tuple[np.ndarray, float]]]" = queue.Queue(maxsize=1)
+        self._result_queue: "queue.Queue[Tuple[float, Dict[int, np.ndarray]]]" = queue.Queue(maxsize=1)
+        self._stop_event = threading.Event()
+        self._processing_thread: Optional[threading.Thread] = None
+        self._latest_lock = threading.Lock()
+        self._latest_gray: Optional[np.ndarray] = None
+        self._latest_timestamp: Optional[float] = None
+        self._latest_transforms: Dict[int, np.ndarray] = {}
+        self._latest_transform_times: Dict[int, float] = {}
+        self._latest_transforms_timestamp: Optional[float] = None
+        self._detector = None
+        self._camera_matrix: Optional[np.ndarray] = None
+        self._dist_coeffs: Optional[np.ndarray] = None
+        self._detection_available = (
+            build_detector is not None
+            and build_homogeneous_transform is not None
+            and solve_tag_poses is not None
+            and self._base_to_camera is not None
+        )
+        self._frame_counter = 0
+        self._last_detection_count = None
+
+    def start(self):
+        if self._processing_thread and self._processing_thread.is_alive():
+            return
+
+        if not self._detection_available:
+            print(
+                "[FrontCameraDetectionWorker] Marker detection disabled (missing dependencies or calibration).",
+                flush=True,
+            )
+
+        detector = self._build_detector()
+        if detector is None:
+            self._detection_available = False
+            print(
+                "[FrontCameraDetectionWorker] Detector initialization failed; detection disabled.",
+                flush=True,
+            )
+
+        self._stop_event.clear()
+        self._processing_thread = threading.Thread(
+            target=self._processing_loop,
+            name="front_camera_detection",
+            daemon=True,
+        )
+        self._processing_thread.start()
+
+    def stop(self):
+        self._stop_event.set()
+        try:
+            self._frame_queue.put_nowait(None)
+        except queue.Full:
+            try:
+                self._frame_queue.get_nowait()
+            except queue.Empty:
+                pass
+            try:
+                self._frame_queue.put_nowait(None)
+            except queue.Full:
+                pass
+
+        if self._processing_thread:
+            self._processing_thread.join(timeout=1.0)
+            self._processing_thread = None
+
+        while True:
+            try:
+                self._result_queue.get_nowait()
+            except queue.Empty:
+                break
+
+    def submit_frame(self, rgb_image: np.ndarray) -> None:
+        if rgb_image is None or self._stop_event.is_set():
+            return
+
+        gray_image = cv2.cvtColor(rgb_image, cv2.COLOR_BGR2GRAY)
+        timestamp = time.time()
+
+        with self._latest_lock:
+            self._latest_gray = gray_image
+            self._latest_timestamp = timestamp
+
+        payload = (gray_image, timestamp)
+        try:
+            self._frame_queue.put_nowait(payload)
+        except queue.Full:
+            try:
+                self._frame_queue.get_nowait()
+            except queue.Empty:
+                pass
+            try:
+                self._frame_queue.put_nowait(payload)
+            except queue.Full:
+                pass
+        self._frame_counter += 1
+
+    def get_latest_frame(self) -> Tuple[Optional[np.ndarray], Optional[float]]:
+        with self._latest_lock:
+            if self._latest_gray is None:
+                return None, None
+            return self._latest_gray.copy(), self._latest_timestamp
+
+    def get_latest_transforms(self) -> Tuple[Dict[int, np.ndarray], Optional[float]]:
+        with self._latest_lock:
+            return (
+                {tag_id: matrix.copy() for tag_id, matrix in self._latest_transforms.items()},
+                self._latest_transforms_timestamp,
+            )
+
+    def get_latest_transform_times(self) -> Dict[int, float]:
+        with self._latest_lock:
+            return dict(self._latest_transform_times)
+
+    def poll_transforms(self) -> Tuple[Optional[Dict[int, np.ndarray]], Optional[float]]:
+        try:
+            timestamp, transforms = self._result_queue.get_nowait()
+        except queue.Empty:
+            return None, None
+
+        copied = {tag_id: matrix.copy() for tag_id, matrix in transforms.items()}
+        with self._latest_lock:
+            self._latest_transforms = {
+                tag_id: matrix.copy() for tag_id, matrix in copied.items()
+            }
+            if timestamp is not None:
+                self._latest_transforms_timestamp = timestamp
+        return copied, timestamp
+
+    def _processing_loop(self):
+        while not self._stop_event.is_set():
+            try:
+                item = self._frame_queue.get(timeout=0.1)
+            except queue.Empty:
+                continue
+
+            if item is None:
+                break
+
+            gray_image, timestamp = item
+            transforms: Dict[int, np.ndarray] = {}
+
+            if self._detection_available:
+                detector = self._build_detector()
+                camera_mats = self._ensure_camera_parameters(gray_image)
+                if detector is not None and camera_mats is not None:
+                    K, dist_coeffs = camera_mats
+                    try:
+                        poses = solve_tag_poses(
+                            detector,
+                            gray_image,
+                            K,
+                            dist_coeffs,
+                            self._tag_size_m,
+                        )
+                    except Exception as exc:  # pragma: no cover - detector failure
+                        poses = []
+                    if self._last_detection_count != len(poses):
+                        print(
+                            f"[FrontCameraDetectionWorker] Detected {len(poses)} tags in current frame.",
+                            flush=True,
+                        )
+                        self._last_detection_count = len(poses)
+
+                    for pose in poses:
+                        if int(pose.tag_id) == 3:
+                            continue
+                        try:
+                            T_cam_to_tag = build_homogeneous_transform(pose.rvec, pose.tvec)
+                        except Exception as exc:  # pragma: no cover
+                            print(
+                                f"[FrontCameraDetectionWorker] Failed to build transform for tag {pose.tag_id}: {exc}",
+                                flush=True,
+                            )
+                            continue
+                        T_base_to_tag = self._base_to_camera @ T_cam_to_tag
+                        transforms[int(pose.tag_id)] = T_base_to_tag
+                        matrix_str = np.array2string(
+                            T_base_to_tag,
+                            formatter={"float_kind": lambda x: f"{x: .4f}"},
+                        )
+                        print(
+                            f"[FrontCameraDetectionWorker] tag {pose.tag_id} transform:\n{matrix_str}",
+                            flush=True,
+                        )
+
+            payload = None
+            with self._latest_lock:
+                if transforms:
+                    for tag_id, matrix in transforms.items():
+                        self._latest_transforms[tag_id] = matrix.copy()
+                        self._latest_transform_times[tag_id] = timestamp
+                    self._latest_transforms_timestamp = timestamp
+                    combined = {
+                        tag_id: matrix.copy()
+                        for tag_id, matrix in self._latest_transforms.items()
+                    }
+                    payload = (timestamp, combined)
+
+            if payload is not None:
+                try:
+                    self._result_queue.put_nowait(payload)
+                except queue.Full:
+                    try:
+                        self._result_queue.get_nowait()
+                    except queue.Empty:
+                        pass
+                    try:
+                        self._result_queue.put_nowait(payload)
+                    except queue.Full:
+                        pass
+
+    def _build_detector(self):
+        if self._detector is not None:
+            return self._detector
+        if build_detector is None:
+            return None
+
+        detector_kwargs = {
+            "nthreads": DEFAULT_DETECTOR_THREADS,
+            "quad_decimate": DEFAULT_DETECTOR_DECIMATE,
+            "quad_sigma": DEFAULT_DETECTOR_SIGMA,
+            "refine_edges": True,
+            "decode_sharpening": DEFAULT_DETECTOR_SHARPENING,
+        }
+        try:
+            sig = inspect.signature(build_detector)
+            accepted = {
+                key: value for key, value in detector_kwargs.items() if key in sig.parameters
+            }
+        except (TypeError, ValueError):  # pragma: no cover - signature introspection failure
+            accepted = detector_kwargs
+
+        try:
+            self._detector = build_detector("tag36h11", **accepted)
+        except TypeError:
+            try:
+                self._detector = build_detector("tag36h11")
+            except Exception as exc:
+                self._detector = None
+        except Exception as exc:  # pragma: no cover - detector creation failure
+            self._detector = None
+        else:
+            if self._detector is not None:
+                print(
+                    "[FrontCameraDetectionWorker] AprilTag detector initialized (tag36h11).",
+                    flush=True,
+                )
+        return self._detector
+
+    def _ensure_camera_parameters(
+        self, frame: np.ndarray
+    ) -> Optional[Tuple[np.ndarray, np.ndarray]]:
+        if self._camera_matrix is not None and self._dist_coeffs is not None:
+            return self._camera_matrix, self._dist_coeffs
+
+        height, width = frame.shape[:2]
+        info = self._intrinsic_info
+        fx = info.get("fx")
+        fy = info.get("fy")
+        ppx = info.get("ppx")
+        ppy = info.get("ppy")
+        coeffs = info.get("coeffs")
+
+        if fx is not None and fy is not None and ppx is not None and ppy is not None:
+            K = np.array(
+                [
+                    [float(fx), 0.0, float(ppx)],
+                    [0.0, float(fy), float(ppy)],
+                    [0.0, 0.0, 1.0],
+                ],
+                dtype=np.float32,
+            )
+            dist_coeffs = (
+                np.array(coeffs[:5], dtype=np.float32)
+                if isinstance(coeffs, (list, tuple, np.ndarray))
+                else np.zeros(5, dtype=np.float32)
+            )
+            self._camera_matrix = K
+            self._dist_coeffs = dist_coeffs
+            return K, dist_coeffs
+
+        fovy_deg = info.get("color_fovy")
+        frame_w = int(info.get("frame_width", width))
+        frame_h = int(info.get("frame_height", height))
+        if fovy_deg is not None:
+            fovy_rad = np.deg2rad(float(fovy_deg))
+            fy = (frame_h / 2.0) / np.tan(max(1e-6, fovy_rad / 2.0))
+            fy = float(fy)
+            fx = fy * (frame_w / max(frame_h, 1))
+            cx = frame_w / 2.0
+            cy = frame_h / 2.0
+            K = np.array(
+                [
+                    [fx, 0.0, cx],
+                    [0.0, fy, cy],
+                    [0.0, 0.0, 1.0],
+                ],
+                dtype=np.float32,
+            )
+            self._camera_matrix = K
+            self._dist_coeffs = np.zeros(5, dtype=np.float32)
+            return self._camera_matrix, self._dist_coeffs
+
+        fx = fy = max(frame_w, frame_h)
+        cx = frame_w / 2.0
+        cy = frame_h / 2.0
+        self._camera_matrix = np.array(
+            [
+                [fx, 0.0, cx],
+                [0.0, fy, cy],
+                [0.0, 0.0, 1.0],
+            ],
+            dtype=np.float32,
+        )
+        self._dist_coeffs = np.zeros(5, dtype=np.float32)
+        return self._camera_matrix, self._dist_coeffs
 def gripper_q_robomanip_to_maniskill(q_robomanip):
     """Convert RoboManip gripper position scalar to ManiSkill scale."""
 
@@ -111,8 +493,63 @@ class ManiSkillPpoAgent(nn.Module):
 
 _NORMALIZED_ACTION_LOW = torch.tensor(-1.0, dtype=torch.float32)
 _NORMALIZED_ACTION_HIGH = torch.tensor(1.0, dtype=torch.float32)
-_DEFAULT_ARM_JOINT_DELTA_LIMIT = 0.02
-_DEFAULT_GRIPPER_JOINT_DELTA_LIMIT = 0.1
+
+_DELTA_PHYSICAL_LOW = torch.tensor(
+    [
+        -0.02,
+        -0.02,
+        -0.02,
+        -0.02,
+        -0.02,
+        -0.02,
+        -0.02,
+        -0.02,
+    ],
+    dtype=torch.float32,
+)
+
+_DELTA_PHYSICAL_HIGH = torch.tensor(
+    [
+        0.02,
+        0.02,
+        0.02,
+        0.02,
+        0.02,
+        0.02,
+        0.02,
+        0.02,
+    ],
+    dtype=torch.float32,
+)
+
+_JOINT_POSITION_LOW = torch.tensor(
+    [
+        -6.2831853,
+        -2.059,
+        -6.2831853,
+        -0.19198,
+        -6.2831853,
+        -1.69297,
+        -6.2831853,
+        0.05,
+    ],
+    dtype=torch.float32,
+)
+
+_JOINT_POSITION_HIGH = torch.tensor(
+    [
+        6.2831853,
+        2.0944,
+        6.2831853,
+        3.927,
+        6.2831853,
+        3.1415927,
+        6.2831853,
+        0.84,
+    ],
+    dtype=torch.float32,
+)
+
 
 class RolloutPpoCus(RolloutBase):
     def run(self):
@@ -165,7 +602,6 @@ class RolloutPpoCus(RolloutBase):
             )
 
         super().setup_model_meta_info()
-        self._init_joint_metadata()
         self.extra_state_keys: list[str] = []
         self.extra_state_dims: Dict[str, int] = {}
         self.ppo_task_handler = None
@@ -174,119 +610,13 @@ class RolloutPpoCus(RolloutBase):
         self.required_marker_ids: List[int] = []
         self.marker_name_map: Dict[int, str] = {}
         self.marker_size_map: Dict[int, float] = {}
+        self.default_target_joint_pos = DEFAULT_TARGET_JOINT_POS.copy()
         self.marker_camera_names: List[str] = ["front"]
         self._marker_camera_active: Optional[str] = None
         self._setup_ppo_task_from_meta()
 
-    def _init_joint_metadata(self) -> None:
-        """Collect joint index information from the environment for scaling."""
-        self._gripper_joint_indices = np.array([], dtype=np.int64)
-        env = self.env.unwrapped if hasattr(self.env, "unwrapped") else self.env
-        command_dim = DataKey.get_dim(DataKey.COMMAND_JOINT_POS, self.env)
-        if command_dim != self.action_dim:
-            raise ValueError(
-                f"[{self.__class__.__name__}] action dim mismatch between meta ({self.action_dim}) "
-                f"and env command dim ({command_dim})."
-            )
-
-        default_target = np.zeros(self.action_dim, dtype=np.float32)
-        body_configs = getattr(env, "body_config_list", None) or []
-        gripper_idxes: List[np.ndarray] = []
-        for body_config in body_configs:
-            if not isinstance(body_config, ArmConfig):
-                continue
-            if body_config.arm_joint_idxes.size:
-                target_arm = np.asarray(body_config.init_arm_joint_pos, dtype=np.float32).reshape(-1)
-                default_target[body_config.arm_joint_idxes] = target_arm[: body_config.arm_joint_idxes.size]
-            if body_config.gripper_joint_idxes.size:
-                target_gripper = np.asarray(
-                    body_config.init_gripper_joint_pos, dtype=np.float32
-                ).reshape(-1)
-                default_target[body_config.gripper_joint_idxes] = target_gripper[
-                    : body_config.gripper_joint_idxes.size
-                ]
-                gripper_idxes.append(body_config.gripper_joint_idxes)
-
-        if gripper_idxes:
-            self._gripper_joint_indices = (
-                np.unique(np.concatenate(gripper_idxes).astype(np.int64))
-                if len(gripper_idxes) > 1
-                else gripper_idxes[0].astype(np.int64)
-            )
-        self.default_target_joint_pos = default_target
-
     def _setup_ppo_task_from_meta(self) -> None:
         self.standard_state_keys = list(self.state_keys)
-
-    def _refresh_marker_cache(self) -> Optional[float]:
-        marker_transforms, marker_timestamp = self.get_latest_marker_transforms(poll=True)
-        if not marker_transforms:
-            marker_transforms, marker_timestamp = self.get_latest_marker_transforms()
-
-        if marker_transforms:
-            for marker_id, matrix in marker_transforms.items():
-                self.marker_transform_cache[marker_id] = matrix.copy()
-        return marker_timestamp
-
-    def _init_action_scaling_tensors(self) -> None:
-        """Initialize tensors describing per-joint min/max and delta limits."""
-        action_space = getattr(self.env, "action_space", None)
-        if action_space is None or not hasattr(action_space, "low") or not hasattr(
-            action_space, "high"
-        ):
-            raise RuntimeError(
-                f"[{self.__class__.__name__}] Environment does not expose a continuous action space."
-            )
-
-        env_low = torch.as_tensor(
-            action_space.low, dtype=torch.float32, device=self.device
-        ).reshape(-1)
-        env_high = torch.as_tensor(
-            action_space.high, dtype=torch.float32, device=self.device
-        ).reshape(-1)
-        if env_low.numel() != self.action_dim or env_high.numel() != self.action_dim:
-            raise ValueError(
-                f"[{self.__class__.__name__}] action space dimension mismatch: "
-                f"space={env_low.numel()}, meta={self.action_dim}."
-            )
-        self._joint_position_low = env_low
-        self._joint_position_high = env_high
-
-        delta_limit = torch.full(
-            (self.action_dim,), _DEFAULT_ARM_JOINT_DELTA_LIMIT, dtype=torch.float32, device=self.device
-        )
-        if getattr(self, "_gripper_joint_indices", None) is not None and self._gripper_joint_indices.size > 0:
-            gripper_idx_tensor = torch.as_tensor(
-                self._gripper_joint_indices, dtype=torch.long, device=self.device
-            )
-            delta_limit[gripper_idx_tensor] = _DEFAULT_GRIPPER_JOINT_DELTA_LIMIT
-        self._action_delta_low = -delta_limit
-        self._action_delta_high = delta_limit
-
-    def _convert_gripper_positions_to_maniskill(self, values: np.ndarray) -> np.ndarray:
-        if getattr(self, "_gripper_joint_indices", None) is None or self._gripper_joint_indices.size == 0:
-            return values
-        converted = values.copy()
-        for idx in self._gripper_joint_indices:
-            converted[idx] = gripper_q_robomanip_to_maniskill(float(converted[idx]))
-        return converted
-
-    def _convert_gripper_velocities_to_maniskill(self, values: np.ndarray) -> np.ndarray:
-        if getattr(self, "_gripper_joint_indices", None) is None or self._gripper_joint_indices.size == 0:
-            return values
-        converted = values.copy()
-        for idx in self._gripper_joint_indices:
-            converted[idx] = gripper_qvel_robomanip_to_maniskill(float(converted[idx]))
-        return converted
-
-    def _convert_gripper_tensor_to_robomanip(self, tensor: torch.Tensor) -> torch.Tensor:
-        if getattr(self, "_gripper_joint_indices", None) is None or self._gripper_joint_indices.size == 0:
-            return tensor
-        for idx in self._gripper_joint_indices:
-            tensor[idx] = tensor[idx].new_tensor(
-                gripper_q_maniskill_to_robomanip(float(tensor[idx].item()))
-            )
-        return tensor
 
         ppo_task_cfg = self.model_meta_info.get("ppo_task")
         if not ppo_task_cfg:
@@ -454,7 +784,17 @@ class RolloutPpoCus(RolloutBase):
         self._normalized_action_high = torch.full(
             (self.action_dim,), float(_NORMALIZED_ACTION_HIGH.item()), device=self.device
         )
-        self._init_action_scaling_tensors()
+
+        if self.action_dim != len(_DELTA_PHYSICAL_LOW):
+            raise ValueError(
+                f"[{self.__class__.__name__}] action dim mismatch for delta bounds: "
+                f"meta={self.action_dim}, expected={len(_DELTA_PHYSICAL_LOW)}"
+            )
+
+        self._delta_physical_low = _DELTA_PHYSICAL_LOW.to(self.device)
+        self._delta_physical_high = _DELTA_PHYSICAL_HIGH.to(self.device)
+        self._joint_position_low = _JOINT_POSITION_LOW.to(self.device)
+        self._joint_position_high = _JOINT_POSITION_HIGH.to(self.device)
 
         print(
             f"[{self.__class__.__name__}] Load ManiSkill PPO checkpoint on {self.device}"
@@ -492,7 +832,6 @@ class RolloutPpoCus(RolloutBase):
         self._marker_camera_active = None
         self.marker_transform_cache: Dict[int, np.ndarray] = {}
         self.marker_detection_verified = False
-        self._last_missing_marker_ids: Optional[List[int]] = None
         if _GLOBAL_T_BASE_TO_CAMERA is None:
             print(
                 f"[{self.__class__.__name__}] T_base→camera calibration not loaded; marker worker disabled.",
@@ -519,7 +858,7 @@ class RolloutPpoCus(RolloutBase):
                 if camera_obj is None:
                     continue
 
-                intrinsic_info = extract_camera_intrinsic_info(camera_obj)
+                intrinsic_info = self._extract_camera_intrinsic_info(camera_obj)
                 self._marker_worker = FrontCameraDetectionWorker(
                     base_to_camera=_GLOBAL_T_BASE_TO_CAMERA,
                     intrinsic_info=intrinsic_info,
@@ -627,6 +966,106 @@ class RolloutPpoCus(RolloutBase):
             f"[{self.__class__.__name__}] Failed to detect required markers within {timeout:.1f}s. "
             f"Missing IDs: {sorted(missing_ids)}"
         )
+
+    def _extract_camera_intrinsic_info(self, camera) -> Optional[Dict[str, Any]]:
+        if camera is None:
+            return None
+
+        info: Dict[str, Any] = {}
+        candidate_attrs = (
+            "color_intrinsics",
+            "intrinsics",
+            "color_intrinsic",
+            "intrinsic",
+        )
+        for attr in candidate_attrs:
+            intr = getattr(camera, attr, None)
+            if intr is None:
+                continue
+
+            def _get_value(name: str):
+                if hasattr(intr, name):
+                    return getattr(intr, name)
+                if isinstance(intr, dict):
+                    return intr.get(name)
+                if hasattr(intr, "__getitem__"):
+                    try:
+                        return intr[name]
+                    except Exception:
+                        return None
+                return None
+
+            fx = _get_value("fx")
+            fy = _get_value("fy")
+            ppx = _get_value("ppx")
+            ppy = _get_value("ppy")
+            coeffs = _get_value("coeffs")
+
+            if fx is not None:
+                info["fx"] = float(fx)
+            if fy is not None:
+                info["fy"] = float(fy)
+            if ppx is not None:
+                info["ppx"] = float(ppx)
+            if ppy is not None:
+                info["ppy"] = float(ppy)
+            if coeffs is not None:
+                info["coeffs"] = list(coeffs) if not isinstance(coeffs, list) else coeffs
+
+            if info:
+                break
+
+        color_fovy = getattr(camera, "color_fovy", None)
+        if color_fovy is not None:
+            info["color_fovy"] = float(color_fovy)
+
+        frame_width = getattr(camera, "color_width", None) or getattr(camera, "width", None)
+        frame_height = getattr(camera, "color_height", None) or getattr(camera, "height", None)
+        if frame_width is not None:
+            info["frame_width"] = int(frame_width)
+        if frame_height is not None:
+            info["frame_height"] = int(frame_height)
+
+        required_keys = ("fx", "fy", "ppx", "ppy")
+        if not all(key in info for key in required_keys):
+            # Attempt to retrieve intrinsics directly from the RealSense pipeline if present.
+            if hasattr(camera, "_pipeline"):
+                try:
+                    import pyrealsense2 as rs  # type: ignore
+
+                    frames = camera._pipeline.wait_for_frames()  # noqa: SLF001
+                    color_profile = frames.get_color_frame().profile.as_video_stream_profile()
+                    intr = color_profile.intrinsics
+                    coeffs = list(intr.coeffs[:5])
+                    info.update(
+                        {
+                            "fx": float(intr.fx),
+                            "fy": float(intr.fy),
+                            "ppx": float(intr.ppx),
+                            "ppy": float(intr.ppy),
+                            "coeffs": coeffs,
+                            "frame_width": intr.width,
+                            "frame_height": intr.height,
+                        }
+                    )
+                    # Cache retrieved values on the camera for subsequent calls.
+                    setattr(camera, "color_fx", intr.fx)
+                    setattr(camera, "color_fy", intr.fy)
+                    setattr(camera, "color_ppx", intr.ppx)
+                    setattr(camera, "color_ppy", intr.ppy)
+                    setattr(camera, "color_coeffs", coeffs)
+                    setattr(camera, "color_width", intr.width)
+                    setattr(camera, "color_height", intr.height)
+                except Exception:
+                    pass
+
+        if not all(key in info for key in required_keys):
+            raise RuntimeError(
+                f"[{self.__class__.__name__}] Camera intrinsics (fx, fy, ppx, ppy) are unavailable. "
+                "Please ensure the RealSense intrinsics are accessible before starting the rollout."
+            )
+
+        return info
 
     def _disable_env_vision(self):
         env = self.env.unwrapped if hasattr(self.env, "unwrapped") else self.env
@@ -757,31 +1196,72 @@ class RolloutPpoCus(RolloutBase):
                     f"but model_meta_info expects {expected_state_dim}."
                 )
 
-        marker_timestamp = self._refresh_marker_cache()
+        marker_transforms, marker_timestamp = self.get_latest_marker_transforms(poll=True)
+        if marker_transforms:
+            for marker_id, matrix in marker_transforms.items():
+                self.marker_transform_cache[marker_id] = matrix.copy()
+
+        if self._marker_worker is not None:
+            marker_times = self._marker_worker.get_latest_transform_times()
+        else:
+            marker_times = {}
+
+        if self.marker_transform_cache:
+            ts_str = (
+                f"{marker_timestamp:.3f}"
+                if marker_timestamp is not None
+                else "unknown"
+            )
+            print(
+                f"[{self.__class__.__name__}] Marker transforms cache (t={ts_str}):",
+                flush=True,
+            )
+            for marker_id in sorted(self.marker_transform_cache.keys()):
+                matrix = self.marker_transform_cache[marker_id]
+                marker_name = self.marker_name_map.get(marker_id, f"id{marker_id}")
+                matrix_str = np.array2string(
+                    matrix,
+                    formatter={"float_kind": lambda x: f"{x: .4f}"},
+                )
+                last_seen = marker_times.get(marker_id)
+                last_seen_str = (
+                    f"{last_seen:.3f}s" if last_seen is not None else "unknown"
+                )
+                print(
+                    f"  [{marker_name}] id={marker_id}, last_seen={last_seen_str}\n{matrix_str}",
+                    flush=True,
+                )
         if self.required_marker_ids:
             missing_now = [
                 marker_id
                 for marker_id in self.required_marker_ids
                 if marker_id not in self.marker_transform_cache
             ]
-            if missing_now != self._last_missing_marker_ids:
-                if missing_now:
-                    print(
-                        f"[{self.__class__.__name__}] Warning: Missing cached transforms for marker IDs {missing_now}.",
-                        flush=True,
-                    )
-                self._last_missing_marker_ids = missing_now
+            if missing_now:
+                print(
+                    f"[{self.__class__.__name__}] Warning: Missing cached transforms for marker IDs {missing_now}.",
+                    flush=True,
+                )
 
         qpos = self.motion_manager.get_data(DataKey.MEASURED_JOINT_POS, self.obs)
         qvel = self.motion_manager.get_data(DataKey.MEASURED_JOINT_VEL, self.obs)
 
-        qpos_ms = self._convert_gripper_positions_to_maniskill(
-            qpos.astype(np.float32).copy()
-        )
-        qvel_ms = self._convert_gripper_velocities_to_maniskill(
-            qvel.astype(np.float32).copy()
-        )
+        qpos_ms = qpos.astype(np.float32).copy()
+        qpos_ms[-1] = gripper_q_robomanip_to_maniskill(qpos_ms[-1])
+        qvel_ms = qvel.astype(np.float32).copy()
+        if qvel_ms.size > 0:
+            qvel_ms[-1] = gripper_qvel_robomanip_to_maniskill(qvel_ms[-1])
         policy_components = [qpos_ms.astype(np.float32), qvel_ms.astype(np.float32)]
+
+        if "target_joint_pos" in extra_state_arrays:
+            target_qpos = extra_state_arrays["target_joint_pos"].astype(np.float32).copy()
+            target_qpos_ms = target_qpos.copy()
+            target_qpos_ms[-1] = gripper_q_robomanip_to_maniskill(target_qpos_ms[-1])
+            policy_components.append(target_qpos_ms.astype(np.float32))
+
+        marker_pose = extra_state_arrays.get("target_marker_pose")
+        if marker_pose is not None:
+            policy_components.append(marker_pose.astype(np.float32))
 
         self.state_for_ppo = np.concatenate(policy_components).astype(np.float32)
 
@@ -881,8 +1361,8 @@ class RolloutPpoCus(RolloutBase):
 
             normalized_span = self._normalized_action_high - self._normalized_action_low
             delta_scale = (clipped_action - self._normalized_action_low) / normalized_span
-            denormalized_delta = self._action_delta_low + delta_scale * (
-                self._action_delta_high - self._action_delta_low
+            denormalized_delta = self._delta_physical_low + delta_scale * (
+                self._delta_physical_high - self._delta_physical_low
             )
 
             current_joint_pos = obs_tensor[..., : self.action_dim].squeeze(0)
@@ -894,8 +1374,8 @@ class RolloutPpoCus(RolloutBase):
 
             if direct_joint_command.numel() > 0:
                 direct_joint_command = direct_joint_command.clone()
-                direct_joint_command = self._convert_gripper_tensor_to_robomanip(
-                    direct_joint_command
+                direct_joint_command[-1] = gripper_q_maniskill_to_robomanip(
+                    direct_joint_command[-1]
                 )
 
             physical_np = direct_joint_command.detach().cpu().numpy().astype(np.float64)

@@ -91,11 +91,11 @@ class RealXarm7DualEnvBase(RealEnvBase):
                 ),
                 arm_root_pose=None,
                 ik_eef_joint_id=7,
-                arm_joint_idxes=np.arange(7, 14),
-                gripper_joint_idxes=np.array([14]),
+                arm_joint_idxes=np.arange(8, 15),
+                gripper_joint_idxes=np.array([15]),
                 gripper_joint_idxes_in_gripper_joint_pos=np.array([1]),
                 eef_idx=1,
-                init_arm_joint_pos=self.init_qpos[7:14],
+                init_arm_joint_pos=self.init_qpos[8:15],
                 init_gripper_joint_pos=np.zeros(1),
             ),
         ]
@@ -249,6 +249,7 @@ class RealXarm7DualEnvBase(RealEnvBase):
                 is_radian=True,
                 wait=False,
             )
+            time.sleep(5)
             if xarm_code != 0:
                 raise RuntimeError(
                     f"[{self.__class__.__name__}] Invalid xArm API code: {xarm_code}"
@@ -261,12 +262,13 @@ class RealXarm7DualEnvBase(RealEnvBase):
                 is_radian=True,
                 wait=False,
             )
+            time.sleep(5)
             if xarm_code != 0:
                 raise RuntimeError(
                     f"[{self.__class__.__name__}] Invalid xArm API code: {xarm_code}"
                 )
 
-            time.sleep(5)
+
             self.xarm_api_left.set_mode(1)
             self.xarm_api_right.set_mode(1)
             self.xarm_api_left.set_state(0)

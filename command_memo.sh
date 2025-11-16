@@ -86,5 +86,23 @@ python ./bin/Rollout.py PpoCus RealXarm7Demo \
 ############################################################################
 
 
+make pickle and run(DualBoxRotationAblated)
+##########################################################################
+python ./bin/CreatePpoCusMetaInfo.py \
+  --config ./ppo_tasks/dual_box_rotation_ablated.json \
+  --output ./checkpoint/PpoCus/DualBoxRotationAblated/model_meta_info.pkl \
+  --force
+
+python ./bin/Rollout.py PpoCus RealXarm7Demo \
+  --wait_before_start \
+  --skip_draw 50000 \
+  --save_rollout \
+  --config ./envs/configs/RealXarm7DemoEnv.yaml \
+  --checkpoint ./checkpoint/PpoCus/Align/002_351.pt
+############################################################################
 
 python ./bin/CollectXarm7Dynamics.py --robot-ip 192.168.1.244 --duration 120 --sample-rate 200 --output-dir ./measurements
+
+
+
+python ./bin/Teleop.py RealXarm7DualDemo --config ./envs/configs/RealXarm7DualDemoEnv.yaml --input_device keyboard
