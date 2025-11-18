@@ -55,8 +55,44 @@ class MotionManager:
         """Get measured data of the specified key from observation."""
         if key == DataKey.MEASURED_JOINT_POS:
             return self.env.unwrapped.get_joint_pos_from_obs(obs)
+        elif key == DataKey.LEFT_MEASURED_JOINT_POS:
+            joint_pos = self.env.unwrapped.get_joint_pos_from_obs(obs)
+            for body_manager in self.body_manager_list:
+                if isinstance(body_manager, ArmManager) and body_manager.body_config.eef_idx == 0:
+                    idxes = np.concatenate(
+                        [body_manager.body_config.arm_joint_idxes, body_manager.body_config.gripper_joint_idxes]
+                    )
+                    return joint_pos[idxes]
+            raise ValueError(f"[{self.__class__.__name__}] Left arm config not found.")
+        elif key == DataKey.RIGHT_MEASURED_JOINT_POS:
+            joint_pos = self.env.unwrapped.get_joint_pos_from_obs(obs)
+            for body_manager in self.body_manager_list:
+                if isinstance(body_manager, ArmManager) and body_manager.body_config.eef_idx == 1:
+                    idxes = np.concatenate(
+                        [body_manager.body_config.arm_joint_idxes, body_manager.body_config.gripper_joint_idxes]
+                    )
+                    return joint_pos[idxes]
+            raise ValueError(f"[{self.__class__.__name__}] Right arm config not found.")
         elif key == DataKey.MEASURED_JOINT_VEL:
             return self.env.unwrapped.get_joint_vel_from_obs(obs)
+        elif key == DataKey.LEFT_MEASURED_JOINT_VEL:
+            joint_vel = self.env.unwrapped.get_joint_vel_from_obs(obs)
+            for body_manager in self.body_manager_list:
+                if isinstance(body_manager, ArmManager) and body_manager.body_config.eef_idx == 0:
+                    idxes = np.concatenate(
+                        [body_manager.body_config.arm_joint_idxes, body_manager.body_config.gripper_joint_idxes]
+                    )
+                    return joint_vel[idxes]
+            raise ValueError(f"[{self.__class__.__name__}] Left arm config not found.")
+        elif key == DataKey.RIGHT_MEASURED_JOINT_VEL:
+            joint_vel = self.env.unwrapped.get_joint_vel_from_obs(obs)
+            for body_manager in self.body_manager_list:
+                if isinstance(body_manager, ArmManager) and body_manager.body_config.eef_idx == 1:
+                    idxes = np.concatenate(
+                        [body_manager.body_config.arm_joint_idxes, body_manager.body_config.gripper_joint_idxes]
+                    )
+                    return joint_vel[idxes]
+            raise ValueError(f"[{self.__class__.__name__}] Right arm config not found.")
         elif key == DataKey.MEASURED_GRIPPER_JOINT_POS:
             return self.env.unwrapped.get_gripper_joint_pos_from_obs(obs)
         elif key == DataKey.MEASURED_EEF_POSE:

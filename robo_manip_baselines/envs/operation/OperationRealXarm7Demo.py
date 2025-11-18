@@ -9,6 +9,10 @@ class GraspPhase(GraspPhaseBase):
         self.gripper_joint_pos = np.array([800.0])
         self.duration = 0.5  # [s]
 
+    def check_transition(self):
+        # Keep sending the open command until the user presses 'n'
+        return self.op.key == ord("n")
+
 
 class OperationRealXarm7Demo:
     def __init__(self, robot_ip, camera_ids, gelsight_ids=None):

@@ -69,6 +69,8 @@ class RealXarm7DualEnvBase(RealEnvBase):
         # Setup robot
         self.init_qpos = init_qpos
         self.joint_vel_limit = np.deg2rad(180)  # [rad/s]
+        # Keep both grippers at a fixed position to avoid unintended motion.
+        self.fixed_gripper_joint_pos = np.array([116.5, 116.5], dtype=np.float64)
         self.body_config_list = [
             ArmConfig(
                 arm_urdf_path=path.join(
@@ -150,6 +152,12 @@ class RealXarm7DualEnvBase(RealEnvBase):
             raise RuntimeError(
                 f"[{self.__class__.__name__}] Invalid xArm API code: {xarm_code}"
             )
+        # Debug: confirm right arm joint state acquisition
+        print(
+            f"[{self.__class__.__name__}] left_code={xarm_code}, right_code={xarm_code}, "
+            f"left_q={left_joint_states[0]}, right_q={right_joint_states[0]}",
+            flush=True,
+        )
         self.arm_joint_pos_actual = np.concatenate(
             [left_joint_states[0], right_joint_states[0]]
         )
@@ -298,14 +306,19 @@ class RealXarm7DualEnvBase(RealEnvBase):
             raise ValueError("Unexpectedly xarm_api.mode != 1 in _set_action function")
 
         # Send command to xArm gripper
-        left_gripper_pos = action[self.body_config_list[0].gripper_joint_idxes][0]
+        if self.fixed_gripper_joint_pos is None:
+            left_gripper_pos = action[self.body_config_list[0].gripper_joint_idxes][0]
+            right_gripper_pos = action[self.body_config_list[1].gripper_joint_idxes][0]
+        else:
+            left_gripper_pos = self.fixed_gripper_joint_pos[0]
+            right_gripper_pos = self.fixed_gripper_joint_pos[1]
+
         xarm_code = self.xarm_api_left.set_gripper_position(left_gripper_pos, wait=False)
         if xarm_code != 0:
             raise RuntimeError(
                 f"[{self.__class__.__name__}] Invalid xArm API code: {xarm_code}"
             )
 
-        right_gripper_pos = action[self.body_config_list[1].gripper_joint_idxes][0]
         xarm_code = self.xarm_api_right.set_gripper_position(right_gripper_pos, wait=False)
         if xarm_code != 0:
             raise RuntimeError(
@@ -319,19 +332,19 @@ class RealXarm7DualEnvBase(RealEnvBase):
         
     def _get_obs(self):
         # Get state from xArm7Dual
-        xarm_code, left_joint_states = self.xarm_api_left.get_joint_states(
+        left_code, left_joint_states = self.xarm_api_left.get_joint_states(
             is_radian=True
         )
-        if xarm_code != 0:
+        if left_code != 0:
             raise RuntimeError(
-                f"[{self.__class__.__name__}] Invalid xArm API code: {xarm_code}"
+                f"[{self.__class__.__name__}] Invalid xArm API code: {left_code}"
             )
-        xarm_code, right_joint_states = self.xarm_api_right.get_joint_states(
+        right_code, right_joint_states = self.xarm_api_right.get_joint_states(
             is_radian=True
         )
-        if xarm_code != 0:
+        if right_code != 0:
             raise RuntimeError(
-                f"[{self.__class__.__name__}] Invalid xArm API code: {xarm_code}"
+                f"[{self.__class__.__name__}] Invalid xArm API code: {right_code}"
             )
         left_arm_joint_pos = left_joint_states[0]
         left_arm_joint_vel = left_joint_states[1]

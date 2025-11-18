@@ -47,3 +47,13 @@ robo_manip_baselines/envs/real/xarm7/RealXarm7EnvBase.py
             time.sleep(0.2)
             return None
 
+
+robo_manip_baselines/envs/operation/OperationRealXarm7Demo.py
+のGraspPhase(7-14行目)でcheck_transitionを追加し、ユーザが'n'を押すまでグリッパ指令800を送り続けるプリモーションフェーズにした。
+
+
+robo_manip_baselines/envs/operation/OperationRealXarm7DualDemo.py
+でも同様に、GraspPhase(7-14行目)が'n'を押すまで両グリッパ800を維持するようにした。
+
+RealEnvBase.pyにおいて、222行目のset_actionのjoint_vel_limit_scale=0.5に変更。
+

@@ -1,4 +1,3 @@
-import argparse
 import csv
 import importlib
 import json
@@ -111,8 +110,12 @@ class ManiSkillPpoAgent(nn.Module):
 
 _NORMALIZED_ACTION_LOW = torch.tensor(-1.0, dtype=torch.float32)
 _NORMALIZED_ACTION_HIGH = torch.tensor(1.0, dtype=torch.float32)
-_DEFAULT_ARM_JOINT_DELTA_LIMIT = 0.02
+_DEFAULT_ARM_JOINT_DELTA_LIMIT = 0.06
 _DEFAULT_GRIPPER_JOINT_DELTA_LIMIT = 0.1
+_PPO_DETERMINISTIC = True
+_PPO_USE_CUDA = torch.cuda.is_available()
+_PPO_LOG_TSV = False
+_PPO_PROFILE = False
 
 class RolloutPpoCus(RolloutBase):
     def run(self):
@@ -123,35 +126,6 @@ class RolloutPpoCus(RolloutBase):
             if worker is not None:
                 worker.stop()
                 self._marker_worker = None
-
-    #RolloutMlpにはない、引数関係などの定義(重要度の低い関数)
-    def set_additional_args(self, parser):
-        super().set_additional_args(parser)
-
-        parser.add_argument(
-            "--ppo-deterministic",
-            action=argparse.BooleanOptionalAction,
-            default=True,
-            help="Use deterministic ManiSkill PPO actions (default: True).",
-        )
-        parser.add_argument(
-            "--ppo-use-cuda",
-            action=argparse.BooleanOptionalAction,
-            default=torch.cuda.is_available(),
-            help="Enable CUDA for ManiSkill PPO if available (default: enabled when CUDA exists).",
-        )
-        parser.add_argument(
-            "--ppo-log-tsv",
-            action=argparse.BooleanOptionalAction,
-            default=False,
-            help="Log observations and actions to TSV each step (default: False).",
-        )
-        parser.add_argument(
-            "--ppo-profile",
-            action=argparse.BooleanOptionalAction,
-            default=False,
-            help="Measure per-step timings for debugging (default: False).",
-        )
 
     def setup_model_meta_info(self):
         checkpoint_dir = os.path.split(self.args.checkpoint)[0]
@@ -288,6 +262,7 @@ class RolloutPpoCus(RolloutBase):
             )
         return tensor
 
+    def _setup_ppo_task_from_meta(self) -> None:
         ppo_task_cfg = self.model_meta_info.get("ppo_task")
         if not ppo_task_cfg:
             return
@@ -442,7 +417,7 @@ class RolloutPpoCus(RolloutBase):
         self.policy = ManiSkillPpoAgent(obs_dim, self.action_dim)
         self.policy.load_state_dict(state_dict)
 
-        use_cuda = self.args.ppo_use_cuda and torch.cuda.is_available()
+        use_cuda = _PPO_USE_CUDA and torch.cuda.is_available()
         self.device = torch.device("cuda" if use_cuda else "cpu")
         self.policy.to(self.device)
         self.policy.eval()
@@ -473,7 +448,7 @@ class RolloutPpoCus(RolloutBase):
         )
 
         self._log_path = None
-        if self.args.ppo_log_tsv:
+        if _PPO_LOG_TSV:
             checkpoint_dir = os.path.dirname(os.path.abspath(self.args.checkpoint))
             default_name = f"{self.__class__.__name__.lower()}_debug_log.tsv"
             self._log_path = os.path.join(checkpoint_dir, default_name)
@@ -542,11 +517,11 @@ class RolloutPpoCus(RolloutBase):
                     )
                 else:
                     print(
-                        f"[{self.__class__.__name__}] No marker cameras specified; marker worker disabled.",
+                    f"[{self.__class__.__name__}] No marker cameras specified; marker worker disabled.",
                         flush=True,
                     )
 
-        self._profile_enabled = bool(getattr(self.args, "ppo_profile", False))
+        self._profile_enabled = bool(_PPO_PROFILE)
         if self._profile_enabled:
             self._profile_data = defaultdict(list)
             self._wrap_profile_hooks()
@@ -781,9 +756,21 @@ class RolloutPpoCus(RolloutBase):
         qvel_ms = self._convert_gripper_velocities_to_maniskill(
             qvel.astype(np.float32).copy()
         )
-        policy_components = [qpos_ms.astype(np.float32), qvel_ms.astype(np.float32)]
+        # PPO 入力用のフラットベクトルを state_keys の順に組み立てる
+        ppo_components: List[np.ndarray] = []
+        for state_key in self.state_keys:
+            if state_key == DataKey.MEASURED_JOINT_POS:
+                ppo_components.append(qpos_ms.astype(np.float32))
+            elif state_key == DataKey.MEASURED_JOINT_VEL:
+                ppo_components.append(qvel_ms.astype(np.float32))
+            elif state_key in extra_state_arrays:
+                ppo_components.append(extra_state_arrays[state_key].astype(np.float32))
+            else:
+                ppo_components.append(
+                    self.motion_manager.get_data(state_key, self.obs).astype(np.float32)
+                )
 
-        self.state_for_ppo = np.concatenate(policy_components).astype(np.float32)
+        self.state_for_ppo = np.concatenate(ppo_components).astype(np.float32)
 
         norm_state = normalize_data(state_vector, self.model_meta_info["state"])
 
@@ -859,6 +846,12 @@ class RolloutPpoCus(RolloutBase):
             if profile_enabled:
                 self._profile_data["state_fetch"].append(timer() - state_start)
 
+
+
+            print(f"state_for_ppo: {self.state_for_ppo}")
+
+
+            
             obs_tensor = torch.tensor(
                 self.state_for_ppo, dtype=torch.float32, device=self.device
             ).unsqueeze(0)
@@ -868,7 +861,7 @@ class RolloutPpoCus(RolloutBase):
 
             with torch.no_grad():
                 raw_action = self.policy.get_action(
-                    obs_tensor, deterministic=self.args.ppo_deterministic
+                    obs_tensor, deterministic=_PPO_DETERMINISTIC
                 )
 
             if profile_enabled:
@@ -878,6 +871,12 @@ class RolloutPpoCus(RolloutBase):
             clipped_action = torch.clamp(
                 raw_action, self._normalized_action_low, self._normalized_action_high
             )
+
+            if clipped_action.numel() != self.action_dim:
+                raise ValueError(
+                    f"[{self.__class__.__name__}] Unexpected action length {clipped_action.numel()} "
+                    f"for action_dim {self.action_dim}."
+                )
 
             normalized_span = self._normalized_action_high - self._normalized_action_low
             delta_scale = (clipped_action - self._normalized_action_low) / normalized_span
@@ -899,6 +898,8 @@ class RolloutPpoCus(RolloutBase):
                 )
 
             physical_np = direct_joint_command.detach().cpu().numpy().astype(np.float64)
+            if getattr(self, "_gripper_joint_indices", None) is not None and self._gripper_joint_indices.size > 0:
+                physical_np[self._gripper_joint_indices] = 116.5
 
             if hasattr(self, "_log_path") and self._log_path:
                 obs_list = (

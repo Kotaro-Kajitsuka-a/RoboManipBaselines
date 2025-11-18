@@ -93,12 +93,12 @@ python ./bin/CreatePpoCusMetaInfo.py \
   --output ./checkpoint/PpoCus/DualBoxRotationAblated/model_meta_info.pkl \
   --force
 
-python ./bin/Rollout.py PpoCus RealXarm7Demo \
+python ./bin/Rollout.py PpoCus RealXarm7DualDemo \
   --wait_before_start \
   --skip_draw 50000 \
   --save_rollout \
-  --config ./envs/configs/RealXarm7DemoEnv.yaml \
-  --checkpoint ./checkpoint/PpoCus/Align/002_351.pt
+  --config ./envs/configs/RealXarm7DualDemoEnv.yaml \
+  --checkpoint ./checkpoint/PpoCus/DualBoxRotationAblated/ckpt_151.pt
 ############################################################################
 
 python ./bin/CollectXarm7Dynamics.py --robot-ip 192.168.1.244 --duration 120 --sample-rate 200 --output-dir ./measurements

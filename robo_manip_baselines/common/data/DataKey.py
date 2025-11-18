@@ -12,6 +12,8 @@ class DataKey:
 
     # Measured joint position (including both arm and gripper)
     MEASURED_JOINT_POS = "measured_joint_pos"
+    LEFT_MEASURED_JOINT_POS = "left_measured_joint_pos"
+    RIGHT_MEASURED_JOINT_POS = "right_measured_joint_pos"
     # Command joint position (including both arm and gripper)
     COMMAND_JOINT_POS = "command_joint_pos"
 
@@ -22,6 +24,8 @@ class DataKey:
 
     # Measured joint velocity
     MEASURED_JOINT_VEL = "measured_joint_vel"
+    LEFT_MEASURED_JOINT_VEL = "left_measured_joint_vel"
+    RIGHT_MEASURED_JOINT_VEL = "right_measured_joint_vel"
     # Command joint velocity
     COMMAND_JOINT_VEL = "command_joint_vel"
 
@@ -70,8 +74,12 @@ class DataKey:
     # All keys of measured data
     MEASURED_DATA_KEYS = [
         MEASURED_JOINT_POS,
+        LEFT_MEASURED_JOINT_POS,
+        RIGHT_MEASURED_JOINT_POS,
         MEASURED_JOINT_POS_REL,
         MEASURED_JOINT_VEL,
+        LEFT_MEASURED_JOINT_VEL,
+        RIGHT_MEASURED_JOINT_VEL,
         # MEASURED_JOINT_TORQUE,
         MEASURED_GRIPPER_JOINT_POS,
         MEASURED_GRIPPER_JOINT_POS_REL,
@@ -106,19 +114,43 @@ class DataKey:
             return 1
         elif key in (
             DataKey.MEASURED_JOINT_POS,
+            DataKey.LEFT_MEASURED_JOINT_POS,
+            DataKey.RIGHT_MEASURED_JOINT_POS,
             DataKey.COMMAND_JOINT_POS,
             DataKey.MEASURED_JOINT_POS_REL,
             DataKey.COMMAND_JOINT_POS_REL,
             DataKey.MEASURED_JOINT_VEL,
+            DataKey.LEFT_MEASURED_JOINT_VEL,
+            DataKey.RIGHT_MEASURED_JOINT_VEL,
             DataKey.COMMAND_JOINT_VEL,
             DataKey.MEASURED_JOINT_TORQUE,
             DataKey.COMMAND_JOINT_TORQUE,
         ):
-            return sum(
-                len(body_config.arm_joint_idxes) + len(body_config.gripper_joint_idxes)
-                for body_config in env.unwrapped.body_config_list
-                if isinstance(body_config, ArmConfig)
-            )
+            if key in (
+                DataKey.MEASURED_JOINT_POS,
+                DataKey.MEASURED_JOINT_VEL,
+                DataKey.MEASURED_JOINT_POS_REL,
+                DataKey.MEASURED_JOINT_TORQUE,
+                DataKey.COMMAND_JOINT_POS,
+                DataKey.COMMAND_JOINT_POS_REL,
+                DataKey.COMMAND_JOINT_VEL,
+                DataKey.COMMAND_JOINT_TORQUE,
+            ):
+                return sum(
+                    len(body_config.arm_joint_idxes) + len(body_config.gripper_joint_idxes)
+                    for body_config in env.unwrapped.body_config_list
+                    if isinstance(body_config, ArmConfig)
+                )
+            elif key in (DataKey.LEFT_MEASURED_JOINT_POS, DataKey.LEFT_MEASURED_JOINT_VEL):
+                for body_config in env.unwrapped.body_config_list:
+                    if isinstance(body_config, ArmConfig) and body_config.eef_idx == 0:
+                        return len(body_config.arm_joint_idxes) + len(body_config.gripper_joint_idxes)
+                raise ValueError("Left arm config not found for dimension lookup.")
+            elif key in (DataKey.RIGHT_MEASURED_JOINT_POS, DataKey.RIGHT_MEASURED_JOINT_VEL):
+                for body_config in env.unwrapped.body_config_list:
+                    if isinstance(body_config, ArmConfig) and body_config.eef_idx == 1:
+                        return len(body_config.arm_joint_idxes) + len(body_config.gripper_joint_idxes)
+                raise ValueError("Right arm config not found for dimension lookup.")
         elif key in (
             DataKey.MEASURED_GRIPPER_JOINT_POS,
             DataKey.COMMAND_GRIPPER_JOINT_POS,
