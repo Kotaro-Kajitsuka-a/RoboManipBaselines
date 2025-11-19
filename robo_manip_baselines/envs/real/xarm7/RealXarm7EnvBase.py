@@ -149,6 +149,18 @@ class RealXarm7EnvBase(RealEnvBase):
             self.init_qpos, duration=None, joint_vel_limit_scale=0.1, wait=True, reset_bool=True
         )
 
+        msg1 = "gripper will move!!! in 100 seconds"
+        msg2 = "グリッパーが動きます!! 100秒後!!"
+
+        border = "★" * (len(msg1) + 8)
+
+        print("\033[1;35m" + border)
+        print(f"★  {msg1}  ★")
+        print(f"★  {msg2}  ★")
+        print(border + "\033[0m")
+
+
+        time.sleep(100.0)
         print(
             f"[{self.__class__.__name__}] Finish moving the robot to the reset position."
         )

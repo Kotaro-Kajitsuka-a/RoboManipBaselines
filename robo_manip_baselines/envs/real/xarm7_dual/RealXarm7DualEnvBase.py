@@ -207,7 +207,7 @@ class RealXarm7DualEnvBase(RealEnvBase):
         self._set_action(
             self.init_qpos,
             duration=None,
-            joint_vel_limit_scale=0.3,
+            joint_vel_limit_scale=0.1,
             wait=True,
             reset_bool=True,
         )

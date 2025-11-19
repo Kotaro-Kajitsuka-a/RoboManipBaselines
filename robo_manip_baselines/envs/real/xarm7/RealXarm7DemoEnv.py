@@ -11,11 +11,10 @@ class RealXarm7DemoEnv(RealXarm7EnvBase):
         RealXarm7EnvBase.__init__(
             self,
             init_qpos=np.concatenate(
-                [np.deg2rad([0.0, -30.0, 0.0, 45.0, 0.0, 75.0, 0.0]), np.array([116.5])]
+                [np.deg2rad([0.0, -30.0, 0.0, 45.0, 0.0, 75.0, 0.0]), np.array([119])]
             ),
             **kwargs,
         )
-
     def get_input_device_kwargs(self, input_device_name):
         if input_device_name == "spacemouse":
             return {"gripper_scale": 20.0}
