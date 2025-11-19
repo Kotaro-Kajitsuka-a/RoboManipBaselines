@@ -155,6 +155,7 @@ class RolloutPpoCus(RolloutBase):
     def _init_joint_metadata(self) -> None:
         """Collect joint index information from the environment for scaling."""
         self._gripper_joint_indices = np.array([], dtype=np.int64)
+        self._eef_joint_index_map: Dict[int, np.ndarray] = {}
         env = self.env.unwrapped if hasattr(self.env, "unwrapped") else self.env
         command_dim = DataKey.get_dim(DataKey.COMMAND_JOINT_POS, self.env)
         if command_dim != self.action_dim:
@@ -180,6 +181,16 @@ class RolloutPpoCus(RolloutBase):
                     : body_config.gripper_joint_idxes.size
                 ]
                 gripper_idxes.append(body_config.gripper_joint_idxes)
+            if body_config.eef_idx is not None:
+                joint_idxes = body_config.arm_joint_idxes
+                if body_config.gripper_joint_idxes.size:
+                    joint_idxes = np.concatenate(
+                        [joint_idxes, body_config.gripper_joint_idxes]
+                    )
+                # Keep track of each arm's joint slice so left/right-only keys can reuse the converted vectors.
+                self._eef_joint_index_map[int(body_config.eef_idx)] = joint_idxes.astype(
+                    np.int64, copy=False
+                )
 
         if gripper_idxes:
             self._gripper_joint_indices = (
@@ -681,9 +692,7 @@ class RolloutPpoCus(RolloutBase):
 
     def get_state(self):
         extra_state_arrays: Dict[str, np.ndarray] = {}
-        if len(self.state_keys) == 0:
-            state_vector = np.zeros(0, dtype=np.float32)
-        else:
+        if len(self.state_keys) != 0:
             extra_state_values: Dict[str, np.ndarray] = {}
             if self.ppo_task_handler is not None:
                 extra_state_raw = self.ppo_task_handler.get_extra_state() or {}
@@ -711,14 +720,73 @@ class RolloutPpoCus(RolloutBase):
                     )
                 extra_state_arrays[key] = arr
 
-            components = []
+        qpos = self.motion_manager.get_data(DataKey.MEASURED_JOINT_POS, self.obs)
+        qvel = self.motion_manager.get_data(DataKey.MEASURED_JOINT_VEL, self.obs)
+
+        qpos_ms = self._convert_gripper_positions_to_maniskill(
+            qpos.astype(np.float32).copy()
+        )
+        qvel_ms = self._convert_gripper_velocities_to_maniskill(
+            qvel.astype(np.float32).copy()
+        )
+        # Cache the latest joint position tensor for action denormalization
+        self._latest_joint_pos_tensor = torch.as_tensor(
+            qpos_ms, dtype=torch.float32, device=self.device
+        )
+
+        def _get_joint_slice(key: str) -> Optional[np.ndarray]:
+            idx_map = getattr(self, "_eef_joint_index_map", None) or {}
+            if key in (
+                DataKey.LEFT_MEASURED_JOINT_POS,
+                DataKey.LEFT_MEASURED_JOINT_VEL,
+            ):
+                target_idx = 0
+            elif key in (
+                DataKey.RIGHT_MEASURED_JOINT_POS,
+                DataKey.RIGHT_MEASURED_JOINT_VEL,
+            ):
+                target_idx = 1
+            else:
+                return None
+            joint_slice = idx_map.get(target_idx)
+            if joint_slice is None:
+                raise ValueError(
+                    f"[{self.__class__.__name__}] State key '{key}' requires joint slice for eef_idx={target_idx}, "
+                    "but no matching arm configuration was found."
+                )
+            return joint_slice
+
+        def _component_for_key(state_key: str) -> np.ndarray:
+            # Always pull from the ManiSkill-aligned joint vectors to keep scaling consistent with training.
+            if state_key in extra_state_arrays:
+                return extra_state_arrays[state_key]
+            if state_key == DataKey.MEASURED_JOINT_POS:
+                return qpos_ms
+            if state_key == DataKey.MEASURED_JOINT_VEL:
+                return qvel_ms
+            if state_key in (
+                DataKey.LEFT_MEASURED_JOINT_POS,
+                DataKey.RIGHT_MEASURED_JOINT_POS,
+            ):
+                indices = _get_joint_slice(state_key)
+                return qpos_ms[indices]
+            if state_key in (
+                DataKey.LEFT_MEASURED_JOINT_VEL,
+                DataKey.RIGHT_MEASURED_JOINT_VEL,
+            ):
+                indices = _get_joint_slice(state_key)
+                return qvel_ms[indices]
+            return self.motion_manager.get_data(state_key, self.obs)
+
+        if len(self.state_keys) == 0:
+            state_vector = np.zeros(0, dtype=np.float32)
+        else:
+            components: List[np.ndarray] = []
             for state_key in self.state_keys:
-                if state_key in extra_state_arrays:
-                    components.append(extra_state_arrays[state_key])
-                else:
-                    components.append(
-                        self.motion_manager.get_data(state_key, self.obs)
-                    )
+                component = np.asarray(
+                    _component_for_key(state_key), dtype=np.float32
+                ).reshape(-1)
+                components.append(component)
 
             state_vector = (
                 np.concatenate(components).astype(np.float32)
@@ -745,37 +813,10 @@ class RolloutPpoCus(RolloutBase):
                     print(
                         f"[{self.__class__.__name__}] Warning: Missing cached transforms for marker IDs {missing_now}.",
                         flush=True,
-                    )
+                )
                 self._last_missing_marker_ids = missing_now
 
-        qpos = self.motion_manager.get_data(DataKey.MEASURED_JOINT_POS, self.obs)
-        qvel = self.motion_manager.get_data(DataKey.MEASURED_JOINT_VEL, self.obs)
-
-        qpos_ms = self._convert_gripper_positions_to_maniskill(
-            qpos.astype(np.float32).copy()
-        )
-        qvel_ms = self._convert_gripper_velocities_to_maniskill(
-            qvel.astype(np.float32).copy()
-        )
-        # Cache the latest joint position tensor for action denormalization
-        self._latest_joint_pos_tensor = torch.as_tensor(
-            qpos_ms, dtype=torch.float32, device=self.device
-        )
-        # PPO 入力用のフラットベクトルを state_keys の順に組み立てる
-        ppo_components: List[np.ndarray] = []
-        for state_key in self.state_keys:
-            if state_key == DataKey.MEASURED_JOINT_POS:
-                ppo_components.append(qpos_ms.astype(np.float32))
-            elif state_key == DataKey.MEASURED_JOINT_VEL:
-                ppo_components.append(qvel_ms.astype(np.float32))
-            elif state_key in extra_state_arrays:
-                ppo_components.append(extra_state_arrays[state_key].astype(np.float32))
-            else:
-                ppo_components.append(
-                    self.motion_manager.get_data(state_key, self.obs).astype(np.float32)
-                )
-
-        self.state_for_ppo = np.concatenate(ppo_components).astype(np.float32)
+        self.state_for_ppo = state_vector.copy()
 
         norm_state = normalize_data(state_vector, self.model_meta_info["state"])
 
@@ -1018,5 +1059,3 @@ class RolloutPpoCus(RolloutBase):
                     f"  - {key} [s] | mean: {samples_arr.mean():.2e}, "
                     f"std: {samples_arr.std():.2e}, min: {samples_arr.min():.2e}, max: {samples_arr.max():.2e}"
                 )
-
-
