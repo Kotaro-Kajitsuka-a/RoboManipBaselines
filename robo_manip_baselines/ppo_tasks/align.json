@@ -145,9 +145,9 @@
     ],
     "markers": [
       {
-        "id": 191,
+        "id": 2,
         "name": "align_marker",
-        "size_m": 0.0309
+        "size_m": 0.10
       }
     ],
     "params": {

@@ -110,12 +110,12 @@ class ManiSkillPpoAgent(nn.Module):
 
 _NORMALIZED_ACTION_LOW = torch.tensor(-1.0, dtype=torch.float32)
 _NORMALIZED_ACTION_HIGH = torch.tensor(1.0, dtype=torch.float32)
-_DEFAULT_ARM_JOINT_DELTA_LIMIT = 0.06
+_DEFAULT_ARM_JOINT_DELTA_LIMIT = 0.03
 _DEFAULT_GRIPPER_JOINT_DELTA_LIMIT = 0.1
 _PPO_DETERMINISTIC = True
 _PPO_USE_CUDA = torch.cuda.is_available()
-_PPO_LOG_TSV = False
-_PPO_PROFILE = False
+_PPO_LOG_TSV = True
+_PPO_PROFILE = True
 
 class RolloutPpoCus(RolloutBase):
     def run(self):
@@ -134,7 +134,7 @@ class RolloutPpoCus(RolloutBase):
         if not os.path.isfile(model_meta_info_path):
             raise FileNotFoundError(
                 f"[{self.__class__.__name__}] Required model_meta_info.pkl was not found "
-                f"next to the checkpoint: {model_meta_info_path}. "
+                f"next to the checkpoint: {model_meta_info_path}  "
                 "Generate the file (e.g., with CreatePpoCusMetaInfo.py) and re-run."
             )
 
@@ -438,6 +438,7 @@ class RolloutPpoCus(RolloutBase):
         expanded_path = _REPO_ROOT / "robo_manip_baselines" / "rollout_debug_log_expanded.csv"
         header = ["step_idx"]
         header += [f"obs_{idx}" for idx in range(self._policy_obs_dim)]
+        header += [f"raw_action_{idx}" for idx in range(self.action_dim)]
         header += [f"direct_joint_command_{idx}" for idx in range(self.action_dim)]
         with open(expanded_path, "w", newline="") as f:
             writer = csv.writer(f)
@@ -756,6 +757,10 @@ class RolloutPpoCus(RolloutBase):
         qvel_ms = self._convert_gripper_velocities_to_maniskill(
             qvel.astype(np.float32).copy()
         )
+        # Cache the latest joint position tensor for action denormalization
+        self._latest_joint_pos_tensor = torch.as_tensor(
+            qpos_ms, dtype=torch.float32, device=self.device
+        )
         # PPO 入力用のフラットベクトルを state_keys の順に組み立てる
         ppo_components: List[np.ndarray] = []
         for state_key in self.state_keys:
@@ -884,7 +889,10 @@ class RolloutPpoCus(RolloutBase):
                 self._action_delta_high - self._action_delta_low
             )
 
-            current_joint_pos = obs_tensor[..., : self.action_dim].squeeze(0)
+            # Use the cached measured joint positions (not the reordered obs) for delta application
+            current_joint_pos = getattr(self, "_latest_joint_pos_tensor", None)
+            if current_joint_pos is None:
+                current_joint_pos = obs_tensor[..., : self.action_dim].squeeze(0)
             direct_joint_command = current_joint_pos + denormalized_delta
             direct_joint_command = torch.max(
                 torch.min(direct_joint_command, self._joint_position_high),
@@ -925,8 +933,13 @@ class RolloutPpoCus(RolloutBase):
                         mode="constant",
                         constant_values=0.0,
                     )
+                raw_action_values = raw_action.detach().cpu().numpy().astype(np.float64).tolist()
+                if len(raw_action_values) < self.action_dim:
+                    raw_action_values += [0.0] * (self.action_dim - len(raw_action_values))
+
                 row = [int(getattr(self, "rollout_time_idx", 0))]
                 row += obs_values.tolist()
+                row += raw_action_values[: self.action_dim]
                 action_values = physical_np.tolist()
                 if len(action_values) < self.action_dim:
                     action_values += [0.0] * (self.action_dim - len(action_values))
@@ -1005,3 +1018,5 @@ class RolloutPpoCus(RolloutBase):
                     f"  - {key} [s] | mean: {samples_arr.mean():.2e}, "
                     f"std: {samples_arr.std():.2e}, min: {samples_arr.min():.2e}, max: {samples_arr.max():.2e}"
                 )
+
+

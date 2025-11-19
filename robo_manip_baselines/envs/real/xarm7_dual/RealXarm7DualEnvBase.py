@@ -117,9 +117,9 @@ class RealXarm7DualEnvBase(RealEnvBase):
         self.xarm_api_left.set_mode(1)
         self.xarm_api_left.set_state(0)
         self.xarm_api_left.set_collision_sensitivity(1)
-        self.xarm_api_left.clean_gripper_error()
-        self.xarm_api_left.set_gripper_mode(0)
-        self.xarm_api_left.set_gripper_enable(True)
+        #self.xarm_api_left.clean_gripper_error()
+        #self.xarm_api_left.set_gripper_mode(0)
+        #self.xarm_api_left.set_gripper_enable(True)
         time.sleep(0.2)
         xarm_code, left_joint_states = self.xarm_api_left.get_joint_states(
             is_radian=True
@@ -217,7 +217,7 @@ class RealXarm7DualEnvBase(RealEnvBase):
         )
 
     def _set_action(
-        self, action, duration=None, joint_vel_limit_scale=0.5, wait=False, reset_bool=False
+        self, action, duration=None, joint_vel_limit_scale=10.0, wait=False, reset_bool=False
     ):
         start_time = time.time()
 
@@ -313,17 +313,17 @@ class RealXarm7DualEnvBase(RealEnvBase):
             left_gripper_pos = self.fixed_gripper_joint_pos[0]
             right_gripper_pos = self.fixed_gripper_joint_pos[1]
 
-        xarm_code = self.xarm_api_left.set_gripper_position(left_gripper_pos, wait=False)
-        if xarm_code != 0:
-            raise RuntimeError(
-                f"[{self.__class__.__name__}] Invalid xArm API code: {xarm_code}"
-            )
+        #xarm_code = self.xarm_api_left.set_gripper_position(left_gripper_pos, wait=False)
+        #if xarm_code != 0:
+            #raise RuntimeError(
+                #f"[{self.__class__.__name__}] Invalid xArm API code: {xarm_code}"
+            #)
 
-        xarm_code = self.xarm_api_right.set_gripper_position(right_gripper_pos, wait=False)
-        if xarm_code != 0:
-            raise RuntimeError(
-                f"[{self.__class__.__name__}] Invalid xArm API code: {xarm_code}"
-            )
+        #xarm_code = self.xarm_api_right.set_gripper_position(right_gripper_pos, wait=False)
+        #if xarm_code != 0:
+            #raise RuntimeError(
+                #f"[{self.__class__.__name__}] Invalid xArm API code: {xarm_code}"
+            #)
         
         # Wait
         elapsed_duration = time.time() - start_time
@@ -355,23 +355,30 @@ class RealXarm7DualEnvBase(RealEnvBase):
             [left_arm_joint_pos, right_arm_joint_pos], dtype=np.float64
         )
 
-        # Get state from Robotiq gripper
-        xarm_code, left_gripper_pos = self.xarm_api_left.get_gripper_position()
-        if xarm_code != 0:
-            raise RuntimeError(
-                f"[{self.__class__.__name__}] Invalid xArm API code: {xarm_code}"
-            )
-        left_gripper_joint_pos = np.array([left_gripper_pos], dtype=np.float64)
+        # Get state from G2 gripper
+        #xarm_code, left_gripper_pos = self.xarm_api_left.get_gripper_position()
+        #if xarm_code != 0:
+            #raise RuntimeError(
+                #f"[{self.__class__.__name__}] Invalid xArm API code: {xarm_code}"
+            #)
+        #left_gripper_joint_pos = np.array([left_gripper_pos], dtype=np.float64)
+        #left_gripper_joint_vel = np.zeros(1)
+
+        #xarm_code, right_gripper_pos = self.xarm_api_right.get_gripper_position()
+        #if xarm_code != 0:
+            #raise RuntimeError(
+                #f"[{self.__class__.__name__}] Invalid xArm API code: {xarm_code}"
+            #)
+        #right_gripper_joint_pos = np.array([right_gripper_pos], dtype=np.float64)
+        #right_gripper_joint_vel = np.zeros(1)
+
+        #gripperのobsは固定量
+        left_gripper_joint_pos = [116.5]
+        right_gripper_joint_pos = [116.5]
+        
         left_gripper_joint_vel = np.zeros(1)
-
-        xarm_code, right_gripper_pos = self.xarm_api_right.get_gripper_position()
-        if xarm_code != 0:
-            raise RuntimeError(
-                f"[{self.__class__.__name__}] Invalid xArm API code: {xarm_code}"
-            )
-        right_gripper_joint_pos = np.array([right_gripper_pos], dtype=np.float64)
         right_gripper_joint_vel = np.zeros(1)
-
+        
         # Get wrench from force sensor
         wrench_left = np.array(
             self.xarm_api_left.get_ft_sensor_data()[1], dtype=np.float64
