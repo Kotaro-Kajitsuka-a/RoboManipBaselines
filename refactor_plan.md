@@ -1,52 +1,76 @@
-## Marker handling refactor plan (RolloutPpoCus → marker_detection)
+# Rollout PPO Refactor Plan
 
-Goal: move marker detection/config/cache responsibilities out of `RolloutPpoCus` into `marker_detection.py` to shrink rollout complexity and isolate AprilTag deps.
+Sanity check command (run after meaningful milestones):
+```
+python ./bin/Rollout.py PpoCus RealXarm7DualDemo \
+  --wait_before_start \
+  --skip_draw 50000 \
+  --save_rollout \
+  --config ./envs/configs/RealXarm7DualDemoEnv.yaml \
+  --checkpoint ./checkpoint/PpoCus/DualBoxRotationAblated/ckpt_26.pt
+```
 
-### Current responsibilities inside RolloutPpoCus
-- Parse marker meta info (`marker_definitions`, `required_marker_ids`, `marker_name_map`, `marker_size_map`, `marker_camera_names`) during `setup_model_meta_info`.
-- Load T_base_to_camera, camera intrinsics, and initialize `FrontCameraDetectionWorker`.
-- Submit frames from `get_images`/`get_state` (`_submit_marker_frame`) and poll/pull cached transforms (`_refresh_marker_cache`, `get_latest_marker_transforms`).
-- Own all marker-related fields and lifecycle (start/stop) intertwined with rollout lifecycle.
+## Workstream 1: Marker subsystem isolation
+**Goal:** Move marker configuration, detection, caching, and lifecycle management out of `RolloutPpoCus` into a dedicated component under `marker_detection.py`.
 
-### Proposed abstraction
-- Introduce `MarkerManager` in `marker_detection.py`:
-  - `MarkerManager.from_meta(meta_info, cameras, default_tag_size=...)` to parse marker config, load calibration (T_base_to_camera), extract intrinsics.
-  - `start()`/`stop()` to manage background worker.
-  - `submit_frame(camera_name, rgb_image)` to feed frames.
-  - `get_transforms(required_ids=None, poll=False)` to fetch latest transforms/timestamps; maintain cache of last-known transforms.
-  - Access to marker metadata (id→name/size mapping, active camera).
-- Keep `FrontCameraDetectionWorker` internal to `MarkerManager`.
+### Tasks
+- [ ] Create `MarkerManager` abstraction (config parsing, calibration loading, worker lifecycle, frame submission, transform cache).
+- [ ] Update `marker_detection.py` to host `MarkerManager` and keep `FrontCameraDetectionWorker` internal.
+- [ ] Replace marker-related fields/methods in `RolloutPpoCus` with `self.marker_manager` usage.
+- [ ] Ensure marker-optional paths degrade gracefully when calibration or cameras are missing.
+- [ ] Document the new marker subsystem usage (README / inline docstrings).
+- [ ] Verify with the sanity command when marker config is present and when it is absent.
 
-### RolloutPpoCus changes (high level)
-- Replace marker-related fields with a single `self.marker_manager`.
-- In `setup_model_meta_info`, call `MarkerManager.from_meta(...)` if meta has marker config.
-- In `reset`/`close`, call `marker_manager.start()/stop()` appropriately.
-- In `get_state`/`get_images`, replace `_submit_marker_frame` and cache polling with `marker_manager.submit_frame`/`marker_manager.get_transforms`.
-- Remove `_refresh_marker_cache`, `_marker_worker`, `_marker_camera_active`, related marker fields from RolloutPpoCus.
+## Workstream 2: State gathering refactor
+**Goal:** Make `get_state` composable and side-effect-light so sensor handling, buffer updates, and marker refreshes are easy to reason about.
 
-### Notes
-- Keep marker functions optional; if calibration or deps are missing, manager should gracefully disable detection and return empty dict.
-- Ensure thread safety and minimal blocking (same semantics as current worker).
-- Update `marker_detection.py` tests/usages accordingly.
+### Tasks
+- [ ] Extract helper(s) for assembling normalized state vectors (`_collect_state_components`).
+- [ ] Extract buffer management into `_update_state_buffers` and image equivalents.
+- [ ] Route marker cache refreshes through `MarkerManager`; remove `_refresh_marker_cache`.
+- [ ] Leave `get_state` responsible only for orchestrating helpers and returning the tensor.
+- [ ] Add unit-level coverage for the new helpers if feasible; otherwise rely on targeted assertions within Rollout.
+- [ ] Re-run the sanity command to confirm no regression in observation shapes.
+
+## Workstream 3: Policy inference refactor
+**Goal:** Break down `infer_policy` into small, testable pieces that separate profiling, model inference, action scaling, and logging.
+
+### Tasks
+- [ ] Introduce helper methods (`_maybe_profile`, `_run_policy_forward`, `_scale_and_clip_action`, `_log_policy_outputs`, `_queue_policy_action`).
+- [ ] Move CSV/log initialization logic into a dedicated `_init_debug_logging` called from `setup_policy`.
+- [ ] Keep gripper conversion and joint limits encapsulated inside helpers with minimal side effects.
+- [ ] Centralize `policy_action_list` updates so batching semantics are obvious.
+- [ ] Validate by running the sanity command and checking action logs for shape consistency.
+
+## Workstream 4: Logging & profiling consolidation
+**Goal:** Standardize how rollout diagnostics are configured and flushed so instrumentation does not clutter functional code.
+
+### Tasks
+- [ ] Create a lightweight logging utility or structured dict to hold log paths, writers, and headers.
+- [ ] Relocate profiling hook installation and teardown into `_init_profiling` / `_finalize_profiling` helpers.
+- [ ] Ensure all logging/profiling state lives in clearly named attributes (e.g., `self.debug_logging`, `self.profile_data`).
+- [ ] Update `print_statistics` to consume the new structures.
+- [ ] Sanity command should run with profiling enabled and disabled to ensure hooks behave identically.
+
+## Workstream 5: Model definition extraction
+**Goal:** Share a single `ManiSkillPpoAgent` implementation across rollouts to simplify maintenance.
+
+### Tasks
+- [ ] Create `robo_manip_baselines/policy/ppo_cus/models.py` (or shared module) containing `_layer_init` + `ManiSkillPpoAgent`.
+- [ ] Update `RolloutPpoCus`, `RolloutPpoCus_Hinansaseta`, and any similar files to import the shared model.
+- [ ] Confirm checkpoints still load without key mismatches.
+- [ ] Update documentation to reflect the new module.
+- [ ] Run the sanity command for at least one policy using the shared model.
+
+## Workstream 6: Marker docs & tooling
+**Goal:** Provide clear instructions for calibration assets, marker IDs, and troubleshooting.
+
+### Tasks
+- [ ] Expand `README_Sim2Real_RL.md` (or a new doc) with MarkerManager usage, calibration file expectations, and debugging steps.
+- [ ] Provide example config snippets for defining markers in `model_meta_info`.
+- [ ] Add troubleshooting tips (e.g., camera not found, missing IDs) linked to log messages.
+- [ ] Verify documentation steps manually using the sanity command sequence.
 
 ---
 
-## Policy model extraction plan (ManiSkillPpoAgent)
-
-Goal: move `ManiSkillPpoAgent` out of rollout files into a shared module for readability and reuse.
-
-### Current state
-- `ManiSkillPpoAgent` is defined inline in `policy/ppo_cus/RolloutPpoCus.py`, `RolloutPpoCus_Hinansaseta.py`, and `policy/ppo/RolloutPpo.py` with small variations.
-- `_layer_init` utility is also embedded alongside.
-
-### Proposed steps
-1) Consolidate the canonical agent definition (decide which variant to keep, or parameterize differences).
-2) Create `policy/ppo_cus/models.py` (or a shared `policy/ppo_common/models.py`) containing:
-   - `_layer_init`
-   - `ManiSkillPpoAgent` (matching checkpoint structure)
-3) Update rollouts to `from .models import ManiSkillPpoAgent` (or shared path) and remove inline class/utility.
-4) Ensure checkpoint compatibility: class name and layer shapes must remain unchanged so existing `state_dict` loads.
-5) Adjust any tests/imports accordingly.
-
-### Notes
-- If Hinansaseta variant differs (e.g., architecture hyperparams), consider either keeping a single canonical definition or exposing constructor args for differences.
+Progress is tracked by moving completed tasks to `done_refactor_plan.md` (create/update as needed).

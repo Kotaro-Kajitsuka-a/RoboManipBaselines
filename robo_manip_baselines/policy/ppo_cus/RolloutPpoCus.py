@@ -42,23 +42,6 @@ _DEFAULT_T_BASE_TO_CAMERA_PATH = (
 )
 _GLOBAL_T_BASE_TO_CAMERA = load_base_to_camera_transform(_DEFAULT_T_BASE_TO_CAMERA_PATH)
 
-def gripper_q_robomanip_to_maniskill(q_robomanip):
-    """Convert RoboManip gripper position scalar to ManiSkill scale."""
-
-    return (q_robomanip - 840.0) / (-1000.0)
-
-
-def gripper_qvel_robomanip_to_maniskill(qvel_robomanip):
-    """Convert RoboManip gripper velocity scalar to ManiSkill scale."""
-
-    return qvel_robomanip / (-1000.0)
-
-
-def gripper_q_maniskill_to_robomanip(q_maniskill):
-    """Convert ManiSkill gripper position scalar to RoboManip scale."""
-
-    return q_maniskill * (-1000.0) + 840.0
-
 
 def _layer_init(layer, std=np.sqrt(2), bias_const=0.0):
     nn.init.orthogonal_(layer.weight, std)
@@ -199,9 +182,6 @@ class RolloutPpoCus(RolloutBase):
                 else gripper_idxes[0].astype(np.int64)
             )
         self.default_target_joint_pos = default_target
-
-    def _setup_ppo_task_from_meta(self) -> None:
-        self.standard_state_keys = list(self.state_keys)
 
     def _refresh_marker_cache(self) -> Optional[float]:
         marker_transforms, marker_timestamp = self.get_latest_marker_transforms(poll=True)
@@ -948,7 +928,7 @@ class RolloutPpoCus(RolloutBase):
 
             physical_np = direct_joint_command.detach().cpu().numpy().astype(np.float64)
             if getattr(self, "_gripper_joint_indices", None) is not None and self._gripper_joint_indices.size > 0:
-                physical_np[self._gripper_joint_indices] = 116.5
+                physical_np[self._gripper_joint_indices] = 119.0
 
             if hasattr(self, "_log_path") and self._log_path:
                 obs_list = (

@@ -15,10 +15,10 @@ class RealXarm7DualDemoEnv(RealXarm7DualEnvBase):
             init_qpos=np.concatenate(
 
                 #Left arm from workspace side
-                [np.deg2rad([0.0, -30.0, 0.0, 45.0, 0.0, 75.0, 0.0]), np.array([116.5])
+                [np.deg2rad([0.0, -30.0, 0.0, 45.0, 0.0, 75.0, 0.0]), np.array([119.0])
                 ,
                 #Right arm from workspace side
-                np.deg2rad([0.0, -30.0, 0.0, 45.0, 0.0, 75.0, 0.0]), np.array([116.5])]
+                np.deg2rad([0.0, -30.0, 0.0, 45.0, 0.0, 75.0, 0.0]), np.array([119.0])]
             ),
             **kwargs,
         )

@@ -6,7 +6,7 @@ from typing import Dict, Mapping, Optional
 import numpy as np
 
 DEFAULT_BOX_POSE = np.array(
-    [0.44, -0.01, 0.04, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0], dtype=np.float32
+    [0.35, -0.01, 0.04, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0], dtype=np.float32
 )
 
 

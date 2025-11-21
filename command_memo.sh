@@ -93,12 +93,12 @@ python ./bin/CreatePpoCusMetaInfo.py \
   --output ./checkpoint/PpoCus/DualBoxRotationAblated/model_meta_info.pkl \
   --force
 
-python ./bin/Rollout.py PpoCus RealXarm7DualDemo \
+python ./robo_manip_baselines/bin/Rollout.py PpoCus RealXarm7DualDemo \
   --wait_before_start \
   --skip_draw 50000 \
   --save_rollout \
-  --config ./envs/configs/RealXarm7DualDemoEnv.yaml \
-  --checkpoint ./checkpoint/PpoCus/DualBoxRotationAblated/ckpt_26.pt
+  --config ./robo_manip_baselines/envs/configs/RealXarm7DualDemoEnv.yaml \
+  --checkpoint ./robo_manip_baselines/checkpoint/PpoCus/DualBoxRotationAblated/ckpt_26.pt
 ############################################################################
 
 make pickle and run(DualSimple)

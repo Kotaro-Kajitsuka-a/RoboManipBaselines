@@ -70,7 +70,7 @@ class RealXarm7DualEnvBase(RealEnvBase):
         self.init_qpos = init_qpos
         self.joint_vel_limit = np.deg2rad(180)  # [rad/s]
         # Keep both grippers at a fixed position to avoid unintended motion.
-        self.fixed_gripper_joint_pos = np.array([116.5, 116.5], dtype=np.float64)
+        self.fixed_gripper_joint_pos = np.array([119.0, 119.0], dtype=np.float64)
         self.body_config_list = [
             ArmConfig(
                 arm_urdf_path=path.join(
@@ -250,20 +250,15 @@ class RealXarm7DualEnvBase(RealEnvBase):
                     break
 
             # send command to the left arm
-            xarm_code = self.xarm_api_left.set_servo_angle(
+            left_xarm_code = self.xarm_api_left.set_servo_angle(
                 angle=left_arm_joint_pos_command,
                 speed=scaled_joint_vel_limit,
                 mvtime=duration,
                 is_radian=True,
                 wait=False,
             )
-            time.sleep(5)
-            if xarm_code != 0:
-                raise RuntimeError(
-                    f"[{self.__class__.__name__}] Invalid xArm API code: {xarm_code}"
-                )
             # send command to the right arm
-            xarm_code = self.xarm_api_right.set_servo_angle(
+            right_xarm_code = self.xarm_api_right.set_servo_angle(
                 angle=right_arm_joint_pos_command,
                 speed=scaled_joint_vel_limit,
                 mvtime=duration,
@@ -271,12 +266,16 @@ class RealXarm7DualEnvBase(RealEnvBase):
                 wait=False,
             )
             time.sleep(5)
-            if xarm_code != 0:
+            if left_xarm_code != 0:
                 raise RuntimeError(
                     f"[{self.__class__.__name__}] Invalid xArm API code: {xarm_code}"
                 )
 
-
+            if right_xarm_code != 0:
+                raise RuntimeError(
+                    f"[{self.__class__.__name__}] Invalid xArm API code: {xarm_code}"
+                )
+            
             self.xarm_api_left.set_mode(1)
             self.xarm_api_right.set_mode(1)
             self.xarm_api_left.set_state(0)
@@ -373,8 +372,8 @@ class RealXarm7DualEnvBase(RealEnvBase):
         #right_gripper_joint_vel = np.zeros(1)
 
         #gripperのobsは固定量
-        left_gripper_joint_pos = [116.5]
-        right_gripper_joint_pos = [116.5]
+        left_gripper_joint_pos = [119.0]
+        right_gripper_joint_pos = [119.0]
         
         left_gripper_joint_vel = np.zeros(1)
         right_gripper_joint_vel = np.zeros(1)
