@@ -31,8 +31,7 @@ from .gripper_utils import (
 )
 from .marker_detection import (
     DEFAULT_TAG_SIZE_M,
-    FrontCameraDetectionWorker,
-    extract_camera_intrinsic_info,
+    MarkerManager,
     load_base_to_camera_transform,
 )
 
@@ -100,15 +99,25 @@ _PPO_USE_CUDA = torch.cuda.is_available()
 _PPO_LOG_TSV = True
 _PPO_PROFILE = True
 
+# Marker configuration (hard-coded; not editable via JSON/meta info)
+
+#10cmの設定で印刷したA4のAprilTagの大きさは9.265cmでした。
+_MARKER_CAMERA_NAMES = ["front"]
+_MARKER_DEFINITIONS: List[Dict[str, Any]] = [
+    {"id": 2, "name": "box_marker", "size_m": 0.09265},
+]
+_MARKER_INITIAL_DETECTION_TIMEOUT = 5.0
+_MARKER_INITIAL_DETECTION_INTERVAL = 0.05
+
 class RolloutPpoCus(RolloutBase):
     def run(self):
         try:
             return super().run()
         finally:
-            worker = getattr(self, "_marker_worker", None)
-            if worker is not None:
-                worker.stop()
-                self._marker_worker = None
+            marker_manager = getattr(self, "marker_manager", None)
+            if marker_manager is not None:
+                marker_manager.stop()
+
 
     def setup_model_meta_info(self):
         checkpoint_dir = os.path.split(self.args.checkpoint)[0]
@@ -118,7 +127,7 @@ class RolloutPpoCus(RolloutBase):
             raise FileNotFoundError(
                 f"[{self.__class__.__name__}] Required model_meta_info.pkl was not found "
                 f"next to the checkpoint: {model_meta_info_path}  "
-                "Generate the file (e.g., with CreatePpoCusMetaInfo.py) and re-run."
+                "Generate the file with CreatePpoCusMetaInfo.py) and re-run."
             )
 
         super().setup_model_meta_info()
@@ -127,19 +136,37 @@ class RolloutPpoCus(RolloutBase):
         self.extra_state_dims: Dict[str, int] = {}
         self.ppo_task_handler = None
         self.ppo_task_params: Dict[str, Any] = {}
-        self.marker_definitions: List[Dict[str, Any]] = []
-        self.required_marker_ids: List[int] = []
-        self.marker_name_map: Dict[int, str] = {}
-        self.marker_size_map: Dict[int, float] = {}
-        self.marker_camera_names: List[str] = ["front"]
+
+        self.marker_definitions: List[Dict[str, Any]] = [
+            dict(entry) for entry in _MARKER_DEFINITIONS
+        ]
+        self.required_marker_ids: List[int] = [
+            entry["id"] for entry in self.marker_definitions
+        ]
+        self.marker_name_map: Dict[int, str] = {
+            entry["id"]: entry["name"] for entry in self.marker_definitions
+        }
+        self.marker_size_map: Dict[int, float] = {
+            entry["id"]: entry["size_m"] for entry in self.marker_definitions
+        }
+        self.marker_camera_names: List[str] = list(_MARKER_CAMERA_NAMES)
         self._marker_camera_active: Optional[str] = None
+        self.marker_manager = MarkerManager(
+            base_to_camera=_GLOBAL_T_BASE_TO_CAMERA,
+            marker_definitions=self.marker_definitions,
+            marker_camera_names=self.marker_camera_names,
+        )
+        # Keep backward-compat attribute for tasks that read directly.
+        self.marker_transform_cache = self.marker_manager.marker_transform_cache
         self._setup_ppo_task_from_meta()
 
     def _init_joint_metadata(self) -> None:
         """Collect joint index information from the environment for scaling."""
         self._gripper_joint_indices = np.array([], dtype=np.int64)
+        
         self._eef_joint_index_map: Dict[int, np.ndarray] = {}
         env = self.env.unwrapped if hasattr(self.env, "unwrapped") else self.env
+
         command_dim = DataKey.get_dim(DataKey.COMMAND_JOINT_POS, self.env)
         if command_dim != self.action_dim:
             raise ValueError(
@@ -182,16 +209,6 @@ class RolloutPpoCus(RolloutBase):
                 else gripper_idxes[0].astype(np.int64)
             )
         self.default_target_joint_pos = default_target
-
-    def _refresh_marker_cache(self) -> Optional[float]:
-        marker_transforms, marker_timestamp = self.get_latest_marker_transforms(poll=True)
-        if not marker_transforms:
-            marker_transforms, marker_timestamp = self.get_latest_marker_transforms()
-
-        if marker_transforms:
-            for marker_id, matrix in marker_transforms.items():
-                self.marker_transform_cache[marker_id] = matrix.copy()
-        return marker_timestamp
 
     def _init_action_scaling_tensors(self) -> None:
         """Initialize tensors describing per-joint min/max and delta limits."""
@@ -320,43 +337,19 @@ class RolloutPpoCus(RolloutBase):
             )
 
         marker_cameras = ppo_task_cfg.get("marker_cameras", [])
-        if isinstance(marker_cameras, list):
-            self.marker_camera_names = [str(name) for name in marker_cameras]
-        elif marker_cameras:
-            raise TypeError(
-                f"[{self.__class__.__name__}] 'ppo_task.marker_cameras' must be a list of camera names."
+        if marker_cameras:
+            print(
+                f"[{self.__class__.__name__}] Ignoring marker_cameras in meta; using hard-coded {_MARKER_CAMERA_NAMES}.",
+                flush=True,
             )
+        self.marker_camera_names = list(_MARKER_CAMERA_NAMES)
 
-        marker_defs_cfg = ppo_task_cfg.get("markers", [])
+        marker_defs_cfg = ppo_task_cfg.get("markers")
         if marker_defs_cfg:
-            if not isinstance(marker_defs_cfg, list):
-                raise TypeError(
-                    f"[{self.__class__.__name__}] 'ppo_task.markers' must be a list."
-                )
-            definitions: List[Dict[str, Any]] = []
-            seen_ids: set[int] = set()
-            for entry in marker_defs_cfg:
-                if not isinstance(entry, dict):
-                    raise TypeError(
-                        f"[{self.__class__.__name__}] Invalid marker entry: {entry}"
-                    )
-                if "id" not in entry:
-                    raise ValueError(
-                        f"[{self.__class__.__name__}] Marker entry requires 'id': {entry}"
-                    )
-                tag_id = int(entry["id"])
-                if tag_id in seen_ids:
-                    raise ValueError(
-                        f"[{self.__class__.__name__}] Duplicate marker id detected: {tag_id}"
-                    )
-                seen_ids.add(tag_id)
-                name = str(entry.get("name", f"marker_{tag_id}"))
-                size_m = float(entry.get("size_m", DEFAULT_TAG_SIZE_M))
-                definitions.append({"id": tag_id, "name": name, "size_m": size_m})
-            self.marker_definitions = definitions
-            self.required_marker_ids = [item["id"] for item in definitions]
-            self.marker_name_map = {item["id"]: item["name"] for item in definitions}
-            self.marker_size_map = {item["id"]: item["size_m"] for item in definitions}
+            print(
+                f"[{self.__class__.__name__}] Ignoring marker definitions in meta; using hard-coded {_MARKER_DEFINITIONS}.",
+                flush=True,
+            )
 
         params = ppo_task_cfg.get("params") or {}
         if not isinstance(params, dict):
@@ -364,6 +357,9 @@ class RolloutPpoCus(RolloutBase):
                 f"[{self.__class__.__name__}] 'ppo_task.params' must be a dictionary."
             )
         self.ppo_task_params = dict(params)
+        # Override marker-related timing with hard-coded values
+        self.ppo_task_params["initial_detection_timeout"] = _MARKER_INITIAL_DETECTION_TIMEOUT
+        self.ppo_task_params["initial_detection_interval"] = _MARKER_INITIAL_DETECTION_INTERVAL
 
         self.extra_state_keys = extra_state_keys
         self.extra_state_dims = extra_state_dims
@@ -371,7 +367,7 @@ class RolloutPpoCus(RolloutBase):
             key for key in self.state_keys if key not in self.extra_state_keys
         ]
 
-        self.ppo_task_handler = builder(self, params)
+        self.ppo_task_handler = builder(self, self.ppo_task_params)
         if self.ppo_task_handler is None:
             raise RuntimeError(
                 f"[{self.__class__.__name__}] Task builder '{module_path}.build_ppo_task' returned None."
@@ -455,17 +451,17 @@ class RolloutPpoCus(RolloutBase):
     def setup_variables(self):
         super().setup_variables()
 
-        self._marker_worker = None
-        self._marker_camera_active = None
-        self.marker_transform_cache: Dict[int, np.ndarray] = {}
         self.marker_detection_verified = False
         self._last_missing_marker_ids: Optional[List[int]] = None
-        if _GLOBAL_T_BASE_TO_CAMERA is None:
+        marker_manager = getattr(self, "marker_manager", None)
+        if marker_manager is None or marker_manager.base_to_camera is None:
             print(
-                f"[{self.__class__.__name__}] T_base→camera calibration not loaded; marker worker disabled.",
+                f"[{self.__class__.__name__}] Marker detection disabled (no calibration or manager).",
                 flush=True,
             )
         else:
+            self.marker_transform_cache = marker_manager.marker_transform_cache
+            marker_manager.reset_cache()
             env = self.env.unwrapped if hasattr(self.env, "unwrapped") else self.env
             primary_cameras = getattr(env, "cameras", {}) or {}
             backup_cameras: Dict[str, Any] = {}
@@ -479,39 +475,23 @@ class RolloutPpoCus(RolloutBase):
                 backup_cameras.keys()
             )
 
-            for camera_name in self.marker_camera_names:
-                camera_obj = primary_cameras.get(camera_name)
-                if camera_obj is None:
-                    camera_obj = backup_cameras.get(camera_name)
-                if camera_obj is None:
-                    continue
-
-                intrinsic_info = extract_camera_intrinsic_info(camera_obj)
-                self._marker_worker = FrontCameraDetectionWorker(
-                    base_to_camera=_GLOBAL_T_BASE_TO_CAMERA,
-                    intrinsic_info=intrinsic_info,
-                    tag_size_m=DEFAULT_TAG_SIZE_M,
-                )
-                self._marker_worker.start()
-                self._marker_camera_active = camera_name
+            started = marker_manager.start_with_cameras(primary_cameras, backup_cameras)
+            if started:
                 print(
-                    f"[{self.__class__.__name__}] Started marker worker for camera '{camera_name}'.",
+                    f"[{self.__class__.__name__}] Started marker worker for camera '{marker_manager._active_camera}'.",
                     flush=True,
                 )
-                break
-
-            if self._marker_worker is None:
-                if self.marker_camera_names:
-                    raise ValueError(
-                        f"[{self.__class__.__name__}] None of the requested marker cameras "
-                        f"{self.marker_camera_names} were found. "
-                        f"Available cameras: {sorted(available_camera_names)}"
-                    )
-                else:
-                    print(
+            elif marker_manager.marker_camera_names:
+                raise ValueError(
+                    f"[{self.__class__.__name__}] None of the requested marker cameras "
+                    f"{marker_manager.marker_camera_names} were found. "
+                    f"Available cameras: {sorted(available_camera_names)}"
+                )
+            else:
+                print(
                     f"[{self.__class__.__name__}] No marker cameras specified; marker worker disabled.",
-                        flush=True,
-                    )
+                    flush=True,
+                )
 
         self._profile_enabled = bool(_PPO_PROFILE)
         if self._profile_enabled:
@@ -519,32 +499,21 @@ class RolloutPpoCus(RolloutBase):
             self._wrap_profile_hooks()
 
     def _submit_marker_frame(self) -> bool:
-        if getattr(self, "_marker_worker", None) is None:
+        marker_manager = getattr(self, "marker_manager", None)
+        if marker_manager is None:
             return False
         if not isinstance(getattr(self, "info", None), dict):
             return False
         rgb_images = self.info.get("rgb_images")
         if not isinstance(rgb_images, dict):
             return False
-        candidate_names = (
-            [self._marker_camera_active]
-            if self._marker_camera_active
-            else self.marker_camera_names
-        )
-        for camera_name in candidate_names:
-            if camera_name is None:
-                continue
-            frame = rgb_images.get(camera_name)
-            if frame is None:
-                continue
-            self._marker_worker.submit_frame(frame.copy())
-            return True
-        return False
+        return marker_manager.submit_rgb_images(rgb_images)
 
     def _ensure_initial_marker_detection(self) -> None:
-        if not self.required_marker_ids:
+        marker_manager = getattr(self, "marker_manager", None)
+        if marker_manager is None or not marker_manager.required_marker_ids:
             return
-        if self._marker_worker is None:
+        if marker_manager._worker is None:
             raise RuntimeError(
                 f"[{self.__class__.__name__}] Marker worker not initialized, but marker IDs were specified."
             )
@@ -554,30 +523,20 @@ class RolloutPpoCus(RolloutBase):
         start_time = time.time()
         last_report_time = start_time
 
-        missing_ids = set(self.required_marker_ids)
+        missing_ids = set(marker_manager.required_marker_ids)
 
         while time.time() - start_time <= timeout:
             self._submit_marker_frame()
-            transforms, _ = self.get_latest_marker_transforms(poll=True)
-            if not transforms:
-                transforms, _ = self.get_latest_marker_transforms()
-
-            if transforms:
-                for marker_id, matrix in transforms.items():
-                    self.marker_transform_cache[marker_id] = matrix.copy()
-                missing_ids = {
-                    marker_id
-                    for marker_id in self.required_marker_ids
-                    if marker_id not in self.marker_transform_cache
-                }
-                if not missing_ids:
-                    self.marker_detection_verified = True
-                    print(
-                        f"[{self.__class__.__name__}] Confirmed initial detection of markers: "
-                        f"{sorted(self.required_marker_ids)}",
-                        flush=True,
-                    )
-                    return
+            marker_manager.refresh_cache(poll=True)
+            missing_ids = set(marker_manager.missing_required_ids())
+            if not missing_ids:
+                self.marker_detection_verified = True
+                print(
+                    f"[{self.__class__.__name__}] Confirmed initial detection of markers: "
+                    f"{sorted(marker_manager.required_marker_ids)}",
+                    flush=True,
+                )
+                return
 
             current_time = time.time()
             if current_time - last_report_time >= 1.0:
@@ -656,21 +615,26 @@ class RolloutPpoCus(RolloutBase):
         self.policy_action_buf = None
 
     def get_latest_marker_frame(self):
-        if getattr(self, "_marker_worker", None) is None:
+        marker_manager = getattr(self, "marker_manager", None)
+        if marker_manager is None:
             return None, None
-        return self._marker_worker.get_latest_frame()
+        return marker_manager.get_latest_frame()
 
     def get_latest_marker_transforms(self, poll: bool = False):
-        worker = getattr(self, "_marker_worker", None)
-        if worker is None:
+        marker_manager = getattr(self, "marker_manager", None)
+        if marker_manager is None:
             return None, None
-        if poll:
-            transforms, timestamp = worker.poll_transforms()
-            if transforms is not None:
-                return transforms, timestamp
-        return worker.get_latest_transforms()
+        return marker_manager.get_latest_transforms(poll=poll)
 
     def get_state(self):
+        # Defensive init (e.g., if setup_variables was bypassed)
+        if not hasattr(self, "marker_transform_cache"):
+            self.marker_transform_cache = {}
+        marker_manager = getattr(self, "marker_manager", None)
+        if marker_manager is not None:
+            # Keep alias in sync with manager cache
+            self.marker_transform_cache = marker_manager.marker_transform_cache
+
         extra_state_arrays: Dict[str, np.ndarray] = {}
         if len(self.state_keys) != 0:
             extra_state_values: Dict[str, np.ndarray] = {}
@@ -781,20 +745,12 @@ class RolloutPpoCus(RolloutBase):
                     f"but model_meta_info expects {expected_state_dim}."
                 )
 
-        marker_timestamp = self._refresh_marker_cache()
-        if self.required_marker_ids:
-            missing_now = [
-                marker_id
-                for marker_id in self.required_marker_ids
-                if marker_id not in self.marker_transform_cache
-            ]
-            if missing_now != self._last_missing_marker_ids:
-                if missing_now:
-                    print(
-                        f"[{self.__class__.__name__}] Warning: Missing cached transforms for marker IDs {missing_now}.",
-                        flush=True,
-                )
-                self._last_missing_marker_ids = missing_now
+        marker_manager = getattr(self, "marker_manager", None)
+        marker_timestamp = None
+        if marker_manager is not None:
+            marker_timestamp = marker_manager.refresh_cache()
+            if marker_manager.required_marker_ids:
+                marker_manager.warn_on_missing()
 
         self.state_for_ppo = state_vector.copy()
 
@@ -825,11 +781,6 @@ class RolloutPpoCus(RolloutBase):
         images = []
         for camera_name in self.camera_names:
             rgb_image = self.info["rgb_images"][camera_name]
-            if (
-                self._marker_worker is not None
-                and camera_name == "front"
-            ):
-                self._marker_worker.submit_frame(rgb_image.copy())
 
             image = np.moveaxis(rgb_image, -1, -3)
             image = torch.tensor(image.copy(), dtype=torch.uint8)
@@ -984,11 +935,12 @@ class RolloutPpoCus(RolloutBase):
 
     def reset(self):
         super().reset()
-        if self.marker_transform_cache is not None:
-            self.marker_transform_cache.clear()
+        marker_manager = getattr(self, "marker_manager", None)
+        if marker_manager is not None:
+            marker_manager.reset_cache()
         self.marker_detection_verified = False
 
-        if self._marker_worker is not None:
+        if marker_manager is not None and marker_manager._worker is not None:
             # Submit the first frame captured during reset, if available.
             self._submit_marker_frame()
             try:

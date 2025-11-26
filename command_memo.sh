@@ -29,7 +29,7 @@ python ./bin/Rollout.py Act RealXarm7Demo --config ./envs/configs/RealXarm7DemoE
 
 Mlp
 ==========================================================================================================
-python ./bin/Teleop.py RealXarm7Demo --config ./envs/configs/RealXarm7DemoEnv.yaml --input_device spacemouse
+python ./robo_manip_baselines/bin/Teleop.py RealXarm7Demo --config ./robo_manip_baselines/envs/configs/RealXarm7DemoEnv.yaml --input_device spacemouse
 python ./bin/Train.py Mlp --dataset_dir ./dataset/RealXarm7Demo_20250911_162223 --num_epochs 250
 python ./bin/Rollout.py Mlp RealXarm7Demo --config ./envs/configs/RealXarm7DemoEnv.yaml --checkpoint ./checkpoint/Mlp/RealXarm7Demo_20250911_162223_Mlp_20250922_162104/policy_epoch175.ckpt --wait_before_start
 no plotでも以外と重い。↓
@@ -52,7 +52,7 @@ python ./bin/CreatePpoCusMetaInfo.py --config ./ppo_tasks/jointhold_marker_check
 python ./bin/CreatePpoCusMetaInfo.py --config ./ppo_tasks/align.json --output ./checkpoint/PpoCus/Align/model_meta_info_align.pkl --force
 
 extrinsic_calibration
-python ./bin/extrinsic_calibraition.py
+python robo_manip_baselines/bin/extrinsic_calibraition.py
 
 make pickle and run
 ##########################################################################
@@ -88,9 +88,9 @@ python ./bin/Rollout.py PpoCus RealXarm7Demo \
 
 make pickle and run(DualBoxRotationAblated)
 ##########################################################################
-python ./bin/CreatePpoCusMetaInfo.py \
-  --config ./ppo_tasks/dual_box_rotation_ablated.json \
-  --output ./checkpoint/PpoCus/DualBoxRotationAblated/model_meta_info.pkl \
+python ./robo_manip_baselines/bin/CreatePpoCusMetaInfo.py \
+  --config ./robo_manip_baselines/ppo_tasks/dual_box_rotation_ablated.json \
+  --output ./robo_manip_baselines/checkpoint/PpoCus/DualBoxRotationAblated/model_meta_info.pkl \
   --force
 
 python ./robo_manip_baselines/bin/Rollout.py PpoCus RealXarm7DualDemo \
@@ -121,3 +121,5 @@ python ./bin/CollectXarm7Dynamics.py --robot-ip 192.168.1.244 --duration 120 --s
 
 
 python ./bin/Teleop.py RealXarm7DualDemo --config ./envs/configs/RealXarm7DualDemoEnv.yaml --input_device keyboard
+
+

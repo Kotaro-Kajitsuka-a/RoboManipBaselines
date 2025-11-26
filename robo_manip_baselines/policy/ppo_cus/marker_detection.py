@@ -4,7 +4,7 @@ import sys
 import threading
 import time
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple, List
 
 import cv2
 import numpy as np
@@ -33,6 +33,7 @@ DEFAULT_DETECTOR_THREADS = 4
 DEFAULT_DETECTOR_DECIMATE = 1.0
 DEFAULT_DETECTOR_SIGMA = 1.0
 DEFAULT_DETECTOR_SHARPENING = 0.1
+DEFAULT_CAMERA_NAME = "front"
 
 
 def load_base_to_camera_transform(path: Path) -> Optional[np.ndarray]:
@@ -199,7 +200,7 @@ class FrontCameraDetectionWorker:
                 flush=True,
             )
 
-        detector = self._build_detector()
+        detector = self._get_or_build_detector()
         if detector is None:
             self._detection_available = False
             print(
@@ -239,7 +240,9 @@ class FrontCameraDetectionWorker:
             except queue.Empty:
                 break
 
+
     def submit_frame(self, rgb_image: np.ndarray) -> None:
+        """Queue a frame for detection."""
         if rgb_image is None or self._stop_event.is_set():
             return
 
@@ -310,7 +313,7 @@ class FrontCameraDetectionWorker:
             transforms: Dict[int, np.ndarray] = {}
 
             if self._detection_available:
-                detector = self._build_detector()
+                detector = self._get_or_build_detector()
                 camera_mats = self._ensure_camera_parameters(gray_image)
                 if detector is not None and camera_mats is not None:
                     K, dist_coeffs = camera_mats
@@ -367,7 +370,7 @@ class FrontCameraDetectionWorker:
                     except queue.Full:
                         pass
 
-    def _build_detector(self):
+    def _get_or_build_detector(self):
         if self._detector is not None:
             return self._detector
         if build_detector is None:
@@ -404,6 +407,10 @@ class FrontCameraDetectionWorker:
                     flush=True,
                 )
         return self._detector
+
+    # Backward compatibility: legacy callers may still reference the old name.
+    def _build_detector(self):
+        return self._get_or_build_detector()
 
     def _ensure_camera_parameters(
         self, frame: np.ndarray
@@ -472,3 +479,137 @@ class FrontCameraDetectionWorker:
         )
         self._dist_coeffs = np.zeros(5, dtype=np.float32)
         return self._camera_matrix, self._dist_coeffs
+
+
+class MarkerManager:
+    """Manage marker config, detection worker lifecycle, and cached transforms."""
+
+    def __init__(
+        self,
+        base_to_camera: Optional[np.ndarray],
+        marker_definitions: Optional[List[Dict[str, Any]]] = None,
+        marker_camera_names: Optional[List[str]] = None,
+        default_tag_size_m: float = DEFAULT_TAG_SIZE_M,
+    ):
+        self.base_to_camera = None if base_to_camera is None else base_to_camera.astype(np.float64)
+        self.marker_definitions: List[Dict[str, Any]] = marker_definitions or []
+        self.required_marker_ids: List[int] = [
+            entry["id"] for entry in self.marker_definitions if "id" in entry
+        ]
+        self.marker_name_map: Dict[int, str] = {
+            entry["id"]: entry.get("name", f"marker_{entry['id']}")  # type: ignore[index]
+            for entry in self.marker_definitions
+            if "id" in entry
+        }
+        self.marker_size_map: Dict[int, float] = {
+            entry["id"]: float(entry.get("size_m", DEFAULT_TAG_SIZE_M))  # type: ignore[index]
+            for entry in self.marker_definitions
+            if "id" in entry
+        }
+        self.marker_camera_names: List[str] = (
+            [str(name) for name in marker_camera_names] if marker_camera_names else [DEFAULT_CAMERA_NAME]
+        )
+        self._tag_size_m = float(
+            self.marker_size_map[self.required_marker_ids[0]]
+        ) if self.required_marker_ids else float(default_tag_size_m)
+
+        self._worker: Optional[FrontCameraDetectionWorker] = None
+        self._active_camera: Optional[str] = None
+        self.marker_transform_cache: Dict[int, np.ndarray] = {}
+        self._last_missing_ids: Optional[List[int]] = None
+
+    def stop(self):
+        if self._worker is not None:
+            self._worker.stop()
+            self._worker = None
+        self._active_camera = None
+
+    def reset_cache(self):
+        self.marker_transform_cache.clear()
+        self._last_missing_ids = None
+
+    def start_with_cameras(
+        self, primary_cameras: Dict[str, Any], backup_cameras: Optional[Dict[str, Any]] = None
+    ) -> bool:
+        """Try to start detection using the first available camera."""
+        backup_cameras = backup_cameras or {}
+        if self.base_to_camera is None:
+            return False
+
+        for camera_name in self.marker_camera_names:
+            camera_obj = primary_cameras.get(camera_name) or backup_cameras.get(camera_name)
+            if camera_obj is None:
+                continue
+            intrinsic_info = extract_camera_intrinsic_info(camera_obj)
+            worker = FrontCameraDetectionWorker(
+                base_to_camera=self.base_to_camera,
+                intrinsic_info=intrinsic_info,
+                tag_size_m=self._tag_size_m,
+            )
+            worker.start()
+            self._worker = worker
+            self._active_camera = camera_name
+            return True
+        return False
+
+    def submit_rgb_images(self, rgb_images: Optional[Dict[str, np.ndarray]]) -> bool:
+        """Submit a frame from rgb_images to the worker."""
+        if self._worker is None or rgb_images is None:
+            return False
+        candidate_names = (
+            [self._active_camera] if self._active_camera is not None else self.marker_camera_names
+        )
+        for camera_name in candidate_names:
+            if camera_name is None:
+                continue
+            frame = rgb_images.get(camera_name)
+            if frame is None:
+                continue
+            self._worker.submit_frame(frame.copy())
+            return True
+        return False
+
+    def get_latest_frame(self):
+        if self._worker is None:
+            return None, None
+        return self._worker.get_latest_frame()
+
+    def get_latest_transforms(self, poll: bool = False):
+        """Get latest transforms from the worker."""
+        if self._worker is None:
+            return None, None
+        if poll:
+            transforms, timestamp = self._worker.poll_transforms()
+            if transforms is not None:
+                return transforms, timestamp
+        return self._worker.get_latest_transforms()
+
+    def refresh_cache(self, poll: bool = False) -> Optional[float]:
+        """Update cache from worker results, returning latest timestamp."""
+        transforms, timestamp = self.get_latest_transforms(poll=poll)
+        if not transforms:
+            transforms, timestamp = self.get_latest_transforms()
+        if transforms:
+            for marker_id, matrix in transforms.items():
+                self.marker_transform_cache[marker_id] = matrix.copy()
+        return timestamp
+
+    def missing_required_ids(self) -> List[int]:
+        """Return missing required marker IDs based on cached transforms."""
+        if not self.required_marker_ids:
+            return []
+        return [
+            marker_id
+            for marker_id in self.required_marker_ids
+            if marker_id not in self.marker_transform_cache
+        ]
+
+    def warn_on_missing(self):
+        missing_now = self.missing_required_ids()
+        if missing_now != self._last_missing_ids:
+            if missing_now:
+                print(
+                    f"[MarkerManager] Warning: Missing cached transforms for marker IDs {missing_now}.",
+                    flush=True,
+                )
+            self._last_missing_ids = missing_now

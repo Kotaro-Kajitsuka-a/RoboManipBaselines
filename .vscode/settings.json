@@ -1,5 +1,14 @@
 {
     "python-envs.defaultEnvManager": "ms-python.python:conda",
     "python-envs.defaultPackageManager": "ms-python.python:conda",
-    "python-envs.pythonProjects": []
+    "python-envs.pythonProjects": [],
+    "files.associations": {
+        "core": "cpp",
+        "bitset": "cpp",
+        "any": "cpp",
+        "functional": "cpp",
+        "new": "cpp",
+        "tuple": "cpp",
+        "type_traits": "cpp"
+    }
 }

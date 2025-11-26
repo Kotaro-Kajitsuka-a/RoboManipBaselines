@@ -45,8 +45,7 @@ class AlignTask:
         marker_ids = self.rollout.required_marker_ids
         if not marker_ids:
             raise ValueError(
-                "[AlignTask] No marker IDs specified in meta info. "
-                "Please populate 'ppo_task.markers'."
+                "[AlignTask] No marker IDs configured on the rollout; check hard-coded marker constants."
             )
         if len(marker_ids) != 1:
             raise ValueError(

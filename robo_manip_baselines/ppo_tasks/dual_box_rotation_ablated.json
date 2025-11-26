@@ -120,14 +120,6 @@
         "name": "box_pose",
         "dim": 9
       }
-    ],
-    "marker_cameras": [
-      "front"
-    ],
-
-    "params": {
-      "initial_detection_timeout": 5.0,
-      "initial_detection_interval": 0.05
-    }
+    ]
   }
 }
