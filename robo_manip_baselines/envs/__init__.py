@@ -61,6 +61,12 @@ register(
     entry_point="robo_manip_baselines.envs.mujoco:MujocoXarm7PushtEnv",
 )
 
+## Kinova Gen3
+register(
+    id="robo_manip_baselines/MujocoKinovaGen3CableEnv-v0",
+    entry_point="robo_manip_baselines.envs.mujoco:MujocoKinovaGen3CableEnv",
+)
+
 ## ViperX 300S
 register(
     id="robo_manip_baselines/MujocoVx300sPickEnv-v0",
@@ -123,4 +129,3 @@ register(
     id="robo_manip_baselines/RealXarm7DualDemoEnv-v0",
     entry_point="robo_manip_baselines.envs.real.xarm7_dual:RealXarm7DualDemoEnv",
 )
-

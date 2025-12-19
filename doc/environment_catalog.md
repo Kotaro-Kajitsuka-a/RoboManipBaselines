@@ -76,6 +76,12 @@ Task to push the T-shaped block to align the pose.
 
 https://github.com/user-attachments/assets/000ae494-8ed5-423a-a26e-652b7817c372
 
+### KinovaGen3
+#### MujocoKinovaGen3Cable
+Task to pass the cable between two poles.
+
+https://github.com/user-attachments/assets/4e9d4112-ce82-47e6-8977-eff4653be6cf
+
 ### ALOHA
 #### MujocoAlohaCable
 Task to manipulate a cable with two grippers.

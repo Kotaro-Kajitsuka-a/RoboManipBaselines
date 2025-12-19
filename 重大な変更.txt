@@ -57,3 +57,20 @@ robo_manip_baselines/envs/operation/OperationRealXarm7DualDemo.py
 
 RealEnvBase.pyにおいて、222行目のset_actionのjoint_vel_limit_scale=0.5に変更。
 
+
+
+一部apiの名称が最近に変更になったっぽい。
+https://github.com/xArm-Developer/xArm-Python-SDK/blob/master/doc/api/xarm_api.md
+例: ft_sensor_set_zero → set_ft_sensor_zero
+ft_sensor_enable → set_ft_sensor_enable
+
+
+robo_manip_baselines/common/body/ArmManager.py
+179行目
+print(self.pin_model.getJointId("joint_eef"))
+
+
+robo_manip_baselines/common/body/ArmManager.py
+300行目
+# Link ID of end-effector in robot model when solving IK by Pinocchio library
+ik_eef_frame_id: int

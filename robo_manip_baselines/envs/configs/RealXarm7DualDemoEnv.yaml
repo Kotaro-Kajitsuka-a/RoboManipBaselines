@@ -2,8 +2,9 @@ robot_ip_left: "192.168.1.244" # left arm from workspace side
 robot_ip_right: "192.168.1.211" # right arm from workspace side
 
 camera_ids:
-  front: "314422070401"
-  hand: "332522077926"
+  #front: "314422070401"
+  left_hand: "332522077926"
+  right_hand: "332522070075"
 # gelsight_ids:
 #   tactile_left: "GelSight Mini R0B 2BNK-CE0U: Ge"
 #   tactile_right: "GelSight Mini R0B 2BG8-0H3X: Ge"

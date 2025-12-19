@@ -103,7 +103,7 @@ class TrainBase(ABC):
             help="number of data files to use for learning (by default all files in the dataset_dir are used)",
         )
         parser.add_argument(
-            "--train_ratio", type=float, default=0.8, help="ratio of train data"
+            "--train_ratio", type=float, default=0.96, help="ratio of train data"
         )
         parser.add_argument(
             "--val_ratio", type=float, default=None, help="ratio of validation data"

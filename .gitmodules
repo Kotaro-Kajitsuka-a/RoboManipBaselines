@@ -48,5 +48,5 @@
 	path = external/check_AprilTag
 	url = https://github.com/kotaro-kaji/check_AprilTag.git
 [submodule "maniskill_exp"]
-	path = maniskill_exp
+	path = third_party/maniskill_exp
 	url = https://github.com/kotaro-kaji/maniskill_exp.git
