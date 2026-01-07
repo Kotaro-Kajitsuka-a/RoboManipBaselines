@@ -117,10 +117,10 @@ python ./robo_manip_baselines/bin/Rollout.py PpoCus RealXarm7DualDemo \
 ############################################################################
 
 python ./bin/CollectXarm7Dynamics.py --rojljbot-ip 192.168.1.244 --duration 120 --sample-rate 200 --output-dir ./measurements
-l
 
-#双腕teleop
-python ./robo_manip_baselines/bin/Teleop.py RealXarm7DualDemo --config ./robo_manip_baselines/envs/configs/RealXarm7DualDemoEnv.yaml --input_device keyboard
+#bimanual_center(base_center_T.calib)の計算
+python ./robo_manip_baselines/calib/calc_center_T.py
+
 
 
 #box 検出単体
@@ -134,11 +134,13 @@ python ./robo_manip_baselines/policy/sac/sac_tasks/box_pose_viewer.py
 #error code確認
 python robo_manip_baselines/bin/check_xarm_err.py --ip-left 192.168.1.244 --ip-right 192.168.1.211
 
-#set
-python robo_manip_baselines/bin/xarm_dual_gravity_comp.py \
-  --ip-left 192.168.1.244 --ip-right 192.168.1.211
 
+双腕teleop + train.py
+######################################################################################
+#双腕teleop
+python ./robo_manip_baselines/bin/Teleop.py RealXarm7DualDemo --config ./robo_manip_baselines/envs/configs/RealXarm7DualDemoEnv_Rollout.yaml --input_device keyboard
 
+######################################################################################
 
 make pickle and run(DualBoxRotation)
 ##########################################################################
@@ -152,14 +154,39 @@ python ./robo_manip_baselines/bin/Rollout.py Sac RealXarm7DualDemo \
   --skip_draw 50000 \
   --save_rollout \
   --config ./robo_manip_baselines/envs/configs/RealXarm7DualDemoEnv.yaml \
-  --checkpoint robo_manip_baselines/checkpoint/Sac/DualBoxRotation/ckpt_2750016.pt \
+  --checkpoint robo_manip_baselines/checkpoint/Sac/DualBoxRotation/ckpt_4000000.pt \
   --world_idx_repeat_count 10 
 
 python ./robo_manip_baselines/bin/Train.py Act \
-  --dataset_dir robo_manip_baselines/dataset/26epi_RolloutSac_RealXarm7DualDemo_20251219_145609 \
-  --num_epochs 250 --camera_names front left_hand right_hand
+  --dataset_dir robo_manip_baselines/dataset/54epi_solid_datasets \
+  --num_epochs 5000 --camera_names front --chunk_size 20 --no-enable_rmb_cache
+
+python ./robo_manip_baselines/bin/Train.py DiffusionPolicy \
+  --dataset_dir robo_manip_baselines/dataset/54epi_solid_datasets \
+  --camera_names front --scheduler ddim
+
+
+python ./robo_manip_baselines/bin/Rollout.py Act RealXarm7DualDemo \
+  --config ./robo_manip_baselines/envs/configs/RealXarm7DualDemoEnv_Rollout.yaml \
+  --checkpoint robo_manip_baselines/checkpoint/Act/54epi_solid_datasets_Act_20251224_155102/policy_last.ckpt \
+  --wait_before_start --skip_draw 50000 --save_rollout --world_idx_repeat_count 10
+
+
+python ./robo_manip_baselines/bin/Rollout.py DiffusionPolicy RealXarm7DualDemo \
+  --config ./robo_manip_baselines/envs/configs/RealXarm7DualDemoEnv_Rollout.yaml \
+  --checkpoint  robo_manip_baselines/checkpoint/DiffusionPolicy/54epi_full_solid_datasets_DiffusionPolicy_20251224_160106/policy_last.ckpt\
+  --wait_before_start --skip_draw 50000 --save_rollout --world_idx_repeat_count 10
+
 
 ############################################################################
+
+Mlp train
+######################################
+python ./robo_manip_baselines/bin/Train.py Mlp\
+  --dataset_dir robo_manip_baselines/dataset/26epi_RolloutSac_RealXarm7DualDemo_20251219_145609 \
+  --num_epochs 250 --camera_names front left_hand right_hand 
+
+######################################
 
 
 
@@ -176,3 +203,7 @@ Train from Act Rollout and rollout imitation policy of imitation policy
 python ./robo_manip_baselines/bin/Train.py Act --dataset_dir robo_manip_baselines/dataset/RolloutAct_RealXarm7DualDemo_20251219_142326 --num_epochs 250 --camera_names left_hand right_hand
 python ./robo_manip_baselines/bin/Rollout.py Act RealXarm7DualDemo --config ./robo_manip_baselines/envs/configs/RealXarm7DualDemoEnv.yaml --checkpoint robo_manip_baselines/checkpoint/Act/RolloutAct_RealXarm7DualDemo_20251219_142326_Act_20251219_143133/policy_best.ckpt --wait_before_start --skip_draw 50000 --save_rollout --world_idx_repeat_count 10
 ==============================================================================================================
+
+
+# Remove markers from dataset
+python robo_manip_baselines/misc/RemoveMarkers.py robo_manip_baselines/dataset/54epi_solid_datasets_test

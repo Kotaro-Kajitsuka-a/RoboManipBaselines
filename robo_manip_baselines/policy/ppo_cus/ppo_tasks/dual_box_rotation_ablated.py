@@ -15,8 +15,8 @@ BOX_MARKER_ID = 2  # must match the hard-coded marker in RolloutPpoCus
 # Downward offset (marker frame -> box frame) along marker -Z axis [m]
 BOX_MARKER_Z_OFFSET_M = 0.05625
 # ArUco/GridBoard parameters (copied from bin/box_detection.py)
-MARKER_LENGTH_M = 0.028625
-MARKER_SEPARATION_M = 0.004836458
+MARKER_LENGTH_M = 0.02940
+MARKER_SEPARATION_M = 0.0050
 MARKERS_X = 5
 MARKERS_Y = 7
 ARUCO_DICT_ID = aruco.DICT_4X4_50
@@ -97,7 +97,7 @@ class BoxPoseProvider:
             if self._latest_transform is None:
                 return None, None
             T = self._latest_transform.copy()
-            T[2, 3] = -0.03175  # force z to fixed value at the source
+            #T[2, 3] = -0.03175  # force z to fixed value at the source
             return T, self._latest_timestamp
 
     def _run(self) -> None:

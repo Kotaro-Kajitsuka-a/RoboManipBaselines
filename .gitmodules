@@ -50,3 +50,6 @@
 [submodule "maniskill_exp"]
 	path = third_party/maniskill_exp
 	url = https://github.com/kotaro-kaji/maniskill_exp.git
+[submodule "third_party/sam2"]
+	path = third_party/sam2
+	url = https://github.com/kotaro-kaji/sam2.git

@@ -405,6 +405,17 @@ class RolloutSac(RolloutBase):
 
         self.data_manager.append_single_data(DataKey.get_rgb_image_key("front"), rgb)
 
+        board_corners = None
+        if self.ppo_task_handler is not None:
+            board_getter = getattr(
+                self.ppo_task_handler, "get_latest_front_aruco_board_corners", None
+            )
+            if callable(board_getter):
+                board_corners = board_getter()
+        if board_corners is None:
+            board_corners = np.full((4, 2), -1.0, dtype=np.float32)
+        self.data_manager.append_single_data("front_aruco_board_corners", board_corners)
+
         box_seq = None
         image_seq = None
         if self.ppo_task_handler is not None:
@@ -611,7 +622,7 @@ class RolloutSac(RolloutBase):
 
 
 
-            print(f"state_for_sac: {self.state_for_sac}")
+            # print(f"state_for_sac: {self.state_for_sac}")
 
 
             

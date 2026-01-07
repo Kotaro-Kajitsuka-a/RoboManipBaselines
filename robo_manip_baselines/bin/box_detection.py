@@ -5,8 +5,8 @@ import pyrealsense2 as rs
 from cv2 import aruco
 
 # ==== ユーザー設定 ============================================================
-MARKER_LENGTH_M      = 0.028625      # 2.8625 cm
-MARKER_SEPARATION_M  = 0.004836458   # 0.4836458 cm
+MARKER_LENGTH_M      = 0.02940       # 2.940 cm
+MARKER_SEPARATION_M  = 0.0050        # 0.50 cm
 # GridBoard サイズ (markersX = 横のマーカー数, markersY = 縦のマーカー数)
 MARKERS_X = 5   # 列数
 MARKERS_Y = 7   # 行数

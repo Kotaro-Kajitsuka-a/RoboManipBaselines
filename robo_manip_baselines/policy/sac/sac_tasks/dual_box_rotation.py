@@ -15,12 +15,14 @@ BOX_MARKER_ID = 2  # must match the hard-coded marker in RolloutSac
 # Downward offset (marker frame -> box frame) along marker -Z axis [m]
 BOX_MARKER_Z_OFFSET_M = 0.05625
 # ArUco/GridBoard parameters (copied from bin/box_detection.py)
-MARKER_LENGTH_M = 0.028625
-MARKER_SEPARATION_M = 0.004836458
+MARKER_LENGTH_M = 0.02940
+MARKER_SEPARATION_M = 0.0050
 MARKERS_X = 5
 MARKERS_Y = 7
 ARUCO_DICT_ID = aruco.DICT_4X4_50
 BOX_DEPTH_M = 0.1140
+GRIDBOARD_W_M = MARKERS_X * MARKER_LENGTH_M + (MARKERS_X - 1) * MARKER_SEPARATION_M
+GRIDBOARD_H_M = MARKERS_Y * MARKER_LENGTH_M + (MARKERS_Y - 1) * MARKER_SEPARATION_M
 BOX_HALF_SIZE = np.array([0.2170 * 0.5, 0.2845 * 0.5, 0.1140 * 0.5], dtype=np.float32)
 BASE_CENTER_T_PATH = Path("robo_manip_baselines/calib/base_center_T.calib")
 # Use 1280x720 (16:9) for detection stability while keeping dataset recording at 640x480.
@@ -51,6 +53,25 @@ def _center_crop_4x3(img: np.ndarray) -> np.ndarray:
     return img[:, x0 : x0 + target_w]
 
 
+def _map_points_to_record_frame(
+    points: np.ndarray, src_w: int, src_h: int, dst_w: int = 640, dst_h: int = 480
+) -> np.ndarray:
+    """Map points from a 16:9 source frame to the 4:3 recorded frame."""
+    target_w = int(round(src_h * (4.0 / 3.0)))
+    if target_w >= src_w:
+        x0 = 0
+        target_w = src_w
+    else:
+        x0 = max((src_w - target_w) // 2, 0)
+    pts = points.astype(np.float32).copy()
+    pts[:, 0] -= float(x0)
+    scale_x = float(dst_w) / float(target_w)
+    scale_y = float(dst_h) / float(src_h)
+    pts[:, 0] *= scale_x
+    pts[:, 1] *= scale_y
+    return pts
+
+
 class BoxPoseProvider:
     """RealSense + ArUco GridBoard based box pose estimator."""
 
@@ -73,8 +94,10 @@ class BoxPoseProvider:
         self._latest_transform: Optional[np.ndarray] = None
         self._latest_timestamp: Optional[float] = None
         self._latest_front_rgb: Optional[np.ndarray] = None  # RGB uint8 (480, 640, 3)
+        self._latest_board_corners: Optional[np.ndarray] = None  # float32 (4, 2)
         self._latest_box_pose_seq: int = 0
         self._latest_image_seq: int = 0
+        self._latest_board_seq: int = 0
         self._lock = threading.Lock()
 
         # Board setup
@@ -89,8 +112,6 @@ class BoxPoseProvider:
         self._board = aruco.GridBoard(
             (MARKERS_X, MARKERS_Y), MARKER_LENGTH_M, MARKER_SEPARATION_M, self._aruco_dict
         )
-        self._board_w = MARKERS_X * MARKER_LENGTH_M + (MARKERS_X - 1) * MARKER_SEPARATION_M
-        self._board_h = MARKERS_Y * MARKER_LENGTH_M + (MARKERS_Y - 1) * MARKER_SEPARATION_M
 
         self._base_T_cam = np.loadtxt(self.calib_path).astype(np.float32)
 
@@ -112,7 +133,7 @@ class BoxPoseProvider:
             if self._latest_transform is None:
                 return None, None
             T = self._latest_transform.copy()
-            T[2, 3] = -0.03175  # force z to fixed value at the source
+            #T[2, 3] = -0.03175  # force z to fixed value at the source
             return T, self._latest_timestamp
 
     def get_latest_front_rgb(self) -> Tuple[Optional[np.ndarray], Optional[float]]:
@@ -133,6 +154,13 @@ class BoxPoseProvider:
         """Return the latest image update sequence number."""
         with self._lock:
             return self._latest_image_seq if self._latest_image_seq > 0 else None
+
+    def get_latest_board_corners(self) -> Optional[np.ndarray]:
+        """Return the latest ArUco board corners in recorded-frame coordinates."""
+        with self._lock:
+            if self._latest_board_corners is None:
+                return None
+            return self._latest_board_corners.copy()
 
     def _run(self) -> None:
         pipeline = rs.pipeline()
@@ -162,7 +190,7 @@ class BoxPoseProvider:
         dist_coeffs = np.array(intr.coeffs[:5], dtype=np.float32)
 
         R_flip_x = np.array([[1, 0, 0], [0, -1, 0], [0, 0, -1]], dtype=np.float32)
-        center_offset = np.array([self._board_w * 0.5, self._board_h * 0.5, 0.0], dtype=np.float32)
+        center_offset = np.array([GRIDBOARD_W_M * 0.5, GRIDBOARD_H_M * 0.5, 0.0], dtype=np.float32)
         z_offset = np.array([0.0, 0.0, -BOX_DEPTH_M * 0.5], dtype=np.float32)
 
         try:
@@ -178,16 +206,40 @@ class BoxPoseProvider:
                 # We record at 640x480 to match the typical RoboManip dataset resolution.
                 rgb = _center_crop_4x3(img)
                 rgb = cv2.resize(rgb, (640, 480), interpolation=cv2.INTER_AREA)
-                with self._lock:
-                    self._latest_front_rgb = rgb
-                    self._latest_image_seq += 1
+
+                board_corners_record = np.full((4, 2), -1.0, dtype=np.float32)
 
                 corners, ids, _ = aruco.detectMarkers(gray, self._aruco_dict, parameters=self._aruco_params)
                 if ids is None or len(ids) == 0:
+                    with self._lock:
+                        self._latest_front_rgb = rgb
+                        self._latest_image_seq += 1
+                        self._latest_board_corners = board_corners_record
+                        self._latest_board_seq += 1
                     continue
                 retval, rvec, tvec = aruco.estimatePoseBoard(corners, ids, self._board, K, dist_coeffs, None, None)
                 if retval <= 0:
+                    with self._lock:
+                        self._latest_front_rgb = rgb
+                        self._latest_image_seq += 1
+                        self._latest_board_corners = board_corners_record
+                        self._latest_board_seq += 1
                     continue
+
+                board_corners_3d = np.array(
+                    [
+                        [0.0, 0.0, 0.0],
+                        [GRIDBOARD_W_M, 0.0, 0.0],
+                        [GRIDBOARD_W_M, GRIDBOARD_H_M, 0.0],
+                        [0.0, GRIDBOARD_H_M, 0.0],
+                    ],
+                    dtype=np.float32,
+                )
+                proj, _ = cv2.projectPoints(board_corners_3d, rvec, tvec, K, dist_coeffs)
+                board_corners_px = proj.reshape(-1, 2)
+                board_corners_record = _map_points_to_record_frame(
+                    board_corners_px, self.res_w, self.res_h
+                )
 
                 R_board, _ = cv2.Rodrigues(rvec)
                 t_board_box = center_offset + R_flip_x @ z_offset
@@ -200,6 +252,10 @@ class BoxPoseProvider:
                 base_T_box = self._base_T_cam @ cam_T_box
 
                 with self._lock:
+                    self._latest_front_rgb = rgb
+                    self._latest_image_seq += 1
+                    self._latest_board_corners = board_corners_record
+                    self._latest_board_seq += 1
                     self._latest_transform = base_T_box.copy()
                     self._latest_timestamp = time.time()
                     self._latest_box_pose_seq += 1
@@ -318,14 +374,14 @@ class DualBoxRotationTask:
     def get_extra_state(self) -> Dict[str, np.ndarray]:
         box_pose = self._compute_box_pose_from_marker()
         box_pushpoint = self._get_box_pushpoint(box_pose)
-        print(
-            f"[DualBoxRotationTask] box_pose={box_pose}",
-            flush=True,
-        )
-        print(
-            f"[DualBoxRotationTask] box_pushpoint={box_pushpoint}",
-            flush=True,
-        )
+        # print(
+        #     f"[DualBoxRotationTask] box_pose={box_pose}",
+        #     flush=True,
+        # )
+        # print(
+        #     f"[DualBoxRotationTask] box_pushpoint={box_pushpoint}",
+        #     flush=True,
+        # )
         return {"box_pose": box_pose, "box_pushpoint": box_pushpoint}
 
     def get_latest_front_rgb(self) -> Optional[np.ndarray]:
@@ -340,6 +396,10 @@ class DualBoxRotationTask:
     def get_latest_image_seq(self) -> Optional[int]:
         """Return the latest image update sequence number from the detector thread."""
         return self._provider.get_latest_image_seq()
+
+    def get_latest_front_aruco_board_corners(self) -> Optional[np.ndarray]:
+        """Return the latest ArUco board corners in the recorded frame."""
+        return self._provider.get_latest_board_corners()
 
 
 def build_ppo_task(

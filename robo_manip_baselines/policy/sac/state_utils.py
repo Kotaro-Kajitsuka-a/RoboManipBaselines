@@ -31,5 +31,4 @@ def get_adjusted_measured_eef_pose(
         else right_pose.astype(np.float32, copy=False)
     )
 
-    print(f"left = {left}, right = {right}")
     return left, right
