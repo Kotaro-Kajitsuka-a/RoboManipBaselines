@@ -75,10 +75,11 @@ class RealXarm7DualEnvBase(RealEnvBase):
             ArmConfig(
                 arm_urdf_path=path.join(
                     path.dirname(__file__),
-                    "../../assets/common/robots/xarm7/xarm7.urdf",
+                    "../../assets/common/robots/xarm7/xarm7_1305_left_ball_ee_left.urdf",
                 ),
                 arm_root_pose=None,
                 ik_eef_joint_id=7,
+                ik_eef_frame_id=52,
                 arm_joint_idxes=np.arange(7),
                 gripper_joint_idxes=np.array([7]),
                 gripper_joint_idxes_in_gripper_joint_pos=np.array([0]),
@@ -89,10 +90,11 @@ class RealXarm7DualEnvBase(RealEnvBase):
             ArmConfig(
                 arm_urdf_path=path.join(
                     path.dirname(__file__),
-                    "../../assets/common/robots/xarm7/xarm7.urdf",
+                    "../../assets/common/robots/xarm7/xarm7_1305_left_ball_ee_right.urdf",
                 ),
                 arm_root_pose=None,
                 ik_eef_joint_id=7,
+                ik_eef_frame_id=52,
                 arm_joint_idxes=np.arange(8, 15),
                 gripper_joint_idxes=np.array([15]),
                 gripper_joint_idxes_in_gripper_joint_pos=np.array([1]),
@@ -114,7 +116,7 @@ class RealXarm7DualEnvBase(RealEnvBase):
         #self.xarm_api_left.set_ft_sensor_zero()
         time.sleep(0.2)
         self.xarm_api_left.clean_error()
-        self.xarm_api_left.set_mode(6)
+        self.xarm_api_left.set_mode(1)
         self.xarm_api_left.set_state(0)
         self.xarm_api_left.set_collision_sensitivity(2)
         #self.xarm_api_left.clean_gripper_error()
@@ -140,9 +142,9 @@ class RealXarm7DualEnvBase(RealEnvBase):
         #self.xarm_api_right.set_ft_sensor_zero()
         time.sleep(0.2)
         self.xarm_api_right.clean_error()
-        self.xarm_api_right.set_mode(6)
+        self.xarm_api_right.set_mode(1)
         self.xarm_api_right.set_state(0)
-        self.xarm_api_right.set_collision_sensitivity(2)
+        self.xarm_api_right.set_collision_sensitivity(1)
         #self.xarm_api_right.clean_gripper_error()
         #self.xarm_api_right.set_gripper_mode(0)
         #self.xarm_api_right.set_gripper_enable(True)
@@ -210,7 +212,8 @@ class RealXarm7DualEnvBase(RealEnvBase):
             self.init_qpos,
             duration=None,
             joint_vel_limit_scale=0.1,
-            wait=True
+            wait=True,
+            reset_bool=True,
         )
 
         print(
@@ -239,7 +242,7 @@ class RealXarm7DualEnvBase(RealEnvBase):
 
 
     def _set_action(
-        self, action, duration=None, joint_vel_limit_scale=10.0, wait=False
+        self, action, duration=None, joint_vel_limit_scale=10.0, wait=False, reset_bool=False
     ):
         start_time = time.time()
 
@@ -255,36 +258,81 @@ class RealXarm7DualEnvBase(RealEnvBase):
             np.clip(joint_vel_limit_scale, 0.01, 10.0) * self.joint_vel_limit
         )
 
+        if reset_bool:
+            self.xarm_api_left.set_mode(6)
+            self.xarm_api_left.set_state(0)
+            self.xarm_api_right.set_mode(6)
+            self.xarm_api_right.set_state(0)
 
-        # send command to the left arm
-        left_xarm_code = self.xarm_api_left.set_servo_angle(
-            angle=left_arm_joint_pos_command,
-            speed=scaled_joint_vel_limit,
-            mvtime=duration,
-            is_radian=True,
-            wait=False,
-        )
-        # send command to the right arm
-        right_xarm_code = self.xarm_api_right.set_servo_angle(
-            angle=right_arm_joint_pos_command,
-            speed=scaled_joint_vel_limit,
-            mvtime=duration,
-            is_radian=True,
-            wait=False,
-        )
-        if left_xarm_code != 0:
-            left_err = self._format_err_warn(self.xarm_api_left, "left")
-            raise RuntimeError(
-                f"[{self.__class__.__name__}] Invalid xArm API code: {left_xarm_code} ({left_err})"
-            )
+            for _ in range(10):
+                time.sleep(0.2)
+                if (
+                    self.xarm_api_left.mode == 6
+                    and self.xarm_api_right.mode == 6
+                ):
+                    print(f"[{self.__class__.__name__}] self.xarm_api_left.mode: {self.xarm_api_left.mode}")
+                    print(f"[{self.__class__.__name__}] self.xarm_api_right.mode: {self.xarm_api_right.mode}")
+                    break
 
-        if right_xarm_code != 0:
-            right_err = self._format_err_warn(self.xarm_api_right, "right")
-            raise RuntimeError(
-                f"[{self.__class__.__name__}] Invalid xArm API code: {right_xarm_code} ({right_err})"
+            # send command to the left arm
+            left_xarm_code = self.xarm_api_left.set_servo_angle(
+                angle=left_arm_joint_pos_command,
+                speed=scaled_joint_vel_limit,
+                mvtime=duration,
+                is_radian=True,
+                wait=False,
             )
-        
-        
+            # send command to the right arm
+            right_xarm_code = self.xarm_api_right.set_servo_angle(
+                angle=right_arm_joint_pos_command,
+                speed=scaled_joint_vel_limit,
+                mvtime=duration,
+                is_radian=True,
+                wait=False,
+            )
+            time.sleep(7)
+            if left_xarm_code != 0:
+                left_err = self._format_err_warn(self.xarm_api_left, "left")
+                raise RuntimeError(
+                    f"[{self.__class__.__name__}] Invalid xArm API code: {left_xarm_code} ({left_err})"
+                )
+
+            if right_xarm_code != 0:
+                right_err = self._format_err_warn(self.xarm_api_right, "right")
+                raise RuntimeError(
+                    f"[{self.__class__.__name__}] Invalid xArm API code: {right_xarm_code} ({right_err})"
+                )
+            
+            self.xarm_api_left.set_mode(1)
+            self.xarm_api_right.set_mode(1)
+            self.xarm_api_left.set_state(0)
+            self.xarm_api_right.set_state(0)
+
+            time.sleep(0.2)
+        elif self.xarm_api_left.mode == 1 and self.xarm_api_right.mode == 1:
+            xarm_code = self.xarm_api_left.set_servo_angle_j(
+                left_arm_joint_pos_command,
+                speed=scaled_joint_vel_limit,  # expects deg/s
+                is_radian=True,
+            )
+            if xarm_code != 0:
+                left_err = self._format_err_warn(self.xarm_api_left, "left")
+                raise RuntimeError(
+                    f"[{self.__class__.__name__}] Invalid xArm API code: {xarm_code} ({left_err})"
+                )
+            xarm_code = self.xarm_api_right.set_servo_angle_j(
+                right_arm_joint_pos_command,
+                speed=scaled_joint_vel_limit,  # set_servo_angle_j expects deg/s
+                is_radian=True,
+            )
+            if xarm_code != 0:
+                right_err = self._format_err_warn(self.xarm_api_right, "right")
+                raise RuntimeError(
+                    f"[{self.__class__.__name__}] Invalid xArm API code: {xarm_code} ({right_err})"
+                )
+        else:
+            raise ValueError("Unexpectedly xarm_api.mode != 1 in _set_action function")
+
         # Send command to xArm gripper
         if self.fixed_gripper_joint_pos is None:
             left_gripper_pos = action[self.body_config_list[0].gripper_joint_idxes][0]

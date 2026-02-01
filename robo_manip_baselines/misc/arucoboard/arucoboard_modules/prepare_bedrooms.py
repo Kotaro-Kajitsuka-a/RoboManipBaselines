@@ -2,11 +2,15 @@ from pathlib import Path
 import subprocess
 
 
-TARGET_MP4_NAME = "front_rgb_image.rmb.mp4"
+def _target_mp4_name(camera_name: str) -> str:
+    if not camera_name:
+        raise ValueError("camera_name must be a non-empty string.")
+    return f"{camera_name}_rgb_image.rmb.mp4"
 
 
-def iter_target_mp4(input_dir: Path):
-    for mp4_path in input_dir.rglob(TARGET_MP4_NAME):
+def iter_target_mp4(input_dir: Path, camera_name: str):
+    target_name = _target_mp4_name(camera_name)
+    for mp4_path in input_dir.rglob(target_name):
         if ".bedrooms" in mp4_path.parts:
             continue
         yield mp4_path
@@ -34,19 +38,20 @@ def extract_frames(mp4_path: Path, bedroom_dir: Path):
     subprocess.run(command, check=True)
 
 
-def prepare_bedrooms(input_dir: Path):
+def prepare_bedrooms(input_dir: Path, camera_name: str):
     input_dir = Path(input_dir)
     if not input_dir.exists():
         raise FileNotFoundError(f"input_dir does not exist: {input_dir}")
 
-    mp4_paths = list(iter_target_mp4(input_dir))
+    mp4_paths = list(iter_target_mp4(input_dir, camera_name))
     print(f"[prepare_bedrooms] Found mp4 files: {len(mp4_paths)}")
     for mp4_path in mp4_paths:
         extract_frames(mp4_path, bedroom_dir_for_mp4(mp4_path))
     return mp4_paths
 
 
-def list_bedroom_dirs(input_dir: Path):
+def list_bedroom_dirs(input_dir: Path, camera_name: str):
     input_dir = Path(input_dir)
-    bedroom_dirs = sorted(input_dir.rglob(".bedrooms/bedroom_front_rgb_image"))
+    base = f"bedroom_{camera_name}_rgb_image"
+    bedroom_dirs = sorted(input_dir.rglob(f".bedrooms/{base}"))
     return [str(p) for p in bedroom_dirs]

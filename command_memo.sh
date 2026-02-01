@@ -4,10 +4,12 @@
 # Go to the top directory of this repository
 cd robo_manip_baselines
 # Connect a SpaceMouse to your PC
-python ./bin/Teleop.py MujocoXarm7Ring --world_idx_list 0 5 --input_device keyboard
+python ./bin/Teleop.py MujocoXarm7Ring --world_idx_list 0 5 --input_device spacemouse
 ================================================================================
 
 
+#Dual teleop in simulation
+python ./bin/Teleop.py MujocoUR5eDualCable --world_idx_list 0 5 --input_device_config ./teleop/configs/SpaceMouseDual.yaml
 
 
 ================================================================================
@@ -139,6 +141,8 @@ python robo_manip_baselines/bin/check_xarm_err.py --ip-left 192.168.1.244 --ip-r
 ######################################################################################
 #双腕teleop
 python ./robo_manip_baselines/bin/Teleop.py RealXarm7DualDemo --config ./robo_manip_baselines/envs/configs/RealXarm7DualDemoEnv_Rollout.yaml --input_device keyboard
+python ./robo_manip_baselines/bin/Teleop.py RealXarm7DualDemo --config ./robo_manip_baselines/envs/configs/RealXarm7DualDemoEnv_Rollout.yaml --input_device_config ./robo_manip_baselines/teleop/configs/SpaceMouseDual.yaml
+
 
 ######################################################################################
 
@@ -159,22 +163,22 @@ python ./robo_manip_baselines/bin/Rollout.py Sac RealXarm7DualDemo \
 
 python ./robo_manip_baselines/bin/Train.py Act \
   --dataset_dir robo_manip_baselines/dataset/54epi_solid_datasets \
-  --num_epochs 5000 --camera_names front --chunk_size 20 --no-enable_rmb_cache
+  --num_epochs 2000 --camera_names front --chunk_size 20 --no-enable_rmb_cache
 
 python ./robo_manip_baselines/bin/Train.py DiffusionPolicy \
-  --dataset_dir robo_manip_baselines/dataset/54epi_solid_datasets \
+  --dataset_dir robo_manip_baselines/dataset/46epis_0112_board_removed \
   --camera_names front --scheduler ddim
 
 
 python ./robo_manip_baselines/bin/Rollout.py Act RealXarm7DualDemo \
   --config ./robo_manip_baselines/envs/configs/RealXarm7DualDemoEnv_Rollout.yaml \
-  --checkpoint robo_manip_baselines/checkpoint/Act/54epi_solid_datasets_Act_20251224_155102/policy_last.ckpt \
+  --checkpoint robo_manip_baselines/checkpoint/Act/46epis_0112_board_removed_Act_20260114_142325/policy_last.ckpt \
   --wait_before_start --skip_draw 50000 --save_rollout --world_idx_repeat_count 10
 
 
 python ./robo_manip_baselines/bin/Rollout.py DiffusionPolicy RealXarm7DualDemo \
   --config ./robo_manip_baselines/envs/configs/RealXarm7DualDemoEnv_Rollout.yaml \
-  --checkpoint  robo_manip_baselines/checkpoint/DiffusionPolicy/54epi_full_solid_datasets_DiffusionPolicy_20251224_160106/policy_last.ckpt\
+  --checkpoint  robo_manip_baselines/checkpoint/DiffusionPolicy/46epis_0112_board_removed_DiffusionPolicy_20260112_174536/policy_last.ckpt \
   --wait_before_start --skip_draw 50000 --save_rollout --world_idx_repeat_count 10
 
 

@@ -1,0 +1,39 @@
+version: 1
+created_at: '2026-01-23T06:58:26.684265+00:00'
+image_size:
+- 640
+- 480
+fps: 30
+cameras:
+  left_hand:
+    serial: '332522077926'
+    intrinsics:
+      width: 640
+      height: 480
+      fx: 605.8124389648438
+      fy: 604.6607055664062
+      cx: 315.23394775390625
+      cy: 256.3607177734375
+      coeffs:
+      - 0.0
+      - 0.0
+      - 0.0
+      - 0.0
+      - 0.0
+      model: distortion.inverse_brown_conrady
+  top:
+    serial: '310522071235'
+    intrinsics:
+      width: 640
+      height: 480
+      fx: 607.811767578125
+      fy: 607.1177368164062
+      cx: 321.6131591796875
+      cy: 246.10968017578125
+      coeffs:
+      - 0.0
+      - 0.0
+      - 0.0
+      - 0.0
+      - 0.0
+      model: distortion.inverse_brown_conrady

@@ -74,7 +74,7 @@ class RealXarm7EnvBase(RealEnvBase):
                 ),
                 arm_root_pose=None,
                 ik_eef_joint_id=7,
-                ik_eef_frame_id=10,
+                ik_eef_frame_id=None,
                 arm_joint_idxes=np.arange(7),
                 gripper_joint_idxes=np.array([7]),
                 gripper_joint_idxes_in_gripper_joint_pos=np.array([0]),
