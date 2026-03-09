@@ -18,8 +18,10 @@ GRIDBOARD_H_M = MARKERS_Y * MARKER_LENGTH_M + (MARKERS_Y - 1) * MARKER_SEPARATIO
 DEFAULT_INTRINSICS_PATH = (
     Path(__file__).resolve().parent.parent / "camera_intrinsics.yaml"
 )
-WIDTH_MARGIN_M = 0.15
-HEIGHT_MARGIN_M = 0.145
+
+WIDTH_MARGIN_M = 0.0175 # actual 0.012
+HEIGHT_MARGIN_M = 0.0525 #actual 0.022
+
 
 
 def load_camera_intrinsics(

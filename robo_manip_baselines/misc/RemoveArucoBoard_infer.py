@@ -18,7 +18,7 @@ MARKERS_X = 5
 MARKERS_Y = 7
 GRIDBOARD_W_M = MARKERS_X * MARKER_LENGTH_M + (MARKERS_X - 1) * MARKER_SEPARATION_M
 GRIDBOARD_H_M = MARKERS_Y * MARKER_LENGTH_M + (MARKERS_Y - 1) * MARKER_SEPARATION_M
-MAX_JUMP_PX = 10.0
+MAX_JUMP_PX = 50.0
 
 
 def is_valid_corners(corners: np.ndarray) -> bool:
@@ -66,7 +66,7 @@ def apply_whiteout(
     # fill_color = np.array([0x4D, 0x78, 0x9A], dtype=np.float32)
 
     # fill_color = np.array([0x52, 0x86, 0xA3], dtype=np.float32)  # #a38652 RGB
-    fill_color = np.array([0x5A, 0x8C, 0xA7], dtype=np.float32)  # #a78c5a RGB
+    fill_color = np.array([0x8D, 0xB8, 0xFB], dtype=np.float32)  # #ac8f5c RGB (top color), #fbb88d
 
 
     frame_f = frame_f * (1.0 - alpha[..., None]) + fill_color * alpha[..., None]

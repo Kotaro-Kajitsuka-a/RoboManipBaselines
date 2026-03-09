@@ -24,10 +24,10 @@ BOX_DEPTH_M = 0.1140
 GRIDBOARD_W_M = MARKERS_X * MARKER_LENGTH_M + (MARKERS_X - 1) * MARKER_SEPARATION_M
 GRIDBOARD_H_M = MARKERS_Y * MARKER_LENGTH_M + (MARKERS_Y - 1) * MARKER_SEPARATION_M
 BOX_HALF_SIZE = np.array([0.2170 * 0.5, 0.2845 * 0.5, 0.1140 * 0.5], dtype=np.float32)
-BASE_CENTER_T_PATH = Path("robo_manip_baselines/calib/base_center_T.calib")
+BASE_CENTER_T_PATH = Path("robo_manip_baselines/calib/base_center_T_top.calib")
 # Use 1280x720 (16:9) for detection stability while keeping dataset recording at 640x480.
 RES_W, RES_H, FPS = 1280, 720, 30
-USE_SERIAL = "314422070401"
+USE_SERIAL = "310522071235"
 
 
 def _rotmat_to_rpy_deg(R: np.ndarray) -> np.ndarray:
@@ -175,13 +175,8 @@ class BoxPoseProvider:
             print(f"[BoxPoseProvider] Failed to start RealSense pipeline: {exc}", flush=True)
             return
 
-        sensor = profile.get_device().first_color_sensor()
-        try:
-            sensor.set_option(rs.option.enable_auto_exposure, 0)
-            sensor.set_option(rs.option.exposure, 140)
-            sensor.set_option(rs.option.gain, 64)
-        except Exception:
-            pass
+        # Match normal record-data camera behavior (no manual exposure/gain override).
+        # Keep rgb8 stream + 1280x720 capture path for SAC-specific cropping/resizing.
 
         color_stream = profile.get_stream(rs.stream.color).as_video_stream_profile()
         intr = color_stream.get_intrinsics()
@@ -276,6 +271,7 @@ class DualBoxRotationTask:
         self._provider.start()
         self._pushpoint_local_right: Optional[np.ndarray] = None
         self._pushpoint_local_left: Optional[np.ndarray] = None
+        self._last_box_pose: Optional[np.ndarray] = None
 
     def __del__(self) -> None:  # pragma: no cover - best-effort cleanup
         try:
@@ -369,7 +365,8 @@ class DualBoxRotationTask:
         translation = T_base_to_box[:3, 3].astype(np.float32)
         rotation = T_base_to_box[:3, :3]
         rotation6d = self._rotation_matrix_to_6d(rotation).astype(np.float32)
-        return np.concatenate([translation, rotation6d]).astype(np.float32)
+        self._last_box_pose = np.concatenate([translation, rotation6d]).astype(np.float32)
+        return self._last_box_pose.copy()
 
     def get_extra_state(self) -> Dict[str, np.ndarray]:
         box_pose = self._compute_box_pose_from_marker()

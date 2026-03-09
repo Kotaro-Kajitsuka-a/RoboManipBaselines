@@ -76,9 +76,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--webcam-fov", type=float, default=62.0, help="Estimated horizontal FOV in degrees for webcam mode")
     parser.add_argument("--tag-size", type=float, default=0.031, help="Default tag edge length in meters")
     parser.add_argument("--family", default="tag36h11", help="AprilTag family")
-    parser.add_argument("--auto-exposure", action="store_true", help="Keep RealSense auto exposure enabled")
-    parser.add_argument("--exposure", type=float, default=140.0, help="Manual RealSense exposure (when auto exposure is disabled)")
-    parser.add_argument("--gain", type=float, default=64.0, help="Manual RealSense gain (when auto exposure is disabled)")
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT_PATH,
                         help="Destination file for the captured transform (CSV).")
     parser.add_argument("--quiet", action="store_true", help="Suppress console logs for T_cam→base_tag.")

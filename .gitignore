@@ -22,6 +22,8 @@ GTAGS
 
 commit.sh
 
+/wandb
+
 
 asobiba.ipynb
 check_hdf5.ipynb
@@ -29,5 +31,7 @@ check_hdf5.ipynb
 
 robo_manip_baselines/rollout_debug_log_expanded.csv
 
-robo_manip_baselines/yolopose/runs
-robo_manip_baselines/yolopose/datasets
+robo_manip_baselines/misc/arucoboard/yolopose/runs
+robo_manip_baselines/misc/arucoboard/yolopose/datasets/**
+
+robo_manip_baselines/misc/arucoboard/runs

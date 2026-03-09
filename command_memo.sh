@@ -158,16 +158,23 @@ python ./robo_manip_baselines/bin/Rollout.py Sac RealXarm7DualDemo \
   --skip_draw 50000 \
   --save_rollout \
   --config ./robo_manip_baselines/envs/configs/RealXarm7DualDemoEnv.yaml \
-  --checkpoint robo_manip_baselines/checkpoint/Sac/DualBoxRotation/ckpt_4000000.pt \
-  --world_idx_repeat_count 10 
+  --checkpoint robo_manip_baselines/checkpoint/Sac/DualBoxRotation/ckpt_18900032.pt \
+  --world_idx_repeat_count 45
 
 python ./robo_manip_baselines/bin/Train.py Act \
   --dataset_dir robo_manip_baselines/dataset/54epi_solid_datasets \
   --num_epochs 2000 --camera_names front --chunk_size 20 --no-enable_rmb_cache
 
-python ./robo_manip_baselines/bin/Train.py DiffusionPolicy \
-  --dataset_dir robo_manip_baselines/dataset/46epis_0112_board_removed \
-  --camera_names front --scheduler ddim
+python ./bin/Train.py DiffusionPolicy \
+<<<<<<< HEAD
+  --dataset_dir ./dataset/45epis_highspeed_board_removed \
+=======
+  --dataset_dir ./dataset/45epis_birdseye_human \
+>>>>>>> 3ac578a (sync)
+  --camera_names top \
+  --scheduler ddim --num_epochs 1000 \
+  --train_ratio 1.0 --val_ratio 0.01 \
+  --seed 62
 
 
 python ./robo_manip_baselines/bin/Rollout.py Act RealXarm7DualDemo \
@@ -178,7 +185,7 @@ python ./robo_manip_baselines/bin/Rollout.py Act RealXarm7DualDemo \
 
 python ./robo_manip_baselines/bin/Rollout.py DiffusionPolicy RealXarm7DualDemo \
   --config ./robo_manip_baselines/envs/configs/RealXarm7DualDemoEnv_Rollout.yaml \
-  --checkpoint  robo_manip_baselines/checkpoint/DiffusionPolicy/46epis_0112_board_removed_DiffusionPolicy_20260112_174536/policy_last.ckpt \
+  --checkpoint robo_manip_baselines/checkpoint/DiffusionPolicy/45epis_birdseye_human_DiffusionPolicy_20260209_092453/policy_last.ckpt \
   --wait_before_start --skip_draw 50000 --save_rollout --world_idx_repeat_count 10
 
 
@@ -209,5 +216,22 @@ python ./robo_manip_baselines/bin/Rollout.py Act RealXarm7DualDemo --config ./ro
 ==============================================================================================================
 
 
+
+
 # Remove markers from dataset
 python robo_manip_baselines/misc/RemoveMarkers.py robo_manip_baselines/dataset/54epi_solid_datasets_test
+
+
+##########################################
+cd robo_manip_baselines/misc/arucoboard
+python PrepareYoloDataset.py path/to/dataset
+python TrainYoloPose.py /home/owner/K_Kajitsuka/RoboManipBaselines/robo_manip_baselines/dataset/45epis_highspeed/yolo_front_dataset.yaml
+##########################################
+python VisualizeYoloTrack2.py ~/Downloads/best_2.pt /home/kotaro/my_projects/robot/RoboManipBaselines/robo_manip_baselines/dataset/45epis_birdseye_human/RealXarm7DualDemo_20260127_120350/RealXarm7DualDemo_world0_016.rmb/front_rgb_image.rmb.mp4
+
+
+
+python robo_manip_baselines/misc/CreateBoxPoseEvalHdf5.py /path/to/dataset_dir ~/Downloads/best_3.pt
+
+
+python robo_manip_baselines/misc/EvalBoxRotation.py /path/to/dataset_dir

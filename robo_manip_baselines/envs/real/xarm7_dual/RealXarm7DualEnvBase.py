@@ -75,10 +75,11 @@ class RealXarm7DualEnvBase(RealEnvBase):
             ArmConfig(
                 arm_urdf_path=path.join(
                     path.dirname(__file__),
-                    "../../assets/common/robots/xarm7/xarm7.urdf",
+                    "../../assets/common/robots/xarm7/xarm7_1305_left_ball_ee_left.urdf",
                 ),
                 arm_root_pose=None,
                 ik_eef_joint_id=7,
+                ik_eef_frame_id=52,
                 arm_joint_idxes=np.arange(7),
                 gripper_joint_idxes=np.array([7]),
                 gripper_joint_idxes_in_gripper_joint_pos=np.array([0]),
@@ -89,10 +90,11 @@ class RealXarm7DualEnvBase(RealEnvBase):
             ArmConfig(
                 arm_urdf_path=path.join(
                     path.dirname(__file__),
-                    "../../assets/common/robots/xarm7/xarm7.urdf",
+                    "../../assets/common/robots/xarm7/xarm7_1305_left_ball_ee_right.urdf",
                 ),
                 arm_root_pose=None,
                 ik_eef_joint_id=7,
+                ik_eef_frame_id=52,
                 arm_joint_idxes=np.arange(8, 15),
                 gripper_joint_idxes=np.array([15]),
                 gripper_joint_idxes_in_gripper_joint_pos=np.array([1]),

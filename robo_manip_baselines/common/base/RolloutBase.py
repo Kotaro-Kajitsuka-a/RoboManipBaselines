@@ -435,34 +435,59 @@ class RolloutBase(OperationDataMixin, ABC):
         self.quit_flag = False
         self.inference_duration_list = []
 
-        while True:
-            if self.reset_flag:
-                self.reset()
-                self.reset_flag = False
+        try:
+            while True:
+                if self.reset_flag:
+                    self.reset()
+                    self.reset_flag = False
 
-            self.phase_manager.pre_update()
+                self.phase_manager.pre_update()
 
-            env_action = np.concatenate(
-                [
-                    self.motion_manager.get_command_data(key)
-                    for key in self.env.unwrapped.command_keys_for_step
-                ]
-            )
+                env_action = np.concatenate(
+                    [
+                        self.motion_manager.get_command_data(key)
+                        for key in self.env.unwrapped.command_keys_for_step
+                    ]
+                )
 
+                if self.args.save_rollout and self.phase_manager.is_phase("RolloutPhase"):
+                    self.record_data()
+
+                self.obs, self.reward, _, _, self.info = self.env.step(env_action)
+
+                self.phase_manager.post_update()
+
+                self.key = cv2.waitKey(1)
+                self.phase_manager.check_transition()
+
+                if self.key == 27:  # escape key
+                    self.quit_flag = True
+                if self.quit_flag:
+                    break
+        except Exception:
             if self.args.save_rollout and self.phase_manager.is_phase("RolloutPhase"):
-                self.record_data()
-
-            self.obs, self.reward, _, _, self.info = self.env.step(env_action)
-
-            self.phase_manager.post_update()
-
-            self.key = cv2.waitKey(1)
-            self.phase_manager.check_transition()
-
-            if self.key == 27:  # escape key
-                self.quit_flag = True
-            if self.quit_flag:
-                break
+                has_data = any(
+                    isinstance(v, list) and len(v) > 0
+                    for v in self.data_manager.all_data_seq.values()
+                )
+                if has_data:
+                    base_filename = self.get_data_filename()
+                    base_root, base_ext = os.path.splitext(base_filename.rstrip("/"))
+                    aborted_filename = f"{base_root}_aborted{base_ext}"
+                    try:
+                        self.data_manager.save_data(
+                            aborted_filename, increment_episode_idx=False
+                        )
+                        print(
+                            f"[{self.__class__.__name__}] Save aborted rollout data as {aborted_filename}",
+                            flush=True,
+                        )
+                    except Exception as save_exc:
+                        print(
+                            f"[{self.__class__.__name__}] Failed to save aborted rollout data: {save_exc}",
+                            flush=True,
+                        )
+            raise
 
         if self.args.result_filename is not None:
             print(

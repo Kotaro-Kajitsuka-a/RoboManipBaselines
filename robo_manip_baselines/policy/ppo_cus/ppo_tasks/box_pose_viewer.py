@@ -86,13 +86,7 @@ def main():
     config.enable_stream(rs.stream.color, RES_W, RES_H, rs.format.bgr8, FPS)
     profile = pipeline.start(config)
 
-    sensor = profile.get_device().first_color_sensor()
-    try:
-        sensor.set_option(rs.option.enable_auto_exposure, 0)
-        sensor.set_option(rs.option.exposure, 140)
-        sensor.set_option(rs.option.gain, 64)
-    except Exception:
-        pass
+    # Match normal record-data behavior: keep camera-side default exposure/gain control.
 
     color_stream = profile.get_stream(rs.stream.color).as_video_stream_profile()
     intr = color_stream.get_intrinsics()

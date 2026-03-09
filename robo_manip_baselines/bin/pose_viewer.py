@@ -274,15 +274,6 @@ def setup_realsense(args: argparse.Namespace):
     config.enable_stream(rs.stream.color, args.width, args.height, rs.format.bgr8, args.fps)
     profile = pipeline.start(config)
 
-    sensor = profile.get_device().first_color_sensor()
-    try:
-        if not args.auto_exposure:
-            sensor.set_option(rs.option.enable_auto_exposure, 0)
-            sensor.set_option(rs.option.exposure, float(args.exposure))
-            sensor.set_option(rs.option.gain, float(args.gain))
-    except Exception:
-        pass
-
     color_stream = profile.get_stream(rs.stream.color).as_video_stream_profile()
     intr = color_stream.get_intrinsics()
     K = np.array([[intr.fx, 0.0, intr.ppx],
@@ -331,9 +322,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--tag-size", type=float, default=0.031, help="Tag edge length in meters")
     parser.add_argument("--disable-base-tag-log", action="store_true",
                         help="Do not print the T_cam→base_tag matrix (still used internally for computations)")
-    parser.add_argument("--auto-exposure", action="store_true", help="Keep RealSense auto exposure enabled")
-    parser.add_argument("--exposure", type=float, default=140.0, help="Manual RealSense exposure (when auto exposure is disabled)")
-    parser.add_argument("--gain", type=float, default=64.0, help="Manual RealSense gain (when auto exposure is disabled)")
     return parser.parse_args()
 
 

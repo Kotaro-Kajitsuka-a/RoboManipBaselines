@@ -34,7 +34,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[3]
 
 _NORMALIZED_ACTION_LOW = torch.tensor(-1.0, dtype=torch.float32)
 _NORMALIZED_ACTION_HIGH = torch.tensor(1.0, dtype=torch.float32)
-_DEFAULT_ARM_JOINT_DELTA_LIMIT = 0.03
+_DEFAULT_ARM_JOINT_DELTA_LIMIT = 0.045
 _DEFAULT_GRIPPER_JOINT_DELTA_LIMIT = 0.1
 _SAC_DETERMINISTIC = True
 _SAC_USE_CUDA = torch.cuda.is_available()
@@ -44,6 +44,14 @@ _SAC_PROFILE = True
 class RolloutSac(RolloutBase):
     def run(self):
         return super().run()
+
+    def set_additional_args(self, parser):
+        parser.add_argument(
+            "--yolo_pt",
+            type=str,
+            default=None,
+            help="path to YOLO pose .pt (use estimator if provided)",
+        )
 
     def setup_model_meta_info(self):
         checkpoint_dir = os.path.split(self.args.checkpoint)[0]
@@ -128,11 +136,23 @@ class RolloutSac(RolloutBase):
             extra_state_keys.append(name)
             extra_state_dims[name] = dim_int
 
+        params = ppo_task_cfg.get("params") or {}
+        if not isinstance(params, dict):
+            raise TypeError(
+                f"[{self.__class__.__name__}] 'ppo_task.params' must be a dictionary."
+            )
+        self.ppo_task_params = dict(params)
+
         module_path = ppo_task_cfg.get("module")
         if not module_path or not isinstance(module_path, str):
             raise ValueError(
                 f"[{self.__class__.__name__}] 'ppo_task.module' must be a non-empty string."
             )
+
+        if getattr(self.args, "yolo_pt", None):
+            module_path = "robo_manip_baselines.policy.sac.sac_tasks.box_estimator"
+            self.ppo_task_params["pt_path"] = self.args.yolo_pt
+            self.ppo_task_params["camera_name"] = "top"
 
         try:
             task_module = importlib.import_module(module_path)
@@ -146,13 +166,6 @@ class RolloutSac(RolloutBase):
             raise AttributeError(
                 f"[{self.__class__.__name__}] Module '{module_path}' does not expose a 'build_ppo_task' function."
             )
-
-        params = ppo_task_cfg.get("params") or {}
-        if not isinstance(params, dict):
-            raise TypeError(
-                f"[{self.__class__.__name__}] 'ppo_task.params' must be a dictionary."
-            )
-        self.ppo_task_params = dict(params)
 
         self.extra_state_keys = extra_state_keys
         self.extra_state_dims = extra_state_dims
@@ -290,12 +303,15 @@ class RolloutSac(RolloutBase):
 
         # Disable vision/image pipelines for this rollout; box pose is handled in the task.
         self.camera_names = []
-        # Even if the env does not provide a "front" camera (e.g. disabled to avoid RealSense
-        # conflicts), we still record the detector-thread image under the fixed name "front".
-        # Keep any existing cameras (e.g. right_hand) and just append "front" to metadata.
+        self._detector_camera_name = (
+            "top" if getattr(self.args, "yolo_pt", None) else "front"
+        )
+        # Even if the env does not provide the detector camera (e.g. disabled to avoid
+        # RealSense conflicts), we still record the detector-thread image under a fixed
+        # camera key in metadata.
         camera_names = list(self.data_manager.meta_data.get("camera_names", []))
-        if "front" not in camera_names:
-            camera_names.append("front")
+        if self._detector_camera_name not in camera_names:
+            camera_names.append(self._detector_camera_name)
         self.data_manager.meta_data["camera_names"] = camera_names
 
         self._profile_enabled = bool(_SAC_PROFILE)
@@ -345,11 +361,21 @@ class RolloutSac(RolloutBase):
         self.state_buf = None
         self.images_buf = None
         self.policy_action_buf = None
-        self._record_front_rgb_last = None
+        self._record_detector_rgb_last = None
         self._box_pose_seq_prev = None
         self._box_pose_stagnation = 0
         self._image_seq_prev = None
         self._image_stagnation = 0
+
+    @staticmethod
+    def _call_optional_handler_method(handler, method_names):
+        if handler is None:
+            return None
+        for method_name in method_names:
+            getter = getattr(handler, method_name, None)
+            if callable(getter):
+                return getter()
+        return None
 
     def _update_stagnation(self, label, seq, prev_seq, stagnation):
         if prev_seq is None:
@@ -377,44 +403,51 @@ class RolloutSac(RolloutBase):
         return prev_seq, stagnation
 
     def record_data(self):
-        """Record one step of rollout data with a hard-coded 'front' RGB frame.
+        """Record one step of rollout data with detector-thread RGB frames.
 
         SAC box tasks run a separate RealSense pipeline in a background thread (see
         `policy/sac/sac_tasks/*`). Opening the same RealSense from the env camera pipeline
         often fails with a "device busy" error, so the env cameras are disabled for SAC.
 
         To still save images, we always append the detector-thread RGB frame under the key
-        `front_rgb_image`.
+        `<detector_camera_name>_rgb_image`.
         """
 
         # Record standard signals (time, reward, measured/command/rel, tactile, etc.)
         super().record_data()
 
-        rgb = None
-        if self.ppo_task_handler is not None:
-            getter = getattr(self.ppo_task_handler, "get_latest_front_rgb", None)
-            if callable(getter):
-                rgb = getter()
+        rgb = self._call_optional_handler_method(
+            self.ppo_task_handler,
+            [
+                f"get_latest_{self._detector_camera_name}_rgb",
+                "get_latest_front_rgb",
+            ],
+        )
 
         if rgb is None:
-            if self._record_front_rgb_last is None:
-                self._record_front_rgb_last = np.zeros((480, 640, 3), dtype=np.uint8)
-            rgb = self._record_front_rgb_last
+            if self._record_detector_rgb_last is None:
+                self._record_detector_rgb_last = np.zeros((480, 640, 3), dtype=np.uint8)
+            rgb = self._record_detector_rgb_last
         else:
-            self._record_front_rgb_last = rgb
+            self._record_detector_rgb_last = rgb
 
-        self.data_manager.append_single_data(DataKey.get_rgb_image_key("front"), rgb)
+        self.data_manager.append_single_data(
+            DataKey.get_rgb_image_key(self._detector_camera_name), rgb
+        )
 
-        board_corners = None
-        if self.ppo_task_handler is not None:
-            board_getter = getattr(
-                self.ppo_task_handler, "get_latest_front_aruco_board_corners", None
-            )
-            if callable(board_getter):
-                board_corners = board_getter()
+        board_corners = self._call_optional_handler_method(
+            self.ppo_task_handler,
+            [
+                f"get_latest_{self._detector_camera_name}_aruco_board_corners",
+                "get_latest_front_aruco_board_corners",
+            ],
+        )
         if board_corners is None:
             board_corners = np.full((4, 2), -1.0, dtype=np.float32)
-        self.data_manager.append_single_data("front_aruco_board_corners", board_corners)
+        self.data_manager.append_single_data(
+            f"{self._detector_camera_name}_aruco_board_corners",
+            board_corners,
+        )
 
         box_seq = None
         image_seq = None
@@ -474,6 +507,7 @@ class RolloutSac(RolloutBase):
                 f"[{self.__class__.__name__}] Task handler did not provide 'box_pose'."
             )
         box_pose = np.asarray(extra_state_raw["box_pose"], dtype=np.float32).reshape(-1)
+        print(f"box_pose: {box_pose}")
         expected_dim = self.extra_state_dims.get("box_pose")
         if expected_dim is not None and box_pose.size != expected_dim:
             raise ValueError(
