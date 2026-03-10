@@ -57,8 +57,8 @@ class RealXarm7DualEnvBase(RealEnvBase):
 
     def __init__(
         self,
-        robot_ip_left,  # left arm from workspace side
-        robot_ip_right,  # right arm from workspace side
+        robot_ip_left,
+        robot_ip_right,
         camera_ids,
         gelsight_ids,
         init_qpos,
@@ -69,11 +69,10 @@ class RealXarm7DualEnvBase(RealEnvBase):
         # Setup robot
         self.init_qpos = init_qpos
         self.joint_vel_limit = np.deg2rad(180)  # [rad/s]
-        # Keep both grippers at a fixed position to avoid unintended motion.
 
-        # グリッパー位置司令の固定化
-        # self.fixed_gripper_joint_pos = np.array([119.0, 119.0], dtype=np.float64)
-        self.fixed_gripper_joint_pos = None  # 現在はNone
+        # Change this value when you want to fix the gripper joint position to a specific value.
+        # example: self.fixed_gripper_joint_pos = np.array([119.0, 119.0], dtype=np.float64)
+        self.fixed_gripper_joint_pos = None
 
         self.body_config_list = [
             ArmConfig(
@@ -115,7 +114,7 @@ class RealXarm7DualEnvBase(RealEnvBase):
         self.xarm_api_left.motion_enable(enable=True)
         self.xarm_api_left.set_ft_sensor_enable(1)
         time.sleep(0.2)
-        # self.xarm_api_left.set_ft_sensor_zero()
+        self.xarm_api_left.set_ft_sensor_zero()
         time.sleep(0.2)
         self.xarm_api_left.clean_error()
         self.xarm_api_left.set_mode(6)
@@ -140,7 +139,7 @@ class RealXarm7DualEnvBase(RealEnvBase):
         self.xarm_api_right.motion_enable(enable=True)
         self.xarm_api_right.set_ft_sensor_enable(1)
         time.sleep(0.2)
-        # self.xarm_api_right.set_ft_sensor_zero()
+        self.xarm_api_right.set_ft_sensor_zero()
         time.sleep(0.2)
         self.xarm_api_right.clean_error()
         self.xarm_api_right.set_mode(6)
@@ -157,12 +156,7 @@ class RealXarm7DualEnvBase(RealEnvBase):
             raise RuntimeError(
                 f"[{self.__class__.__name__}] Invalid xArm API code: {xarm_code}"
             )
-        # Debug: confirm right arm joint state acquisition
-        print(
-            f"[{self.__class__.__name__}] left_code={xarm_code}, right_code={xarm_code}, "
-            f"left_q={left_joint_states[0]}, right_q={right_joint_states[0]}",
-            flush=True,
-        )
+
         self.arm_joint_pos_actual = np.concatenate(
             [left_joint_states[0], right_joint_states[0]]
         )
@@ -217,29 +211,7 @@ class RealXarm7DualEnvBase(RealEnvBase):
             f"[{self.__class__.__name__}] Finish moving the robot to the reset position."
         )
 
-        if False:
-            start = time.monotonic()
-            code, result = self.xarm_api_right.iden_ft_sensor_load_offset()
-            elapsed = time.monotonic() - start
-            if code != 0:
-                raise RuntimeError(f"iden_ft_sensor_load_offset failed: code={code}")
-            print(f"identified offsets in {elapsed:.2f}s: {result}")
-
-            apply_code = self.xarm_api_right.set_ft_sensor_load_offset(result)
-            if apply_code != 0:
-                raise RuntimeError(
-                    f"set_ft_sensor_load_offset failed: code={apply_code}"
-                )
-            print("applied load offsets")
-
-            save_code = self.xarm_api_right.save_conf()
-            if save_code != 0:
-                raise RuntimeError(f"save_conf failed: code={save_code}")
-            print("saved configuration to controller flash")
-
-    def _set_action(
-        self, action, duration=None, joint_vel_limit_scale=10.0, wait=False
-    ):
+    def _set_action(self, action, duration=None, joint_vel_limit_scale=0.5, wait=False):
         start_time = time.time()
 
         # Overwrite duration or joint_pos for safety
@@ -338,7 +310,7 @@ class RealXarm7DualEnvBase(RealEnvBase):
             [left_arm_joint_pos, right_arm_joint_pos], dtype=np.float64
         )
 
-        # Get state from G2 gripper
+        # Get state from UFactory gripper
         xarm_code, left_gripper_pos = self.xarm_api_left.get_gripper_position()
         if xarm_code != 0:
             raise RuntimeError(
@@ -355,38 +327,15 @@ class RealXarm7DualEnvBase(RealEnvBase):
         right_gripper_joint_pos = np.array([right_gripper_pos], dtype=np.float64)
         right_gripper_joint_vel = np.zeros(1)
 
-        # gripperのobsを固定量に
-        # left_gripper_joint_pos = [119.0]
-        # right_gripper_joint_pos = [119.0]
-
-        left_gripper_joint_vel = np.zeros(1)
-        right_gripper_joint_vel = np.zeros(1)
-
         # Get wrench from force sensor
         wrench_left = np.array(
-            self.xarm_api_left.get_ft_sensor_data(is_raw=True)[1], dtype=np.float64
+            self.xarm_api_left.get_ft_sensor_data()[1], dtype=np.float64
         )
         wrench_right = np.array(
             self.xarm_api_right.get_ft_sensor_data()[1], dtype=np.float64
         )
         force = np.concatenate((wrench_left[0:3], wrench_right[0:3]), dtype=np.float64)
         torque = np.concatenate((wrench_left[3:6], wrench_right[3:6]), dtype=np.float64)
-
-        # print("get_ft_sensor_config")
-        # left_code, left_config = self.xarm_api_left.get_ft_sensor_config()
-        # right_code, right_config = self.xarm_api_right.get_ft_sensor_config()
-        # assert left_code==0  and right_code == 0
-        # print(f"left_config\n{left_config}")
-        # print(f"right_config\n{right_config}")
-
-        # print()
-
-        # print()
-        # print("#######################################################################")
-        # print(wrench_left)
-        # print(wrench_right)
-        # print("#######################################################################")
-        # print()
 
         return {
             "joint_pos": np.concatenate(

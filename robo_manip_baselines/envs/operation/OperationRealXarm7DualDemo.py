@@ -1,22 +1,15 @@
 import gymnasium as gym
+import numpy as np
 
 from robo_manip_baselines.common import GraspPhaseBase
 
 
 class GraspPhase(GraspPhaseBase):
     def set_target(self):
-        # Skip sending any gripper command before rollout.
-        self.duration = 0.0
+        self.gripper_joint_pos = np.array([800.0, 800.0])
+        self.duration = 0.5
 
-    def pre_update(self):
-        # Do nothing so the hardware grippers stay at their current positions.
-        pass
 
-    def check_transition(self):
-        # Move to the next phase immediately.
-        return True
-
-        
 class OperationRealXarm7DualDemo:
     def __init__(self, robot_ip_left, robot_ip_right, camera_ids, gelsight_ids=None):
         self.robot_ip_left = robot_ip_left
