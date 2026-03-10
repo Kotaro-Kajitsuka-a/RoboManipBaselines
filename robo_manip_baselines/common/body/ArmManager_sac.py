@@ -174,7 +174,13 @@ class ArmManager(BodyManagerBase):
     def get_eef_pose_from_joint_pos(self, arm_joint_pos):
         pin_data = self.pin_model.createData()
         pin.forwardKinematics(self.pin_model, pin_data, arm_joint_pos)
-        se3 = pin_data.oMi[self.body_config.ik_eef_joint_id]
+        pin.updateFramePlacements(self.pin_model, pin_data)
+
+        if self.body_config.ik_eef_frame_id is not None:
+            se3 = pin_data.oMf[self.body_config.ik_eef_frame_id]
+        else:
+            se3 = pin_data.oMi[self.body_config.ik_eef_joint_id]
+
         return get_pose_from_se3(se3)
 
     def get_command_data(self, key):
@@ -229,6 +235,7 @@ class ArmManager(BodyManagerBase):
             self.pin_data,
             self.arm_joint_pos,
         )
+        pin.updateFramePlacements(self.pin_model, self.pin_data)
 
     def inverse_kinematics(self):
         # https://gepettoweb.laas.fr/doc/stack-of-tasks/pinocchio/master/doxygen-html/md_doc_b-examples_d-inverse-kinematics.html
@@ -257,6 +264,8 @@ class ArmManager(BodyManagerBase):
 
     @property
     def current_se3(self):
+        if self.body_config.ik_eef_frame_id is not None:
+            return self.pin_data.oMf[self.body_config.ik_eef_frame_id]
         return self.pin_data.oMi[self.body_config.ik_eef_joint_id]
 
 
@@ -274,6 +283,9 @@ class ArmConfig(BodyConfigBase):
 
     # Link ID of end-effector in robot model when solving IK by Pinocchio library
     ik_eef_joint_id: int
+
+    # Frame ID of end-effector in robot model when solving IK by Pinocchio library
+    ik_eef_frame_id: int
 
     # Indices of arm joints at observed joint positions
     arm_joint_idxes: npt.NDArray[np.int_]
