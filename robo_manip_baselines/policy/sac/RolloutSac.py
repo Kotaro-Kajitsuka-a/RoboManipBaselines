@@ -1,13 +1,7 @@
-import csv
 import importlib
-import json
 import os
-import time
-import types
-from collections import defaultdict
-from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, Dict, Optional, List
+from typing import Any, Dict
 
 import cv2
 import matplotlib.pylab as plt
@@ -19,7 +13,6 @@ from robo_manip_baselines.common import (
     DataKey,
     RolloutBase,
     denormalize_data,
-    normalize_data,
 )
 
 from .SacPolicy import Actor
@@ -30,21 +23,14 @@ from .gripper_utils import (
 )
 from .state_utils import get_adjusted_measured_eef_pose
 
-_REPO_ROOT = Path(__file__).resolve().parents[3]
-
 _NORMALIZED_ACTION_LOW = torch.tensor(-1.0, dtype=torch.float32)
 _NORMALIZED_ACTION_HIGH = torch.tensor(1.0, dtype=torch.float32)
 _DEFAULT_ARM_JOINT_DELTA_LIMIT = 0.045
 _DEFAULT_GRIPPER_JOINT_DELTA_LIMIT = 0.1
 _SAC_DETERMINISTIC = True
 _SAC_USE_CUDA = torch.cuda.is_available()
-_SAC_LOG_TSV = True
-_SAC_PROFILE = True
 
 class RolloutSac(RolloutBase):
-    def run(self):
-        return super().run()
-
     def set_additional_args(self, parser):
         parser.add_argument(
             "--yolo_pt",
@@ -102,52 +88,25 @@ class RolloutSac(RolloutBase):
             return
 
         extra_keys_cfg = ppo_task_cfg.get("extra_keys", [])
-        if not isinstance(extra_keys_cfg, list):
-            raise TypeError(
-                f"[{self.__class__.__name__}] 'ppo_task.extra_keys' must be a list."
-            )
+        assert isinstance(extra_keys_cfg, list)
 
         extra_state_keys: list[str] = []
         extra_state_dims: Dict[str, int] = {}
         for entry in extra_keys_cfg:
-            if not isinstance(entry, dict):
-                raise TypeError(
-                    f"[{self.__class__.__name__}] 'ppo_task.extra_keys' entries must be objects."
-                )
-            name = entry.get("name")
-            dim = entry.get("dim")
-            if not name or not isinstance(name, str):
-                raise ValueError(
-                    f"[{self.__class__.__name__}] Invalid extra key name: {entry}"
-                )
-            if name in extra_state_keys:
-                raise ValueError(
-                    f"[{self.__class__.__name__}] Duplicate extra key detected: {name}"
-                )
-            if dim is None:
-                raise ValueError(
-                    f"[{self.__class__.__name__}] Missing dimension for extra key '{name}'."
-                )
-            dim_int = int(dim)
-            if dim_int <= 0:
-                raise ValueError(
-                    f"[{self.__class__.__name__}] Dimension for extra key '{name}' must be positive."
-                )
+            name = entry["name"]
+            dim_int = int(entry["dim"])
+            assert isinstance(name, str) and name
+            assert name not in extra_state_dims
+            assert dim_int > 0
             extra_state_keys.append(name)
             extra_state_dims[name] = dim_int
 
         params = ppo_task_cfg.get("params") or {}
-        if not isinstance(params, dict):
-            raise TypeError(
-                f"[{self.__class__.__name__}] 'ppo_task.params' must be a dictionary."
-            )
+        assert isinstance(params, dict)
         self.ppo_task_params = dict(params)
 
-        module_path = ppo_task_cfg.get("module")
-        if not module_path or not isinstance(module_path, str):
-            raise ValueError(
-                f"[{self.__class__.__name__}] 'ppo_task.module' must be a non-empty string."
-            )
+        module_path = ppo_task_cfg["module"]
+        assert isinstance(module_path, str) and module_path
 
         if getattr(self.args, "yolo_pt", None):
             module_path = "robo_manip_baselines.policy.sac.sac_tasks.box_estimator"
@@ -161,19 +120,12 @@ class RolloutSac(RolloutBase):
                 f"[{self.__class__.__name__}] Failed to import PPO task module '{module_path}'."
             ) from exc
 
-        builder = getattr(task_module, "build_ppo_task", None)
-        if builder is None:
-            raise AttributeError(
-                f"[{self.__class__.__name__}] Module '{module_path}' does not expose a 'build_ppo_task' function."
-            )
+        builder = task_module.build_ppo_task
 
         self.extra_state_keys = extra_state_keys
         self.extra_state_dims = extra_state_dims
         self.ppo_task_handler = builder(self, self.ppo_task_params)
-        if self.ppo_task_handler is None:
-            raise RuntimeError(
-                f"[{self.__class__.__name__}] Task builder '{module_path}.build_ppo_task' returned None."
-            )
+        assert self.ppo_task_handler is not None
 
         task_name = ppo_task_cfg.get("name") or module_path
         print(
@@ -233,7 +185,6 @@ class RolloutSac(RolloutBase):
         self.device = torch.device("cuda" if use_cuda else "cpu")
         self.policy.to(self.device)
         self.policy.eval()
-        self._policy_obs_dim = int(np.prod(policy_env.single_observation_space.shape))
 
         self._normalized_action_low = torch.full(
             (self.action_dim,), float(_NORMALIZED_ACTION_LOW.item()), device=self.device
@@ -246,32 +197,6 @@ class RolloutSac(RolloutBase):
         print(
             f"[{self.__class__.__name__}] Load ManiSkill SAC checkpoint on {self.device}"
         )
-
-        expanded_path = _REPO_ROOT / "robo_manip_baselines" / "rollout_debug_log_expanded.csv"
-        header = ["step_idx"]
-        header += [f"obs_{idx}" for idx in range(self._policy_obs_dim)]
-        header += [f"raw_action_{idx}" for idx in range(self.action_dim)]
-        header += [f"direct_joint_command_{idx}" for idx in range(self.action_dim)]
-        with open(expanded_path, "w", newline="") as f:
-            writer = csv.writer(f)
-            writer.writerow(header)
-        self._expanded_csv_path: Optional[Path] = expanded_path
-        print(
-            f"[{self.__class__.__name__}] Logging expanded observations/actions to {expanded_path}"
-        )
-
-        self._log_path = None
-        if _SAC_LOG_TSV:
-            checkpoint_dir = os.path.dirname(os.path.abspath(self.args.checkpoint))
-            default_name = f"{self.__class__.__name__.lower()}_debug_log.tsv"
-            self._log_path = os.path.join(checkpoint_dir, default_name)
-            os.makedirs(os.path.dirname(self._log_path), exist_ok=True)
-            with open(self._log_path, "w", newline="") as f:
-                writer = csv.writer(f, delimiter="\t")
-                writer.writerow(["step_idx", "obs", "direct_joint_command"])
-            print(
-                f"[{self.__class__.__name__}] Logging observations and actions to {self._log_path}"
-            )
 
     def _build_policy_env_from_meta_info(self):
         obs_dim = len(self.model_meta_info["state"]["example"])
@@ -314,35 +239,6 @@ class RolloutSac(RolloutBase):
             camera_names.append(self._detector_camera_name)
         self.data_manager.meta_data["camera_names"] = camera_names
 
-        self._profile_enabled = bool(_SAC_PROFILE)
-        if self._profile_enabled:
-            self._profile_data = defaultdict(list)
-            self._wrap_profile_hooks()
-
-    def _wrap_profile_hooks(self):
-        env = self.env
-
-        original_step = env.step
-        rollout_self = self
-
-        def profiled_step(env_self, action):
-            start = time.perf_counter()
-            result = original_step(action)
-            rollout_self._profile_data["env_step"].append(time.perf_counter() - start)
-            return result
-
-        env.step = types.MethodType(profiled_step, env)
-
-        original_record_data = self.record_data
-
-        def profiled_record_data():
-            start = time.perf_counter()
-            result = original_record_data()
-            rollout_self._profile_data["record_data"].append(time.perf_counter() - start)
-            return result
-
-        self.record_data = profiled_record_data
-
     def setup_plot(self):
         num_cols = max(len(self.camera_names), 1)
         fig_ax = plt.subplots(
@@ -358,8 +254,6 @@ class RolloutSac(RolloutBase):
     def reset_variables(self):
         super().reset_variables()
 
-        self.state_buf = None
-        self.images_buf = None
         self.policy_action_buf = None
         self._record_detector_rgb_last = None
         self._box_pose_seq_prev = None
@@ -403,14 +297,14 @@ class RolloutSac(RolloutBase):
         return prev_seq, stagnation
 
     def record_data(self):
-        """Record one step of rollout data with detector-thread RGB frames.
+        """detector thread の RGB フレームを使って rollout 1 step 分のデータを記録する。
 
-        SAC box tasks run a separate RealSense pipeline in a background thread (see
-        `policy/sac/sac_tasks/*`). Opening the same RealSense from the env camera pipeline
-        often fails with a "device busy" error, so the env cameras are disabled for SAC.
+        SAC の box task では、別スレッドで独立した RealSense pipeline を動かしている
+        (`policy/sac/sac_tasks/*` を参照)。同じ RealSense を env 側の camera pipeline から
+        同時に開こうとすると "device busy" で失敗しやすいため、SAC では env camera を無効化している。
 
-        To still save images, we always append the detector-thread RGB frame under the key
-        `<detector_camera_name>_rgb_image`.
+        それでも画像を保存できるように、detector thread 側の RGB フレームを
+        `<detector_camera_name>_rgb_image` というキーで常に追加する。
         """
 
         # Record standard signals (time, reward, measured/command/rel, tactile, etc.)
@@ -484,30 +378,12 @@ class RolloutSac(RolloutBase):
         )
 
     def _get_arm_joint_indices(self, eef_idx: int) -> np.ndarray:
-        idx_map = getattr(self, "_joint_indices_by_arm_id", None) or {}
-        joint_slice = idx_map.get(eef_idx)
-        if joint_slice is None:
-            raise ValueError(
-                f"[{self.__class__.__name__}] Missing joint indices for eef_idx={eef_idx}."
-            )
-        return joint_slice
+        return self._joint_indices_by_arm_id[eef_idx]
 
     def _get_box_pose(self) -> np.ndarray:
-        if self.ppo_task_handler is None:
-            raise RuntimeError(
-                f"[{self.__class__.__name__}] box_pose requested but ppo_task_handler is not configured."
-            )
-        extra_state_raw = self.ppo_task_handler.get_extra_state() or {}
-        if not isinstance(extra_state_raw, dict):
-            raise TypeError(
-                f"[{self.__class__.__name__}] Task handler must return a dict of extra states."
-            )
-        if "box_pose" not in extra_state_raw:
-            raise KeyError(
-                f"[{self.__class__.__name__}] Task handler did not provide 'box_pose'."
-            )
-        box_pose = np.asarray(extra_state_raw["box_pose"], dtype=np.float32).reshape(-1)
-        print(f"box_pose: {box_pose}")
+        extra_state = self.ppo_task_handler.get_extra_state()
+        assert isinstance(extra_state, dict)
+        box_pose = np.asarray(extra_state["box_pose"], dtype=np.float32).reshape(-1)
         expected_dim = self.extra_state_dims.get("box_pose")
         if expected_dim is not None and box_pose.size != expected_dim:
             raise ValueError(
@@ -516,14 +392,6 @@ class RolloutSac(RolloutBase):
         return box_pose
 
     def _get_box_pushpoint(self, box_pose: np.ndarray) -> np.ndarray:
-        if self.ppo_task_handler is None:
-            raise RuntimeError(
-                f"[{self.__class__.__name__}] box_pushpoint requested but ppo_task_handler is not configured."
-            )
-        if not hasattr(self.ppo_task_handler, "_get_box_pushpoint"):
-            raise AttributeError(
-                f"[{self.__class__.__name__}] Task handler does not implement _get_box_pushpoint."
-            )
         pushpoint = self.ppo_task_handler._get_box_pushpoint(box_pose)
         pushpoint = np.asarray(pushpoint, dtype=np.float32).reshape(-1)
         expected_dim = self.extra_state_dims.get("box_pushpoint")
@@ -534,10 +402,6 @@ class RolloutSac(RolloutBase):
         return pushpoint
 
     def get_state(self):
-        # Defensive init (e.g., if setup_variables was bypassed)
-        if not hasattr(self, "marker_transform_cache"):
-            self.marker_transform_cache = {}
-
         qpos = self.motion_manager.get_data(DataKey.MEASURED_JOINT_POS, self.obs)
         qvel = self.motion_manager.get_data(DataKey.MEASURED_JOINT_VEL, self.obs)
 
@@ -585,96 +449,18 @@ class RolloutSac(RolloutBase):
                 f"but model_meta_info expects {expected_state_dim}."
             )
 
-        self.state_for_sac = state_vector.copy()
-
-        norm_state = normalize_data(state_vector, self.model_meta_info["state"])
-
-        state = torch.tensor(norm_state, dtype=torch.float32)
-
-        # Store and return
-        if self.state_buf is None:
-            self.state_buf = [
-                state for _ in range(self.model_meta_info["data"]["n_obs_steps"])
-            ]
-        else:
-            self.state_buf.pop(0)
-            self.state_buf.append(state)
-
-        state = torch.stack(self.state_buf, dim=0)[torch.newaxis].to(self.device)
-
-        return state
-
-
-    #RolloutMlpのように直近数枚の画像データをbufferに貯めてpolicyに入力することに使える関数ですが現在のState-based RLには不必要なためコメントアウト(オーバーライドしない)
-    # def get_images(self):
-    #     if len(self.camera_names) == 0:
-    #         return None
-
-    #     images = []
-    #     for camera_name in self.camera_names:
-    #         rgb_image = self.info["rgb_images"][camera_name]
-
-    #         image = np.moveaxis(rgb_image, -1, -3)
-    #         image = torch.tensor(image.copy(), dtype=torch.uint8)
-    #         image = self.image_transforms(image)
-
-    #         images.append(image)
-
-    #     # Store and return
-    #     if self.images_buf is None:
-    #         self.images_buf = [
-    #             [image for _ in range(self.model_meta_info["data"]["n_obs_steps"])]
-    #             for image in images
-    #         ]
-    #     else:
-    #         for single_images_buf, image in zip(self.images_buf, images):
-    #             single_images_buf.pop(0)
-    #             single_images_buf.append(image)
-
-    #     images = torch.stack(
-    #         [
-    #             torch.stack(single_images_buf, dim=0)[torch.newaxis].to(self.device)
-    #             for single_images_buf in self.images_buf
-    #         ]
-    #     )
-
-    #     return images
+        return torch.tensor(state_vector, dtype=torch.float32, device=self.device).unsqueeze(0)
 
     def infer_policy(self):
         # Infer
         if self.policy_action_buf is None or len(self.policy_action_buf) == 0:
-            profile_enabled = getattr(self, "_profile_enabled", False)
-            if profile_enabled:
-                timer = time.perf_counter
-                total_start = timer()
-                state_start = timer()
-
-            self.get_state()  # update buffers and logs
-
-            if profile_enabled:
-                self._profile_data["state_fetch"].append(timer() - state_start)
-
-
-
-            # print(f"state_for_sac: {self.state_for_sac}")
-
-
-            
-            obs_tensor = torch.tensor(
-                self.state_for_sac, dtype=torch.float32, device=self.device
-            ).unsqueeze(0)
-
-            if profile_enabled:
-                policy_start = timer()
+            obs_tensor = self.get_state()
 
             with torch.no_grad():
                 if _SAC_DETERMINISTIC:
                     raw_action = self.policy.get_eval_action(obs_tensor)
                 else:
                     raw_action, _, _ = self.policy.get_action(obs_tensor)
-
-            if profile_enabled:
-                self._profile_data["policy_forward"].append(timer() - policy_start)
 
             raw_action = raw_action.squeeze(0)
             clipped_action = torch.clamp(
@@ -713,49 +499,7 @@ class RolloutSac(RolloutBase):
             if getattr(self, "_gripper_joint_indices", None) is not None and self._gripper_joint_indices.size > 0:
                 physical_np[self._gripper_joint_indices] = 119.0
 
-            if hasattr(self, "_log_path") and self._log_path:
-                obs_list = (
-                    obs_tensor.squeeze(0).detach().cpu().numpy().astype(np.float64).tolist()
-                )
-                direct_list = physical_np.tolist()
-                with open(self._log_path, "a", newline="") as f:
-                    writer = csv.writer(f, delimiter="\t")
-                    writer.writerow(
-                        [
-                            int(getattr(self, "rollout_time_idx", 0)),
-                            json.dumps(obs_list),
-                            json.dumps(direct_list),
-                        ]
-                    )
-            if self._expanded_csv_path is not None:
-                obs_values = obs_tensor.squeeze(0).detach().cpu().numpy().astype(np.float64)
-                obs_values = obs_values[: self._policy_obs_dim]
-                if obs_values.size < self._policy_obs_dim:
-                    obs_values = np.pad(
-                        obs_values,
-                        (0, self._policy_obs_dim - obs_values.size),
-                        mode="constant",
-                        constant_values=0.0,
-                    )
-                raw_action_values = raw_action.detach().cpu().numpy().astype(np.float64).tolist()
-                if len(raw_action_values) < self.action_dim:
-                    raw_action_values += [0.0] * (self.action_dim - len(raw_action_values))
-
-                row = [int(getattr(self, "rollout_time_idx", 0))]
-                row += obs_values.tolist()
-                row += raw_action_values[: self.action_dim]
-                action_values = physical_np.tolist()
-                if len(action_values) < self.action_dim:
-                    action_values += [0.0] * (self.action_dim - len(action_values))
-                row += action_values[: self.action_dim]
-                with open(self._expanded_csv_path, "a", newline="") as f:
-                    writer = csv.writer(f)
-                    writer.writerow(row)
-
             self.policy_action_buf = [physical_np]
-
-            if profile_enabled:
-                self._profile_data["infer_total"].append(timer() - total_start)
 
         # Store action
         self.policy_action = denormalize_data(
@@ -771,12 +515,7 @@ class RolloutSac(RolloutBase):
             self.ppo_task_handler.on_reset()
 
     def set_command_data(self, action_keys=None):
-        if getattr(self, "_profile_enabled", False):
-            start = time.perf_counter()
-            super().set_command_data(action_keys)
-            self._profile_data["set_command_data"].append(time.perf_counter() - start)
-        else:
-            super().set_command_data(action_keys)
+        super().set_command_data(action_keys)
 
     def draw_plot(self):
         # Clear plot
@@ -796,16 +535,3 @@ class RolloutSac(RolloutBase):
             self.policy_name,
             cv2.cvtColor(np.asarray(self.canvas.buffer_rgba()), cv2.COLOR_RGB2BGR),
         )
-
-    def print_statistics(self):
-        super().print_statistics()
-        if getattr(self, "_profile_enabled", False) and self._profile_data:
-            print(f"[{self.__class__.__name__}] Profiling summary")
-            for key, samples in self._profile_data.items():
-                if not samples:
-                    continue
-                samples_arr = np.array(samples)
-                print(
-                    f"  - {key} [s] | mean: {samples_arr.mean():.2e}, "
-                    f"std: {samples_arr.std():.2e}, min: {samples_arr.min():.2e}, max: {samples_arr.max():.2e}"
-                )
