@@ -18,7 +18,7 @@
 	path = third_party/gello_software
 	url = https://github.com/mmurooka/gello_software.git
         ignore = untracked
-	
+
 [submodule "third_party/YCB_sim"]
 	path = third_party/YCB_sim
 	url = https://github.com/mmurooka/YCB_sim.git
@@ -40,14 +40,7 @@
 	url = https://github.com/Naoki-Shibayama/ManiFlow_Policy.git
         ignore = untracked
 
-[submodule "reference/RoboManipBaselines"]
-	path = reference/RoboManipBaselines
-	url = https://github.com/isri-aist/RoboManipBaselines
-        ignore = untracked
-[submodule "external/check_AprilTag"]
-	path = external/check_AprilTag
-	url = https://github.com/kotaro-kaji/check_AprilTag.git
-        ignore = untracked
+
 [submodule "maniskill_exp"]
 	path = third_party/maniskill_exp
 	url = https://github.com/kotaro-kaji/maniskill_exp.git
@@ -56,7 +49,3 @@
 	path = third_party/sam2
 	url = https://github.com/kotaro-kaji/sam2.git
         ignore = untracked
-[submodule "third_party/xArm-Python-SDK"]
-	path = third_party/xArm-Python-SDK
-	url = https://github.com/kotaro-kaji/xArm-Python-SDK.git
-		ignore = untracked

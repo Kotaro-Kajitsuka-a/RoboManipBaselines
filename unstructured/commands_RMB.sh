@@ -39,7 +39,7 @@ python ./bin/Rollout.py Mlp RealXarm7Demo --config ./envs/configs/RealXarm7DemoE
 ====================================================================================================
 
 Ppo
-python ./bin/Rollout.py Ppo RealXarm7Demo --wait_before_start --skip_draw 50 --save_rollout --config ./envs/configs/RealXarm7DemoEnv.yaml --checkpoint final_ckpt.pt 
+python ./bin/Rollout.py Ppo RealXarm7Demo --wait_before_start --skip_draw 50 --save_rollout --config ./envs/configs/RealXarm7DemoEnv.yaml --checkpoint final_ckpt.pt
 
 Ppo_cus
 python ./bin/Rollout.py PpoCus RealXarm7Demo --wait_before_start --skip_draw 50 --ppo-marker-enable --ppo-enable-vision --save_rollout --config ./envs/configs/RealXarm7DemoEnv.yaml --checkpoint final_ckpt.pt
@@ -126,11 +126,11 @@ python ./robo_manip_baselines/calib/calc_center_T.py
 
 
 #box 検出単体
-python ./robo_manip_baselines/policy/ppo_cus/ppo_tasks/dual_box_rotation_ablated.py 
+python ./robo_manip_baselines/policy/ppo_cus/ppo_tasks/dual_box_rotation_ablated.py
 python ./robo_manip_baselines/policy/ppo_cus/ppo_tasks/box_pose_viewer.py
 
 #box 検出単体(SAC)
-python ./robo_manip_baselines/policy/sac/sac_tasks/dual_box_rotation.py 
+python ./robo_manip_baselines/policy/sac/sac_tasks/dual_box_rotation.py
 python ./robo_manip_baselines/policy/sac/sac_tasks/box_pose_viewer.py
 
 #error code確認
@@ -166,11 +166,7 @@ python ./robo_manip_baselines/bin/Train.py Act \
   --num_epochs 2000 --camera_names front --chunk_size 20 --no-enable_rmb_cache
 
 python ./bin/Train.py DiffusionPolicy \
-<<<<<<< HEAD
   --dataset_dir ./dataset/45epis_highspeed_board_removed \
-=======
-  --dataset_dir ./dataset/45epis_birdseye_human \
->>>>>>> 3ac578a (sync)
   --camera_names top \
   --scheduler ddim --num_epochs 1000 \
   --train_ratio 1.0 --val_ratio 0.01 \
@@ -195,7 +191,7 @@ Mlp train
 ######################################
 python ./robo_manip_baselines/bin/Train.py Mlp\
   --dataset_dir robo_manip_baselines/dataset/26epi_RolloutSac_RealXarm7DualDemo_20251219_145609 \
-  --num_epochs 250 --camera_names front left_hand right_hand 
+  --num_epochs 250 --camera_names front left_hand right_hand
 
 ######################################
 

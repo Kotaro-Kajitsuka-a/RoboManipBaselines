@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-#test1
+# test1
 
-import sys
-import numpy as np
-import openvr
 import time
 
-class ViveTracker():
+import numpy as np
+import openvr
+
+
+class ViveTracker:
     def __init__(self):
         self.vr_system = openvr.init(openvr.VRApplication_Other)
 
@@ -25,7 +26,6 @@ class ViveTracker():
                 openvr.TrackingUniverseStanding, 0, openvr.k_unMaxTrackedDeviceCount
             )
 
-
             if print_info:
                 print("Device info:")
 
@@ -34,7 +34,7 @@ class ViveTracker():
 
             if print_info:
                 print_info = False
-                
+
             time.sleep(0.01)
 
     def process_single_device_data(self, device_idx, print_info=False):
@@ -42,7 +42,9 @@ class ViveTracker():
             return
 
         device_type = self.vr_system.getTrackedDeviceClass(device_idx)
-        device_sn = self.vr_system.getStringTrackedDeviceProperty(device_idx, openvr.Prop_SerialNumber_String)
+        device_sn = self.vr_system.getStringTrackedDeviceProperty(
+            device_idx, openvr.Prop_SerialNumber_String
+        )
         is_pose_valid = self.device_data_list[device_idx].bPoseIsValid
         pose_matrix_data = self.device_data_list[device_idx].mDeviceToAbsoluteTracking
 
@@ -51,7 +53,7 @@ class ViveTracker():
                 openvr.TrackedDeviceClass_GenericTracker: "Tracker",
                 openvr.TrackedDeviceClass_Controller: "Controller",
                 openvr.TrackedDeviceClass_TrackingReference: "BaseStation",
-                openvr.TrackedDeviceClass_HMD: "HMD"
+                openvr.TrackedDeviceClass_HMD: "HMD",
             }
             device_type_str = type_map.get(device_type, "Unknown")
             print(f"  - {device_type_str}: {device_sn}")
@@ -66,7 +68,7 @@ class ViveTracker():
         pose_mat[3, 3] = 1.0
 
         print(pose_name)
-        print(pose_mat[0:3,3])
+        print(pose_mat[0:3, 3])
 
 
 if __name__ == "__main__":
