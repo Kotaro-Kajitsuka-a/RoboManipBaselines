@@ -167,7 +167,7 @@ class AddPointCloudToRmbData:
             # Generate pointcloud
             for rgb_image, depth_image in zip(rgb_image_seq, depth_image_seq):
                 # Convert to pointcloud
-                pointcloud = np.concat(
+                pointcloud = np.concatenate(
                     convert_depth_image_to_pointcloud(depth_image, fovy, rgb_image),
                     axis=1,
                 )

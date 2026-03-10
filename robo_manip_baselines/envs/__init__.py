@@ -61,10 +61,22 @@ register(
     entry_point="robo_manip_baselines.envs.mujoco:MujocoXarm7PushtEnv",
 )
 
+## Franka Emika Panda
+register(
+    id="robo_manip_baselines/MujocoPandaCableEnv-v0",
+    entry_point="robo_manip_baselines.envs.mujoco:MujocoPandaCableEnv",
+)
+
 ## Kinova Gen3
 register(
     id="robo_manip_baselines/MujocoKinovaGen3CableEnv-v0",
     entry_point="robo_manip_baselines.envs.mujoco:MujocoKinovaGen3CableEnv",
+)
+
+## CRX-5iA
+register(
+    id="robo_manip_baselines/MujocoCrx5iaCableEnv-v0",
+    entry_point="robo_manip_baselines.envs.mujoco:MujocoCrx5iaCableEnv",
 )
 
 ## ViperX 300S
@@ -103,6 +115,16 @@ register(
 register(
     id="robo_manip_baselines/IsaacUR5eCabinetEnv-v0",
     entry_point="robo_manip_baselines.envs.isaac:IsaacUR5eCabinetEnv",
+)
+
+# Tacto
+register(
+    id="robo_manip_baselines/TactoSawyerGraspEnv-v0",
+    entry_point="robo_manip_baselines.envs.tacto:TactoSawyerGraspEnv",
+)
+register(
+    id="robo_manip_baselines/TactoSawyerInsertEnv-v0",
+    entry_point="robo_manip_baselines.envs.tacto:TactoSawyerInsertEnv",
 )
 
 # Real

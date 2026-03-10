@@ -135,7 +135,7 @@ $ pip install -e .
 > $ PYTORCH3D_FORCE_NO_CUDA=1 pip install -e .
 > ```
 
-## Installation of each teleoperation interface
+## Installation of each teleoperation device
 Complete [the common installation](#common-installation) first.
 
 ### [SpaceMouse](https://3dconnexion.com/us/spacemouse)
@@ -149,6 +149,35 @@ $ cd third_party/gello_software
 $ pip install -e .
 $ pip install -e third_party/DynamixelSDK/python
 ```
+
+## Installation of each sensor device
+Complete [the common installation](#common-installation) first.
+
+### [Femto Bolt](https://www.orbbec.com/products/tof-camera/femto-bolt/)
+Install dependent libraries including [pyorbbecsdk](https://github.com/orbbec/pyorbbecsdk):
+```console
+# Go to the top directory of this repository
+$ cd third_party/pyorbbecsdk
+$ pip install -r requirements.txt
+$ mkdir build
+$ cd build
+$ cmake -Dpybind11_DIR=`pybind11-config --cmakedir` ..
+$ make -j4
+$ make install
+
+# Go to the top directory of this repository
+$ export PYTHONPATH=$PYTHONPATH:`realpath third_party/pyorbbecsdk/install/lib/`
+$ cd third_party/pyorbbecsdk
+$ sudo bash ./scripts/install_udev_rules.sh
+$ sudo udevadm control --reload-rules && sudo udevadm trigger
+```
+
+> [!NOTE]
+> Run the following command to set `PYTHONPATH` each time you open a terminal.
+> ```console
+> # Go to the top directory of this repository
+> $ export PYTHONPATH=$PYTHONPATH:`realpath third_party/pyorbbecsdk/install/lib/`
+> ```
 
 ## Installation of each environment
 Complete [the common installation](#common-installation) first.
@@ -178,6 +207,23 @@ Isaac Gym and MuJoCo version 3 are conflicted by a file of the same name, `libsd
 Downgrade MuJoCo:
 ```console
 $ pip install mujoco==2.3.7
+```
+
+### [TACTO environments](../robo_manip_baselines/envs/tacto)
+Install dependent libraries including [tacto](https://github.com/facebookresearch/tacto):
+```console
+# Go to the top directory of this repository
+$ pip install -e .[tacto]
+
+# Go to the top directory of this repository
+$ cd third_party/tacto/third_party/attrdict
+$ pip install -e .
+$ cd ../urdfpy
+$ pip install -e .
+$ cd ../pybulletX
+$ pip install -e .
+$ cd ../../
+$ pip install -e .
 ```
 
 ### [Real UR5e environments](../robo_manip_baselines/envs/real/ur5e)

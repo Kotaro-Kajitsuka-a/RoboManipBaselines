@@ -1,0 +1,2 @@
+from .TactoSawyerGraspEnv import TactoSawyerGraspEnv
+from .TactoSawyerInsertEnv import TactoSawyerInsertEnv

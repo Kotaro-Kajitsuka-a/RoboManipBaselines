@@ -219,7 +219,9 @@ class RealEnvBase(EnvDataMixin, gym.Env, ABC):
         return observation, info
 
     def step(self, action):
-        self._set_action(action, duration=self.dt, joint_vel_limit_scale=0.25, wait=True)
+        self._set_action(
+            action, duration=self.dt, joint_vel_limit_scale=0.25, wait=True
+        )
 
         observation = self._get_obs()
         reward = 0.0
@@ -285,6 +287,16 @@ class RealEnvBase(EnvDataMixin, gym.Env, ABC):
             # if np.linalg.norm(arm_joint_pos_command_overwritten - arm_joint_pos_command) > 1e-10:
             #     print(f"[{self.__class__.__name__}] Overwrite joint command for safety.")
             action[arm_joint_idxes] = arm_joint_pos_command_overwritten
+
+        if not np.all(np.isfinite(action)):
+            raise RuntimeError(
+                f"[{self.__class__.__name__}] Action contains NaN or Inf: {action}"
+            )
+
+        if duration is None or not np.isfinite(duration):
+            raise RuntimeError(
+                f"[{self.__class__.__name__}] Duration is NaN or Inf: {duration}"
+            )
 
         return action, duration
 

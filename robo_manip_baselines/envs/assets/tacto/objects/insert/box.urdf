@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<robot name="box">
+  <link name="box">
+    <visual>
+      <origin rpy="1.5708 0 1.5708" xyz="0 0 0"/>
+      <geometry>
+        <mesh filename="meshes/box.obj"/>
+      </geometry>
+      <material name="yellow">
+        <color rgba="0.6 0.6 0.2 1"/>
+      </material>
+    </visual>
+
+    <collision>
+      <origin rpy="1.5708 0 1.5708" xyz="0 0 0"/>
+      <geometry>
+        <mesh filename="meshes/vhacd_box.obj"/>
+      </geometry>
+    </collision>
+
+    <inertial>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <mass value="1.0"/>
+      <inertia ixx="0.001" iyy="0.001" izz="0.001"
+               ixy="0" ixz="0" iyz="0"/>
+    </inertial>
+  </link>
+</robot>

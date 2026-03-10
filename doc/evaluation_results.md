@@ -10,7 +10,7 @@ We performed rollouts at six different object positions for each of the five che
 | [**Diffusion Policy**](../robo_manip_baselines/policy/diffusion_policy) | 27<br>(&plusmn;19) | 7<br>(&plusmn;15) | 60<br>(&plusmn;28) | 93<br>(&plusmn;15) | 60<br>(&plusmn;19) | 77<br>(&plusmn;9) | 67<br>(&plusmn;0) | 87<br>(&plusmn;14) | 33<br>(&plusmn;12) | **57<br>(&plusmn;29)** |
 
 #### Success rate vs. number of epochs
-<img width="2000" height="1200" alt="plot_epoch" src="https://github.com/user-attachments/assets/fd7109af-6d24-45a1-8909-a56b2d7b35b7" />
+<img width="2000" height="1200" alt="epoch" src="https://github.com/user-attachments/assets/5bcc7170-9a9f-41b2-bdd1-b709fdf0d364" />
 
 #### Success rate vs. number of training demos
-<img width="2000" height="1200" alt="plot_datasize" src="https://github.com/user-attachments/assets/e9e695f6-b44d-4d2e-b9f2-8e3cb2e506a5" />
+<img width="2000" height="1200" alt="datanum" src="https://github.com/user-attachments/assets/f4c603d3-a63b-41bc-8bf6-620276ba3ebb" />

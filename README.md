@@ -18,6 +18,9 @@
 
 # 🤖 [RoboManipBaselines](https://isri-aist.github.io/RoboManipBaselines-ProjectPage)
 
+<a href="https://isri-aist.github.io/RoboManipBaselines-ProjectPage/"><strong>Project Page</strong></a> |
+<a href="https://arxiv.org/abs/2509.17057"><strong>arXiv</strong></a>
+
 A software framework integrating various **imitation learning methods** and **benchmark environments** for robotic manipulation.  
 Provides easy-to-use **baselines** for policy training, evaluation, and deployment.
 
@@ -112,7 +115,7 @@ Please check individual files or directories (especially `third_party` and `asse
 
 ## 📖 Citation
 
-If you use RoboManipBaselines in your work, please cite us:
+If you use RoboManipBaselines in your work, please cite [our paper](https://arxiv.org/abs/2509.17057):
 
 ```bibtex
 @article{RoboManipBaselines_Murooka_2025,

@@ -120,7 +120,7 @@ class TestRealEnvBaseGetInfo(unittest.TestCase):
                 # get rgb image
                 info = dummy_real_env._get_info()
                 for camera_name in (
-                    dummy_real_env.camera_names | dummy_real_env.rgb_tactile_names
+                    dummy_real_env.camera_names + dummy_real_env.rgb_tactile_names
                 ):
                     rgb_image = info["rgb_images"][camera_name]
                     rgb_image = cv2.resize(rgb_image, (SHOW_WIDTH, SHOW_HEIGHT))

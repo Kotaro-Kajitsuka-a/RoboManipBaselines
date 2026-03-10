@@ -27,7 +27,7 @@ class TrainAct(TrainBase):
 
         parser.add_argument("--kl_weight", type=int, default=10, help="KL weight")
         parser.add_argument(
-            "--chunk_size", type=int, default=100, help="action chunking size"
+            "--chunk_size", type=int, default=25, help="action chunking size"
         )
         parser.add_argument(
             "--hidden_dim", type=int, default=512, help="hidden dimension"

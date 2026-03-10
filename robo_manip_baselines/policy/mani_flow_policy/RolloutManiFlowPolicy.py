@@ -199,7 +199,7 @@ class RolloutManiFlowPolicy(RolloutBase):
             depth_image = cv2.resize(depth_image, image_size)
 
             # Convert to pointcloud
-            pointcloud = np.concat(
+            pointcloud = np.concatenate(
                 convert_depth_image_to_pointcloud(depth_image, fovy, rgb_image),
                 axis=1,
             )

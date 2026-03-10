@@ -14,7 +14,11 @@ from .xarm7.MujocoXarm7CableEnv import MujocoXarm7CableEnv
 from .xarm7.MujocoXarm7RingEnv import MujocoXarm7RingEnv
 from .xarm7.MujocoXarm7PushtEnv import MujocoXarm7PushtEnv
 
+from .panda.MujocoPandaCableEnv import MujocoPandaCableEnv
+
 from .kinovagen3.MujocoKinovaGen3CableEnv import MujocoKinovaGen3CableEnv
+
+from .crx5ia.MujocoCrx5iaCableEnv import MujocoCrx5iaCableEnv
 
 from .vx300s.MujocoVx300sPickEnv import MujocoVx300sPickEnv
 

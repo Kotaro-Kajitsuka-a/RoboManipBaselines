@@ -76,11 +76,24 @@ Task to push the T-shaped block to align the pose.
 
 https://github.com/user-attachments/assets/000ae494-8ed5-423a-a26e-652b7817c372
 
+### Panda
+#### MujocoPandaCableEnv
+Task to pass the cable between two poles.
+
+https://github.com/user-attachments/assets/046eaf8b-a02f-408f-a586-821338fbeec0
+
 ### KinovaGen3
 #### MujocoKinovaGen3Cable
 Task to pass the cable between two poles.
 
 https://github.com/user-attachments/assets/4e9d4112-ce82-47e6-8977-eff4653be6cf
+
+### CRX-5iA
+#### MujocoCrx5iaCable
+Task to pass the cable between two poles.
+
+https://github.com/user-attachments/assets/d1880909-6d93-4225-9d3d-3216ff25b402
+
 
 ### ALOHA
 #### MujocoAlohaCable
@@ -117,6 +130,13 @@ Task to open the top lid of the box.
 The parallel simulation feature of Isaac Gym allows multiple robots to be controlled in parallel while adding random noise.
 
 https://github.com/user-attachments/assets/4f171bd3-7572-41a4-9e81-9df5dfec575a
+
+## [Tacto](https://github.com/facebookresearch/tacto) environments
+### Sawyer
+#### TactoSawyerGrasp
+Task to pick a box with optical tactile sensing at the fingertips.
+
+https://github.com/user-attachments/assets/0e119da0-5ff8-4129-ab0d-c0f2bd5ec04a
 
 ## Real-world environments
 ### UR5e

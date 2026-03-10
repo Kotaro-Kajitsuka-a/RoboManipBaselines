@@ -50,7 +50,7 @@ class TrainDiffusionPolicy(TrainBase):
         parser.set_defaults(norm_type="limits")
 
         parser.set_defaults(batch_size=64)
-        parser.set_defaults(num_epochs=2000)
+        parser.set_defaults(num_epochs=500)
         parser.set_defaults(lr=1e-4)
 
         parser.add_argument(
@@ -73,7 +73,7 @@ class TrainDiffusionPolicy(TrainBase):
         parser.add_argument(
             "--scheduler",
             type=str,
-            default="ddpm",
+            default="ddim",
             choices=["ddpm", "ddim"],
             help="type of noise scheduler ('ddpm' or 'ddim')",
         )
