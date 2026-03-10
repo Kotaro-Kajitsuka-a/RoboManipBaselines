@@ -70,10 +70,6 @@ class RealXarm7DualEnvBase(RealEnvBase):
         self.init_qpos = init_qpos
         self.joint_vel_limit = np.deg2rad(180)  # [rad/s]
 
-        # Change this value when you want to fix the gripper joint position to a specific value.
-        # example: self.fixed_gripper_joint_pos = np.array([119.0, 119.0], dtype=np.float64)
-        self.fixed_gripper_joint_pos = None
-
         self.body_config_list = [
             ArmConfig(
                 arm_urdf_path=path.join(
@@ -255,12 +251,8 @@ class RealXarm7DualEnvBase(RealEnvBase):
             )
 
         # Send command to xArm gripper
-        if self.fixed_gripper_joint_pos is None:
-            left_gripper_pos = action[self.body_config_list[0].gripper_joint_idxes][0]
-            right_gripper_pos = action[self.body_config_list[1].gripper_joint_idxes][0]
-        else:
-            left_gripper_pos = self.fixed_gripper_joint_pos[0]
-            right_gripper_pos = self.fixed_gripper_joint_pos[1]
+        left_gripper_pos = action[self.body_config_list[0].gripper_joint_idxes][0]
+        right_gripper_pos = action[self.body_config_list[1].gripper_joint_idxes][0]
 
         xarm_code = self.xarm_api_left.set_gripper_position(
             left_gripper_pos, wait=False
