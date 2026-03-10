@@ -70,7 +70,11 @@ class RealXarm7DualEnvBase(RealEnvBase):
         self.init_qpos = init_qpos
         self.joint_vel_limit = np.deg2rad(180)  # [rad/s]
         # Keep both grippers at a fixed position to avoid unintended motion.
-        self.fixed_gripper_joint_pos = np.array([119.0, 119.0], dtype=np.float64)
+
+        # グリッパー位置司令の固定化
+        # self.fixed_gripper_joint_pos = np.array([119.0, 119.0], dtype=np.float64)
+        self.fixed_gripper_joint_pos = None  # 現在はNone
+
         self.body_config_list = [
             ArmConfig(
                 arm_urdf_path=path.join(
@@ -351,9 +355,9 @@ class RealXarm7DualEnvBase(RealEnvBase):
         right_gripper_joint_pos = np.array([right_gripper_pos], dtype=np.float64)
         right_gripper_joint_vel = np.zeros(1)
 
-        # gripperのobsは固定量
-        left_gripper_joint_pos = [119.0]
-        right_gripper_joint_pos = [119.0]
+        # gripperのobsを固定量に
+        # left_gripper_joint_pos = [119.0]
+        # right_gripper_joint_pos = [119.0]
 
         left_gripper_joint_vel = np.zeros(1)
         right_gripper_joint_vel = np.zeros(1)
