@@ -1,0 +1,59 @@
+<mujoco model="xarm7_dual_box">
+  <include file="../xarm7/env_xarm7_common.xml"/>
+
+  <asset>
+    <material name="box_white" rgba="1 1 1 1" specular="0.2" shininess="0.3"/>
+    <material name="box_red" rgba="1 0 0 1" specular="0.2" shininess="0.3"/>
+    <material name="box_green" rgba="0 1 0 1" specular="0.2" shininess="0.3"/>
+    <material name="box_orange" rgba="1 0.5 0 1" specular="0.2" shininess="0.3"/>
+    <material name="box_pale_yellow" rgba="1 0.96 0.75 1" specular="0.2" shininess="0.3"/>
+    <material name="box_pale_blue" rgba="0.75 0.9 1 1" specular="0.2" shininess="0.3"/>
+    <material name="box_pale_pink" rgba="1 0.85 0.9 1" specular="0.2" shininess="0.3"/>
+    <material name="box_pale_mint" rgba="0.82 1 0.9 1" specular="0.2" shininess="0.3"/>
+    <material name="box_pale_lavender" rgba="0.88 0.84 1 1" specular="0.2" shininess="0.3"/>
+    <material name="stand" rgba="0.4 0.4 0.45 1" specular="0.3" shininess="0.4"/>
+  </asset>
+
+  <include file="../../robots/xarm7/xarm7_shared_config.xml"/>
+  <include file="../../robots/xarm7/xarm7_specific_config_left.xml"/>
+  <include file="../../robots/xarm7/xarm7_specific_config_right.xml"/>
+
+  <worldbody>
+    <light pos="0 0 1.5" dir="0 0 -1" directional="true" diffuse="0.3 0.3 0.3"/>
+
+    <camera name="front" mode="fixed" pos="0.75 0.0 1.55" euler="0.0 0.785398 1.5708"/>
+    <camera name="left" mode="fixed" pos="0.1 -0.9 1.35" euler="0.785398 0.0 0.1"/>
+    <camera name="right" mode="fixed" pos="0.1 0.9 1.35" euler="-0.785398 0.0 3.0415"/>
+
+    <geom name="floor" size="0 0 0.05" type="plane" material="floor"/>
+
+    <geom name="wall1" type="box" size="10 10 0.01" pos="10 0 10" zaxis="1 0 0" material="wall"/>
+    <geom name="wall2" type="box" size="10 10 0.01" pos="-10 0 10" zaxis="1 0 0" material="wall"/>
+    <geom name="wall3" type="box" size="10 10 0.01" pos="0 10 10" zaxis="0 1 0" material="wall"/>
+    <geom name="wall4" type="box" size="10 10 0.01" pos="0 -10 10" zaxis="0 1 0" material="wall"/>
+
+    <body name="table">
+      <geom type="box" size="0.45 0.55 0.019" pos="0 0 0.721" material="table"/>
+      <geom type="box" size="0.03 0.03 0.351" pos="0.36 0.46 0.351" material="table"/>
+      <geom type="box" size="0.03 0.03 0.351" pos="-0.36 0.46 0.351" material="table"/>
+      <geom type="box" size="0.03 0.03 0.351" pos="0.36 -0.46 0.351" material="table"/>
+      <geom type="box" size="0.03 0.03 0.351" pos="-0.36 -0.46 0.351" material="table"/>
+    </body>
+
+    <body name="stand">
+      <geom type="box" size="0.09 0.68 0.36" pos="-0.31 0.0 0.36" material="stand"/>
+    </body>
+
+    <body name="left/xarm7_root_frame" pos="-0.31 0.28 0.74">
+      <include file="../../robots/xarm7/xarm7_body_left.xml"/>
+    </body>
+    <body name="right/xarm7_root_frame" pos="-0.31 -0.28 0.74">
+      <include file="../../robots/xarm7/xarm7_body_right.xml"/>
+    </body>
+
+    <body name="box" pos="0.18 0.0 0.78">
+      <freejoint name="box_freejoint"/>
+      <geom name="box_geom" type="box" size="0.09 0.14 0.04" material="box_white" friction="0.8 0.1 0.1"/>
+    </body>
+  </worldbody>
+</mujoco>

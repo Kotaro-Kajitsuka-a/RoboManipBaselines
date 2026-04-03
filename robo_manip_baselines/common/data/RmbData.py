@@ -1,6 +1,7 @@
 import os
 import shutil
 
+import cv2
 import h5py
 import numpy as np
 import torchcodec
@@ -9,11 +10,12 @@ import videoio
 from .DataKey import DataKey
 
 
-def to_hashable(path, idx):
+def to_hashable(path, idx, image_size):
     if isinstance(idx, slice):
-        return (path, (idx.start, idx.stop, idx.step))
+        idx_key = (idx.start, idx.stop, idx.step)
     else:
-        return (path, idx)
+        idx_key = idx
+    return (path, idx_key, image_size)
 
 
 class RmbData:
@@ -23,9 +25,10 @@ class RmbData:
         # Note that this cache is not shared among processes in the multi-process data loader
         cache = {}
 
-        def __init__(self, path, enable_cache=False):
+        def __init__(self, path, enable_cache=False, image_size=None):
             self.path = path
             self.enable_cache = enable_cache
+            self.image_size = None if image_size is None else tuple(image_size)
 
         def __len__(self):
             decoder = torchcodec.decoders.VideoDecoder(self.path)
@@ -33,7 +36,7 @@ class RmbData:
 
         def __getitem__(self, idx):
             if self.enable_cache:
-                hashable = to_hashable(self.path, idx)
+                hashable = to_hashable(self.path, idx, self.image_size)
                 if hashable not in self.cache:
                     self.cache[hashable] = self._get_data(idx)
                 return self.cache[hashable]
@@ -47,15 +50,44 @@ class RmbData:
             decoder = torchcodec.decoders.VideoDecoder(
                 self.path, dimension_order="NHWC"
             )
-            return decoder[idx].numpy()
+            data = decoder[idx].numpy()
+            if self.image_size is not None:
+                if data.ndim == 3:  # (H, W, C)
+                    data = cv2.resize(
+                        data,
+                        self.image_size,
+                        interpolation=cv2.INTER_LINEAR,
+                    )
+                elif data.ndim == 4:  # (T, H, W, C)
+                    data = np.stack(
+                        [
+                            cv2.resize(
+                                frame,
+                                self.image_size,
+                                interpolation=cv2.INTER_LINEAR,
+                            )
+                            for frame in data
+                        ],
+                        axis=0,
+                    )
+                else:
+                    raise ValueError(
+                        f"[{self.__class__.__name__}] Unexpected video data ndim: {data.ndim}, expected 3 or 4"
+                    )
+            return data
 
         @property
         def shape(self):
             decoder = torchcodec.decoders.VideoDecoder(self.path)
+            if self.image_size is None:
+                height = decoder.metadata.height
+                width = decoder.metadata.width
+            else:
+                width, height = self.image_size
             return (
                 decoder.metadata.num_frames,
-                decoder.metadata.height,
-                decoder.metadata.width,
+                height,
+                width,
                 3,
             )
 
@@ -65,25 +97,56 @@ class RmbData:
 
     class RmbDepthVideo(RmbVideo):
         def _get_data(self, idx):
-            return (1e-3 * videoio.uint16read(self.path)[idx]).astype(np.float32)
+            data = (1e-3 * videoio.uint16read(self.path)[idx]).astype(np.float32)
+            if self.image_size is not None:
+                if data.ndim == 2:  # (H, W)
+                    data = cv2.resize(
+                        data,
+                        self.image_size,
+                        interpolation=cv2.INTER_LINEAR,
+                    )
+
+                elif data.ndim == 3:  # (N, H, W)
+                    data = np.stack(
+                        [
+                            cv2.resize(
+                                frame,
+                                self.image_size,
+                                interpolation=cv2.INTER_LINEAR,
+                            )
+                            for frame in data
+                        ],
+                        axis=0,
+                    )
+                else:
+                    raise ValueError(
+                        f"[{self.__class__.__name__}] Unexpected video data ndim: {data.ndim}, expected 2 or 3"
+                    )
+            return data
 
         @property
         def shape(self):
             decoder = torchcodec.decoders.VideoDecoder(self.path)
+            if self.image_size is None:
+                height = decoder.metadata.height
+                width = decoder.metadata.width
+            else:
+                width, height = self.image_size
             return (
                 decoder.metadata.num_frames,
-                decoder.metadata.height,
-                decoder.metadata.width,
+                height,
+                width,
             )
 
         @property
         def dtype(self):
             return np.float32
 
-    def __init__(self, path, enable_cache=False, mode="r"):
+    def __init__(self, path, enable_cache=False, mode="r", image_size=None):
         self.path = path
-        self.mode = mode
         self.enable_cache = enable_cache
+        self.mode = mode
+        self.image_size = None if image_size is None else tuple(image_size)
 
         _, ext = os.path.splitext(self.path.rstrip("/"))
         if ext.lower() == ".hdf5":
@@ -135,11 +198,13 @@ class RmbData:
             return self.RmbRgbVideo(
                 os.path.join(self.path, f"{key}.rmb.mp4"),
                 enable_cache=self.enable_cache,
+                image_size=self.image_size,
             )
         elif DataKey.is_depth_image_key(key):
             return self.RmbDepthVideo(
                 os.path.join(self.path, f"{key}.rmb.mp4"),
                 enable_cache=self.enable_cache,
+                image_size=self.image_size,
             )
         else:
             return self.h5file[key]

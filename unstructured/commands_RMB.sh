@@ -231,3 +231,8 @@ python robo_manip_baselines/misc/CreateBoxPoseEvalHdf5.py /path/to/dataset_dir ~
 
 
 python robo_manip_baselines/misc/EvalBoxRotation.py /path/to/dataset_dir
+
+
+
+#teleop xarm mujoco
+python ./bin/Teleop.py MujocoXarm7DualBox --input_device_config ./teleop/configs/SpaceMouseDual.yaml --world_idx_list 0 1

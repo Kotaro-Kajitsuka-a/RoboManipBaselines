@@ -460,13 +460,18 @@ class RolloutBase(OperationDataMixin, ABC):
 
                 self.phase_manager.post_update()
 
-                self.key = cv2.waitKey(1)
+                if self.args.no_plot:
+                    self.key = -1
+                else:
+                    self.key = cv2.waitKey(1)
+
                 self.phase_manager.check_transition()
 
                 if self.key == 27:  # escape key
                     self.quit_flag = True
                 if self.quit_flag:
                     break
+
         except Exception:
             if self.args.save_rollout and self.phase_manager.is_phase("RolloutPhase"):
                 has_data = any(

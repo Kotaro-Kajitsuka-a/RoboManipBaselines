@@ -13,6 +13,7 @@ from .ur5e_dual.MujocoUR5eDualCableEnv import MujocoUR5eDualCableEnv
 from .xarm7.MujocoXarm7CableEnv import MujocoXarm7CableEnv
 from .xarm7.MujocoXarm7RingEnv import MujocoXarm7RingEnv
 from .xarm7.MujocoXarm7PushtEnv import MujocoXarm7PushtEnv
+from .xarm7_dual.MujocoXarm7DualBoxEnv import MujocoXarm7DualBoxEnv
 
 from .panda.MujocoPandaCableEnv import MujocoPandaCableEnv
 

@@ -40,6 +40,8 @@ class TrainBase(ABC):
 
         self.setup_policy()
 
+        self.load_ckpt()
+
     def setup_args(self, parser=None, argv=None):
         if parser is None:
             parser = argparse.ArgumentParser(
@@ -57,6 +59,13 @@ class TrainBase(ABC):
             type=str,
             default=None,
             help="checkpoint directory",
+        )
+
+        parser.add_argument(
+            "--pretrain_checkpoint",
+            type=str,
+            default=None,
+            help="pre-trained checkpoint loaded at the start of training",
         )
 
         parser.add_argument(
@@ -406,6 +415,19 @@ class TrainBase(ABC):
     @abstractmethod
     def setup_policy(self):
         pass
+
+    def load_ckpt(self):
+        if self.args.pretrain_checkpoint is not None:
+            print(
+                f"[{self.__class__.__name__}] Load pre-trained checkpoint: {self.args.pretrain_checkpoint}"
+            )
+            self.policy.load_state_dict(
+                torch.load(
+                    self.args.pretrain_checkpoint,
+                    map_location="cuda",
+                    weights_only=True,
+                )
+            )
 
     def print_policy_info(self):
         print(

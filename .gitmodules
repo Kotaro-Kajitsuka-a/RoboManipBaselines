@@ -1,19 +1,19 @@
 [submodule "third_party/eipl"]
 	path = third_party/eipl
 	url = https://github.com/mmurooka/eipl.git
-        ignore = untracked
+	ignore = untracked
 [submodule "third_party/act"]
 	path = third_party/act
 	url = https://github.com/mmurooka/act.git
-        ignore = untracked
+	ignore = untracked
 [submodule "third_party/diffusion_policy"]
 	path = third_party/diffusion_policy
 	url = https://github.com/mmurooka/diffusion_policy.git
-        ignore = untracked
+	ignore = untracked
 [submodule "third_party/roboagent"]
 	path = third_party/roboagent
 	url = https://github.com/mmurooka/roboagent.git
-        ignore = untracked
+	ignore = untracked
 [submodule "third_party/gello_software"]
 	path = third_party/gello_software
 	url = https://github.com/mmurooka/gello_software.git
@@ -22,29 +22,31 @@
 [submodule "third_party/YCB_sim"]
 	path = third_party/YCB_sim
 	url = https://github.com/mmurooka/YCB_sim.git
-        ignore = untracked
+	ignore = untracked
 [submodule "third_party/3D-Diffusion-Policy"]
 	path = third_party/3D-Diffusion-Policy
 	url = https://github.com/Naoki-Shibayama/3D-Diffusion-Policy.git
-        ignore = untracked
+	ignore = untracked
 [submodule "third_party/pyorbbecsdk"]
 	path = third_party/pyorbbecsdk
 	url = https://github.com/orbbec/pyorbbecsdk.git
-        ignore = untracked
+	ignore = untracked
 [submodule "third_party/FlowPolicy"]
 	path = third_party/FlowPolicy
 	url = https://github.com/mmurooka/FlowPolicy.git
-        ignore = untracked
+	ignore = untracked
 [submodule "third_party/ManiFlow_Policy"]
 	path = third_party/ManiFlow_Policy
 	url = https://github.com/Naoki-Shibayama/ManiFlow_Policy.git
-        ignore = untracked
+	ignore = untracked
 [submodule "third_party/tacto"]
 	path = third_party/tacto
 	url = https://github.com/Naoki-Shibayama/tacto.git
         ignore = untracked
-
-
+[submodule "third_party/lerobot"]
+	path = third_party/lerobot
+	url = https://github.com/huggingface/lerobot.git
+	ignore = untracked
 [submodule "maniskill_exp"]
 	path = third_party/maniskill_exp
 	url = https://github.com/kotaro-kaji/maniskill_exp.git

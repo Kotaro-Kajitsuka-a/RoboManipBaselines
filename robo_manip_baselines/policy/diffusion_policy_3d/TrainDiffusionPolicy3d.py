@@ -226,6 +226,13 @@ class TrainDiffusionPolicy3d(TrainBase, TrainPointCloudMixin):
             f"  - with color: {self.args.use_pc_color}, num points: {data_info['num_points']}, image size: {data_info['image_size']}, min bound: {data_info['min_bound']}, max bound: {data_info['max_bound']}, rpy_angle: {data_info['rpy_angle']}"
         )
 
+    def load_ckpt(self):
+        super().load_ckpt()
+
+        if self.args.pretrain_checkpoint is not None:
+            if self.args.use_ema:
+                self.ema_policy.load_state_dict(self.policy.state_dict())
+
     def train_loop(self):
         for epoch in tqdm(range(self.args.num_epochs)):
             # Run train step

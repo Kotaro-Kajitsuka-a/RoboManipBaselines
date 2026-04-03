@@ -18,12 +18,14 @@ GTAGS
 *.pt
 
 .venv
+/.venv_tutorial
 
 
 commit.sh
 
 /wandb
 
+AGENTS.md
 
 asobiba.ipynb
 check_hdf5.ipynb

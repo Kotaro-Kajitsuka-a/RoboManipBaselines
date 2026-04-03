@@ -1,6 +1,6 @@
 <p align="center">
   <a href="https://isri-aist.github.io/RoboManipBaselines-ProjectPage">
-    <img src="https://github.com/user-attachments/assets/76636cfe-9abe-4b6f-b867-1afbd1669120" alt="logo" width="300">
+    <img src="https://github.com/user-attachments/assets/4a4a6429-7e3c-4cfa-90b3-ed54dd9019a3" alt="logo" width="300">
   </a>
   <br/>
   <a href="https://github.com/isri-aist/RoboManipBaselines/actions/workflows/install.yml">
@@ -24,9 +24,7 @@
 A software framework integrating various **imitation learning methods** and **benchmark environments** for robotic manipulation.  
 Provides easy-to-use **baselines** for policy training, evaluation, and deployment.
 
-https://github.com/user-attachments/assets/c37c9956-2d50-488d-83ae-9c11c3900992
-
-https://github.com/user-attachments/assets/ba4a772f-0de5-47da-a4ec-bdcbf13d7d58
+https://github.com/user-attachments/assets/1ad3dcbe-bb4c-4711-96c3-5e196e9d067b
 
 ---
 
@@ -55,6 +53,8 @@ We provide several powerful policy architectures for manipulation tasks:
 - 🔹 **[3D Diffusion Policy](./robo_manip_baselines/policy/diffusion_policy_3d)**: Diffusion-based policy with 3D point cloud input
 - 🔹 **[Flow Policy](./robo_manip_baselines/policy/flow_policy)**: Flow-matching-based policy with 3D point cloud input
 - 🔹 **[ManiFlow Policy](./robo_manip_baselines/policy/mani_flow_policy)**: Flow-matching and consistency-based policy with 2D/3D vision
+- 🔹 **[pi0](./robo_manip_baselines/policy/pi0)**: Flow-matching-based policy with a vision-language model backbone (PaliGemma)
+- 🔹 **[GR00T](./robo_manip_baselines/policy/gr00t)**: Diffusion Transformer-based policy with a vision-language model backbone (Eagle-2)
 
 ---
 
@@ -119,8 +119,8 @@ If you use RoboManipBaselines in your work, please cite [our paper](https://arxi
 
 ```bibtex
 @article{RoboManipBaselines_Murooka_2025,
-  title={RoboManipBaselines: A Unified Framework for Imitation Learning in Robotic Manipulation across Real and Simulated Environments},
-  author={Murooka, Masaki and Motoda, Tomohiro and Nakajo, Ryoichi and Oh, Hanbit and Makihara, Koshi and Shirai, Keisuke and Domae, Yukiyasu},
+  title={RoboManipBaselines: A Unified Framework for Imitation Learning in Robotic Manipulation across Real and Simulation Environments},
+  author={Murooka, Masaki and Motoda, Tomohiro and Nakajo, Ryoichi and Oh, Hanbit and Makihara, Koshi and Shirai, Keisuke and Ogata, Tetsuya and Domae, Yukiyasu},
   journal={arXiv preprint arXiv:2509.17057},
   year={2025}
 }

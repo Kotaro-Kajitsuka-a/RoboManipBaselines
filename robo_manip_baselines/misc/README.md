@@ -10,11 +10,11 @@ Visualize the demonstration data by plotting it.
 $ python ./VisualizeData.py <rmb_file>
 ```
 
-### Convert demonstration data
-Convert RMB format file between RmbData-Compact (`.rmb`) and RmbData-SingleHDF5 (`.hdf5`). The format is automatically determined from the file extension.
+### Switch internal format of demonstration data
+Switch RMB format file between RmbData-Compact (`.rmb`) and RmbData-SingleHDF5 (`.hdf5`). The format is automatically determined from the file extension.
 
 ```console
-$ python ./ConvertRmbData.py <rmb_file_in> <rmb_file_out>
+$ python ./SwitchRmbDataFormat.py <rmb_file_in> <rmb_file_out>
 ```
 
 ### Compare demonstration data

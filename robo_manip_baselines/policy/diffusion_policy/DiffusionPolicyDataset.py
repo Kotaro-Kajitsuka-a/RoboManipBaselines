@@ -1,4 +1,3 @@
-import cv2
 import numpy as np
 import torch
 
@@ -23,9 +22,12 @@ class DiffusionPolicyDataset(DatasetBase, DpStyleDatasetMixin):
     def __getitem__(self, chunk_idx):
         skip = self.model_meta_info["data"]["skip"]
         horizon = self.model_meta_info["data"]["horizon"]
+        image_size = self.model_meta_info["data"]["image_size"]
         episode_idx, start_time_idx = self.chunk_info_list[chunk_idx]
 
-        with RmbData(self.filenames[episode_idx], self.enable_rmb_cache) as rmb_data:
+        with RmbData(
+            self.filenames[episode_idx], self.enable_rmb_cache, image_size=image_size
+        ) as rmb_data:
             episode_len = rmb_data[DataKey.TIME][::skip].shape[0]
             time_idxes = np.clip(
                 np.arange(start_time_idx, start_time_idx + horizon), 0, episode_len - 1
@@ -61,12 +63,13 @@ class DiffusionPolicyDataset(DatasetBase, DpStyleDatasetMixin):
                 axis=0,
             )
 
-        # Resize images
-        K, T, H, W, C = images.shape
-        image_size = self.model_meta_info["data"]["image_size"]
-        images = np.array(
-            [cv2.resize(img, image_size) for img in images.reshape(-1, H, W, C)]
-        ).reshape(K, T, *image_size[::-1], C)
+        # Check image size
+        current_h, current_w = images.shape[2:4]
+        target_w, target_h = self.model_meta_info["data"]["image_size"]
+        if (current_w, current_h) != (target_w, target_h):
+            raise ValueError(
+                f"[{self.__class__.__name__}] Image size mismatch: ({current_w}, {current_h}) != ({target_w}, {target_h})"
+            )
 
         # Pre-convert data
         state, action, images = self.pre_convert_data(state, action, images)

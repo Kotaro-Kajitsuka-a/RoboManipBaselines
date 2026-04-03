@@ -31,7 +31,7 @@ $ python ./bin/Teleop.py MujocoUR5eCable --world_idx_list 0 5 --input_device key
 > A teleoperation input device such as a 3D mouse can be used instead of a keyboard. See [here](../robo_manip_baselines/teleop/README.md).
 
 In our experience, models can be trained stably with roughly 30 data sets.
-The teleoperation data is saved in the `robo_manip_baselines/dataset/MujocoUR5eCable_<date_suffix>` directory (e.g., `MujocoUR5eCable_20240101_120000`) in HDF5 format.
+The teleoperation data is saved in the `robo_manip_baselines/dataset/MujocoUR5eCable_<date_suffix>` directory (e.g., `MujocoUR5eCable_20240101_120000`).
 
 ## Model training
 Train the ACT:
@@ -40,7 +40,7 @@ Train the ACT:
 $ cd robo_manip_baselines
 $ python ./bin/Train.py Act --dataset_dir ./dataset/MujocoUR5eCable_20240101_120000
 ```
-The learned parameters are saved in the `robo_manip_baselines/checkpoint/Act/<dataset_name>_Act_<date_suffix>` directory (e.g., `MujocoUR5eCable_20240101_120000_Act_20240101_130000`) in HDF5 format.
+The learned parameters are saved in the `robo_manip_baselines/checkpoint/Act/<dataset_name>_Act_<date_suffix>` directory (e.g., `MujocoUR5eCable_20240101_120000_Act_20240101_130000`).
 
 > [!NOTE]
 > The following error will occur if the chunk_size is larger than the time series length of the training data.
