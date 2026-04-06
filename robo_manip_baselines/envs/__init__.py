@@ -61,6 +61,16 @@ register(
     entry_point="robo_manip_baselines.envs.mujoco:MujocoXarm7PushtEnv",
 )
 
+## xArm7-Dual
+register(
+    id="robo_manip_baselines/MujocoXarm7DualBoxEnv-v0",
+    entry_point="robo_manip_baselines.envs.mujoco:MujocoXarm7DualBoxEnv",
+)
+register(
+    id="robo_manip_baselines/MujocoXarm7DualAdmittanceBoxEnv-v0",
+    entry_point="robo_manip_baselines.envs.mujoco:MujocoXarm7DualAdmittanceBoxEnv",
+)
+
 ## Franka Emika Panda
 register(
     id="robo_manip_baselines/MujocoPandaCableEnv-v0",

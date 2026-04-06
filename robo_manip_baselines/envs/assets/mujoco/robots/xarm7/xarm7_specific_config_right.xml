@@ -1,0 +1,45 @@
+<mujoco model="right_xarm7_specific_config">
+  <actuator>
+    <general name="right/act1" joint="right/joint1" class="size1"/>
+    <general name="right/act2" joint="right/joint2" class="size1" ctrlrange="-2.059 2.0944"/>
+    <general name="right/act3" joint="right/joint3" class="size2"/>
+    <general name="right/act4" joint="right/joint4" class="size2" ctrlrange="-0.19198 3.927"/>
+    <general name="right/act5" joint="right/joint5" class="size2"/>
+    <general name="right/act6" joint="right/joint6" class="size3" ctrlrange="-1.69297 3.14159"/>
+    <general name="right/act7" joint="right/joint7" class="size3"/>
+    <general name="right/gripper" tendon="right/split" forcerange="-100 100" ctrlrange="0 255"
+             biastype="affine" gainprm="0.3137255 0 0" biasprm="0 -100 -10"/>
+  </actuator>
+
+  <sensor>
+    <force name="right/force_sensor" site="right/force_sensor"/>
+    <torque name="right/torque_sensor" site="right/force_sensor"/>
+  </sensor>
+
+  <contact>
+    <exclude body1="right/right_inner_knuckle" body2="right/right_outer_knuckle"/>
+    <exclude body1="right/right_inner_knuckle" body2="right/right_finger"/>
+    <exclude body1="right/left_inner_knuckle" body2="right/left_outer_knuckle"/>
+    <exclude body1="right/left_inner_knuckle" body2="right/left_finger"/>
+  </contact>
+
+  <tendon>
+    <fixed name="right/split">
+      <joint joint="right/right_driver_joint" coef="0.5"/>
+      <joint joint="right/left_driver_joint" coef="0.5"/>
+    </fixed>
+  </tendon>
+
+  <equality>
+    <joint joint1="right/left_driver_joint" joint2="right/right_driver_joint"
+           polycoef="0 1 0 0 0" solimp="0.95 0.99 0.001" solref="0.005 1"/>
+    <joint joint1="right/left_driver_joint" joint2="right/left_inner_knuckle_joint"
+           polycoef="0 1 0 0 0" solimp="0.95 0.99 0.001" solref="0.005 1"/>
+    <joint joint1="right/left_driver_joint" joint2="right/left_finger_joint"
+           polycoef="0 1 0 0 0" solimp="0.95 0.99 0.001" solref="0.005 1"/>
+    <joint joint1="right/right_driver_joint" joint2="right/right_inner_knuckle_joint"
+           polycoef="0 1 0 0 0" solimp="0.95 0.99 0.001" solref="0.005 1"/>
+    <joint joint1="right/right_driver_joint" joint2="right/right_finger_joint"
+           polycoef="0 1 0 0 0" solimp="0.95 0.99 0.001" solref="0.005 1"/>
+  </equality>
+</mujoco>
