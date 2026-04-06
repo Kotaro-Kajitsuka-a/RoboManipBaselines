@@ -69,10 +69,10 @@ class MujocoXarm7DualBoxEnv(MujocoXarm7DualEnvBase):
         self.box_half_size = self.model.geom_size[self.box_geom_id].copy()
 
         self.box_center_com_offset = self._com_offset_from_ratio()
-        self.box_high_com_offset = self._com_offset_from_ratio(z_ratio=100.0)
-        self.box_low_com_offset = self._com_offset_from_ratio(z_ratio=-100.0)
         self.box_xarm_side_com_offset = self._com_offset_from_ratio(x_ratio=-50.0)
-        self.box_xarm_side_more_com_offset = self._com_offset_from_ratio(x_ratio=-100.0)
+        self.box_anti_xarm_side_com_offset = self._com_offset_from_ratio(x_ratio=50.0)
+        self.box_left_hand_side_com_offset = self._com_offset_from_ratio(y_ratio=50.0)
+        self.box_right_hand_side_com_offset = self._com_offset_from_ratio(y_ratio=-50.0)
 
     def _com_offset_from_ratio(self, x_ratio=0.0, y_ratio=0.0, z_ratio=0.0):
         ratio = np.array([x_ratio, y_ratio, z_ratio], dtype=np.float64)
@@ -103,36 +103,36 @@ class MujocoXarm7DualBoxEnv(MujocoXarm7DualEnvBase):
             com_offset = self.box_center_com_offset
         elif world_idx == 1:
             box_mat_id = self.box_red_mat_id
-            mass_scale = 0.5
+            mass_scale = 2.0
             com_offset = self.box_center_com_offset
         elif world_idx == 2:
             box_mat_id = self.box_green_mat_id
-            mass_scale = 1.5
+            mass_scale = 4.0
             com_offset = self.box_center_com_offset
         elif world_idx == 3:
             box_mat_id = self.box_orange_mat_id
-            mass_scale = 0.1
+            mass_scale = 0.5
             com_offset = self.box_center_com_offset
         elif world_idx == 4:
             box_mat_id = self.box_pale_yellow_mat_id
-            mass_scale = 1.0
-            com_offset = self.box_high_com_offset
+            mass_scale = 0.1
+            com_offset = self.box_center_com_offset
         elif world_idx == 5:
             box_mat_id = self.box_pale_blue_mat_id
             mass_scale = 1.0
-            com_offset = self.box_low_com_offset
+            com_offset = self.box_xarm_side_com_offset
         elif world_idx == 6:
             box_mat_id = self.box_pale_pink_mat_id
             mass_scale = 1.0
-            com_offset = self.box_xarm_side_com_offset
+            com_offset = self.box_anti_xarm_side_com_offset
         elif world_idx == 7:
             box_mat_id = self.box_pale_mint_mat_id
             mass_scale = 1.0
-            com_offset = self.box_xarm_side_more_com_offset + self.box_high_com_offset
+            com_offset = self.box_left_hand_side_com_offset
         else:
             box_mat_id = self.box_pale_lavender_mat_id
             mass_scale = 1.0
-            com_offset = self.box_xarm_side_more_com_offset + self.box_low_com_offset
+            com_offset = self.box_right_hand_side_com_offset
 
         self.model.geom_matid[self.box_geom_id] = box_mat_id
         self.model.body_mass[self.box_body_id] = self.box_base_mass * mass_scale

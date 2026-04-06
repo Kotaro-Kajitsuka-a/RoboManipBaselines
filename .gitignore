@@ -19,7 +19,7 @@ GTAGS
 
 .venv
 /.venv_tutorial
-
+.venv_tutorial
 
 commit.sh
 
@@ -28,8 +28,8 @@ commit.sh
 AGENTS.md
 
 asobiba.ipynb
-check_hdf5.ipynb
-
+check_hdf4.ipynb
+.codex
 
 robo_manip_baselines/rollout_debug_log_expanded.csv
 

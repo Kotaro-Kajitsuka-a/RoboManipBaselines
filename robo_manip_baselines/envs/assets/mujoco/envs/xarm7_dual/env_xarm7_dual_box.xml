@@ -1,6 +1,12 @@
 <mujoco model="xarm7_dual_box">
   <include file="../xarm7/env_xarm7_common.xml"/>
 
+  <visual>
+    <!-- Make contact-force vectors easier to see at low mass contacts. -->
+    <scale contactwidth="0.12" contactheight="0.04" forcewidth="0.06"/>
+    <map force="0.02"/>
+  </visual>
+
   <asset>
     <material name="box_white" rgba="1 1 1 1" specular="0.2" shininess="0.3"/>
     <material name="box_red" rgba="1 0 0 1" specular="0.2" shininess="0.3"/>
@@ -53,7 +59,7 @@
 
     <body name="box" pos="0.18 0.0 0.78">
       <freejoint name="box_freejoint"/>
-      <geom name="box_geom" type="box" size="0.09 0.14 0.04" material="box_white" friction="0.8 0.1 0.1"/>
+      <geom name="box_geom" type="box" size="0.09 0.14 0.04" material="box_white" mass="0.5" friction="0.8 0.1 0.1"/>
     </body>
   </worldbody>
 </mujoco>
