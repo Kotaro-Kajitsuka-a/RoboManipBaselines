@@ -10,6 +10,13 @@ Visualize the demonstration data by plotting it.
 $ python ./VisualizeData.py <rmb_file>
 ```
 
+### Visualize substep wrench data
+Visualize the admittance substep wrench stored in `substep_measured_eef_wrench`.
+
+```console
+$ python ./VisualizeSubstepWrench.py <rmb_file> [--arm_idx 0] [--step_slice 100:200]
+```
+
 ### Switch internal format of demonstration data
 Switch RMB format file between RmbData-Compact (`.rmb`) and RmbData-SingleHDF5 (`.hdf5`). The format is automatically determined from the file extension.
 

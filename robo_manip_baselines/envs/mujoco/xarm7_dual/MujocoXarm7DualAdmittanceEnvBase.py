@@ -1,155 +1,161 @@
-from os import path
-
-import mujoco
 import numpy as np
-from gymnasium.spaces import Box, Dict
 
-from robo_manip_baselines.common import ArmConfig
-from robo_manip_baselines.teleop import (
-    GelloInputDevice,
-    KeyboardInputDevice,
-    SpacemouseInputDevice,
-)
+from robo_manip_baselines.common import DataKey, EefAdmittanceArmManager
 
-from ..MujocoEnvBase import MujocoEnvBase
+from ..MujocoMultiRateEnvBase import MujocoMultiRateEnvBase
+from .MujocoXarm7DualEnvBase import MujocoXarm7DualEnvBase
 
 
-class MujocoXarm7DualAdmittanceEnvBase(MujocoEnvBase):
-    default_camera_config = {
-        "azimuth": -135.0,
-        "elevation": -45.0,
-        "distance": 1.8,
-        "lookat": [0.0, 0.0, 0.8],
-    }
-    observation_space = Dict(
-        {
-            "joint_pos": Box(low=-np.inf, high=np.inf, shape=(16,), dtype=np.float64),
-            "joint_vel": Box(low=-np.inf, high=np.inf, shape=(16,), dtype=np.float64),
-            "wrench": Box(low=-np.inf, high=np.inf, shape=(12,), dtype=np.float64),
-        }
-    )
-
-    def setup_robot(self, init_qpos):
-        self.init_qpos[: len(init_qpos)] = init_qpos
-        self.init_qvel[:] = 0.0
-
-        mujoco.mj_kinematics(self.model, self.data)
-
-        self.body_config_list = [
-            ArmConfig(
-                arm_urdf_path=path.join(
-                    path.dirname(__file__),
-                    "../../assets/common/robots/xarm7/xarm7.urdf",
-                ),
-                arm_root_pose=self.get_body_pose("left/xarm7_root_frame"),
-                ik_eef_joint_id=7,
-                arm_joint_idxes=np.arange(0, 7),
-                gripper_joint_idxes=np.array([7]),
-                gripper_joint_idxes_in_gripper_joint_pos=np.array([0]),
-                eef_idx=0,
-                init_arm_joint_pos=self.init_qpos[0:7],
-                init_gripper_joint_pos=np.zeros(1),
-            ),
-            ArmConfig(
-                arm_urdf_path=path.join(
-                    path.dirname(__file__),
-                    "../../assets/common/robots/xarm7/xarm7.urdf",
-                ),
-                arm_root_pose=self.get_body_pose("right/xarm7_root_frame"),
-                ik_eef_joint_id=7,
-                arm_joint_idxes=np.arange(8, 15),
-                gripper_joint_idxes=np.array([15]),
-                gripper_joint_idxes_in_gripper_joint_pos=np.array([1]),
-                eef_idx=1,
-                init_arm_joint_pos=self.init_qpos[13:20],
-                init_gripper_joint_pos=np.zeros(1),
-            ),
+class MujocoXarm7DualAdmittanceEnvBase(MujocoMultiRateEnvBase, MujocoXarm7DualEnvBase):
+    def __init__(self, xml_file, init_qpos, **kwargs):
+        super().__init__(xml_file, init_qpos, **kwargs)
+        substep_wrench_shape = DataKey.get_dim(
+            DataKey.SUBSTEP_MEASURED_EEF_WRENCH, self
+        )
+        self._substep_measured_eef_wrench_seq = np.zeros(
+            substep_wrench_shape, dtype=np.float64
+        )
+        self._substep_compensated_eef_wrench_seq = np.zeros(
+            substep_wrench_shape, dtype=np.float64
+        )
+        self._substep_compensated_lpf_eef_wrench_seq = np.zeros(
+            substep_wrench_shape, dtype=np.float64
+        )
+        self._substep_measured_eef_wrench_idx = 0
+        self._base_target_eef_pose = np.zeros(
+            DataKey.get_dim(DataKey.COMMAND_EEF_POSE, self), dtype=np.float64
+        )
+        self._base_target_gripper_joint_pos = np.zeros(
+            DataKey.get_dim(DataKey.COMMAND_GRIPPER_JOINT_POS, self), dtype=np.float64
+        )
+        self._current_ctrl = self.init_qpos[: self.model.nu].copy()
+        self._admittance_arm_manager_list = [
+            EefAdmittanceArmManager(
+                self,
+                body_config,
+                arm_name=arm_name,
+                gravity_comp_body_names=self._get_gravity_comp_body_names(arm_name),
+            )
+            for body_config, arm_name in zip(self.body_config_list, ("left", "right"))
         ]
 
-    def setup_input_device(self, input_device_name, motion_manager, overwrite_kwargs):
-        if input_device_name == "spacemouse":
-            InputDeviceClass = SpacemouseInputDevice
-        elif input_device_name == "gello":
-            InputDeviceClass = GelloInputDevice
-        elif input_device_name == "keyboard":
-            InputDeviceClass = KeyboardInputDevice
-        else:
-            raise ValueError(
-                f"[{self.__class__.__name__}] Invalid input device key: {input_device_name}"
+    @property
+    def command_keys_for_step(self):
+        return [DataKey.COMMAND_EEF_POSE, DataKey.COMMAND_GRIPPER_JOINT_POS]
+
+    @property
+    def command_keys_to_save(self):
+        return [DataKey.COMMAND_EEF_POSE, DataKey.COMMAND_GRIPPER_JOINT_POS]
+
+    def reset_model(self):
+        obs = super().reset_model()
+        self._reset_multirate_state(obs)
+        return obs
+
+    def get_substep_wrench_data_to_save(self):
+        return {
+            DataKey.SUBSTEP_MEASURED_EEF_WRENCH: self._substep_measured_eef_wrench_seq.copy(),
+            DataKey.SUBSTEP_COMPENSATED_EEF_WRENCH: self._substep_compensated_eef_wrench_seq.copy(),
+            DataKey.SUBSTEP_COMPENSATED_LPF_EEF_WRENCH: self._substep_compensated_lpf_eef_wrench_seq.copy(),
+        }
+
+    def _on_policy_step(self, action):
+        action = np.asarray(action, dtype=np.float64)
+        self._substep_measured_eef_wrench_seq.fill(0.0)
+        self._substep_compensated_eef_wrench_seq.fill(0.0)
+        self._substep_compensated_lpf_eef_wrench_seq.fill(0.0)
+        self._substep_measured_eef_wrench_idx = 0
+        pose_dim = DataKey.get_dim(DataKey.COMMAND_EEF_POSE, self)
+        self._base_target_eef_pose = action[:pose_dim].copy()
+        self._base_target_gripper_joint_pos = action[pose_dim:].copy()
+        for body_manager in self._admittance_arm_manager_list:
+            eef_idx = body_manager.body_config.eef_idx
+            body_manager.set_command_eef_pose(
+                self._base_target_eef_pose[7 * eef_idx : 7 * (eef_idx + 1)]
+            )
+            body_manager.set_command_gripper_joint_pos(
+                self._base_target_gripper_joint_pos[
+                    body_manager.body_config.gripper_joint_idxes_in_gripper_joint_pos
+                ]
             )
 
-        default_kwargs = self.get_input_device_kwargs(input_device_name)
+    def _on_admittance_step(self):
+        obs = self._get_obs()
+        measured_joint_pos = self.get_joint_pos_from_obs(obs)
+        measured_wrench = self.get_eef_wrench_from_obs(obs)
+        self._substep_measured_eef_wrench_seq[self._substep_measured_eef_wrench_idx] = (
+            measured_wrench.copy()
+        )
+        for body_manager in self._admittance_arm_manager_list:
+            eef_idx = body_manager.body_config.eef_idx
+            body_manager.sync_with_measurement(
+                measured_joint_pos[body_manager.body_config.arm_joint_idxes],
+                measured_joint_pos[body_manager.body_config.gripper_joint_idxes],
+                measured_wrench[6 * eef_idx : 6 * (eef_idx + 1)],
+            )
+            step_result = body_manager.update_command(self.admittance_timestep)
+            self._substep_compensated_eef_wrench_seq[
+                self._substep_measured_eef_wrench_idx, 6 * eef_idx : 6 * (eef_idx + 1)
+            ] = step_result.comp_wrench.copy()
+            self._substep_compensated_lpf_eef_wrench_seq[
+                self._substep_measured_eef_wrench_idx, 6 * eef_idx : 6 * (eef_idx + 1)
+            ] = step_result.comp_wrench_lpf.copy()
+            arm_joint_pos, gripper_joint_pos = body_manager.get_command_joint_pos()
+            self._current_ctrl[body_manager.body_config.arm_joint_idxes] = arm_joint_pos
+            self._current_ctrl[body_manager.body_config.gripper_joint_idxes] = (
+                gripper_joint_pos
+            )
+        self._substep_measured_eef_wrench_idx += 1
 
+    def _apply_ctrl(self):
+        self.data.ctrl[:] = self._current_ctrl
+
+    def _reset_multirate_state(self, obs):
+        measured_joint_pos = self.get_joint_pos_from_obs(obs)
+        measured_wrench = self.get_eef_wrench_from_obs(obs)
+        self._substep_measured_eef_wrench_seq.fill(0.0)
+        self._substep_compensated_eef_wrench_seq.fill(0.0)
+        self._substep_compensated_lpf_eef_wrench_seq.fill(0.0)
+        self._substep_measured_eef_wrench_idx = 0
+        for body_manager in self._admittance_arm_manager_list:
+            eef_idx = body_manager.body_config.eef_idx
+            body_manager.reset()
+            body_manager.sync_with_measurement(
+                measured_joint_pos[body_manager.body_config.arm_joint_idxes],
+                measured_joint_pos[body_manager.body_config.gripper_joint_idxes],
+                measured_wrench[6 * eef_idx : 6 * (eef_idx + 1)],
+            )
+            body_manager.set_command_joint_pos(
+                measured_joint_pos[body_manager.body_config.arm_joint_idxes],
+                measured_joint_pos[body_manager.body_config.gripper_joint_idxes],
+            )
+            arm_joint_pos, gripper_joint_pos = body_manager.get_command_joint_pos()
+            self._current_ctrl[body_manager.body_config.arm_joint_idxes] = arm_joint_pos
+            self._current_ctrl[body_manager.body_config.gripper_joint_idxes] = (
+                gripper_joint_pos
+            )
+
+        self._base_target_eef_pose = np.concatenate(
+            [
+                body_manager.get_command_eef_pose()
+                for body_manager in self._admittance_arm_manager_list
+            ]
+        )
+        self._base_target_gripper_joint_pos = np.concatenate(
+            [
+                body_manager.get_command_gripper_joint_pos()
+                for body_manager in self._admittance_arm_manager_list
+            ]
+        )
+
+    @staticmethod
+    def _get_gravity_comp_body_names(arm_name):
         return [
-            InputDeviceClass(
-                body_manager,
-                **{
-                    **default_kwargs.get(device_idx, {}),
-                    **overwrite_kwargs.get(device_idx, {}),
-                },
-            )
-            for device_idx, body_manager in enumerate(motion_manager.body_manager_list)
+            f"{arm_name}/xarm_gripper_base_link",
+            f"{arm_name}/left_outer_knuckle",
+            f"{arm_name}/left_inner_knuckle",
+            f"{arm_name}/left_finger",
+            f"{arm_name}/right_outer_knuckle",
+            f"{arm_name}/right_inner_knuckle",
+            f"{arm_name}/right_finger",
         ]
-
-    def get_input_device_kwargs(self, input_device_name):
-        return {}
-
-    def _get_obs(self):
-        left_obs = self._get_obs_single_arm("left")
-        right_obs = self._get_obs_single_arm("right")
-        return {
-            key: np.concatenate([left_obs[key], right_obs[key]])
-            for key in left_obs.keys()
-        }
-
-    def _get_obs_single_arm(self, left_right):
-        arm_joint_name_list = [
-            "joint1",
-            "joint2",
-            "joint3",
-            "joint4",
-            "joint5",
-            "joint6",
-            "joint7",
-        ]
-        gripper_joint_name_list = [
-            "left_driver_joint",
-            "left_finger_joint",
-            "left_inner_knuckle_joint",
-            "right_driver_joint",
-            "right_finger_joint",
-            "right_inner_knuckle_joint",
-        ]
-
-        arm_joint_pos = np.array(
-            [
-                self.data.joint(f"{left_right}/{joint_name}").qpos[0]
-                for joint_name in arm_joint_name_list
-            ]
-        )
-        arm_joint_vel = np.array(
-            [
-                self.data.joint(f"{left_right}/{joint_name}").qvel[0]
-                for joint_name in arm_joint_name_list
-            ]
-        )
-        gripper_qpos = np.array(
-            [
-                self.data.joint(f"{left_right}/{joint_name}").qpos[0]
-                for joint_name in gripper_joint_name_list
-            ]
-        )
-        gripper_joint_pos = gripper_qpos.mean(keepdims=True) / 0.8 * 255.0
-        gripper_joint_vel = np.zeros(1)
-        force = self.data.sensor(f"{left_right}/force_sensor").data.flat.copy()
-        torque = self.data.sensor(f"{left_right}/torque_sensor").data.flat.copy()
-
-        return {
-            "joint_pos": np.concatenate(
-                (arm_joint_pos, gripper_joint_pos), dtype=np.float64
-            ),
-            "joint_vel": np.concatenate(
-                (arm_joint_vel, gripper_joint_vel), dtype=np.float64
-            ),
-            "wrench": np.concatenate((force, torque), dtype=np.float64),
-        }

@@ -1,6 +1,7 @@
 import threading
 
 import numpy as np
+import pinocchio as pin
 
 from .InputDeviceBase import InputDeviceBase
 
@@ -94,23 +95,49 @@ class KeyboardInputDevice(InputDeviceBase):
             raise RuntimeError(f"[{self.__class__.__name__}] Device is not connected.")
 
     def set_command_data(self):
+        delta_pos = np.zeros(3)
+
+        # X-axis
+        if self.state["w"]:
+            delta_pos[0] += self.pos_scale
+        if self.state["s"]:
+            delta_pos[0] -= self.pos_scale
+
+        # Y-axis
+        if self.state["a"]:
+            delta_pos[1] += self.pos_scale
+        if self.state["d"]:
+            delta_pos[1] -= self.pos_scale
+
+        # Z-axis
+        if self.state["q"]:
+            delta_pos[2] += self.pos_scale
+        if self.state["e"]:
+            delta_pos[2] -= self.pos_scale
+
+        delta_rpy = np.zeros(3)
+
+        # Roll
+        if self.state["j"]:
+            delta_rpy[0] -= self.rpy_scale
+        if self.state["l"]:
+            delta_rpy[0] += self.rpy_scale
+
+        # Pitch
+        if self.state["i"]:
+            delta_rpy[1] += self.rpy_scale
+        if self.state["k"]:
+            delta_rpy[1] -= self.rpy_scale
+
+        # Yaw
+        if self.state["u"]:
+            delta_rpy[2] += self.rpy_scale * 2.0
+        if self.state["o"]:
+            delta_rpy[2] -= self.rpy_scale * 2.0
+
         target_se3 = self.arm_manager.target_se3.copy()
-
-        current_z = target_se3.translation[2]
-        print(current_z)
-        target_z = current_z - 0.0005
-        threshhold_z = 0.90
-        if target_z < threshhold_z:
-            target_z = threshhold_z
-
-        target_se3.translation = np.array([0.208189, 3.00184e-06, target_z])
-        target_se3.rotation = np.array(
-            [
-                [1, 5.26999e-06, 5.87127e-12],
-                [5.26999e-06, -1, 5.11829e-06],
-                [3.28442e-11, -5.11829e-06, -1],
-            ]
-        )
+        target_se3.translation += delta_pos
+        target_se3.rotation = pin.rpy.rpyToMatrix(*delta_rpy) @ target_se3.rotation
 
         self.arm_manager.set_command_eef_pose(target_se3)
 

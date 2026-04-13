@@ -59,6 +59,12 @@ class DataKey:
 
     # Measured end-effector wrench (fx, fy, fz, nx, ny, nz)
     MEASURED_EEF_WRENCH = "measured_eef_wrench"
+    # Measured end-effector raw wrench in sensor frame for all admittance substeps within one env step
+    SUBSTEP_MEASURED_EEF_WRENCH = "substep_measured_eef_wrench"
+    # Gravity-compensated end-effector wrench in sensor frame for all admittance substeps within one env step
+    SUBSTEP_COMPENSATED_EEF_WRENCH = "substep_compensated_eef_wrench"
+    # LPF of gravity-compensated end-effector wrench in sensor frame for all admittance substeps within one env step
+    SUBSTEP_COMPENSATED_LPF_EEF_WRENCH = "substep_compensated_lpf_eef_wrench"
     # Command end-effector wrench (fx, fy, fz, nx, ny, nz)
     COMMAND_EEF_WRENCH = "command_eef_wrench"
 
@@ -138,6 +144,9 @@ class DataKey:
             DataKey.MEASURED_EEF_VEL,
             DataKey.COMMAND_EEF_VEL,
             DataKey.MEASURED_EEF_WRENCH,
+            DataKey.SUBSTEP_MEASURED_EEF_WRENCH,
+            DataKey.SUBSTEP_COMPENSATED_EEF_WRENCH,
+            DataKey.SUBSTEP_COMPENSATED_LPF_EEF_WRENCH,
             DataKey.COMMAND_EEF_WRENCH,
         ):
             num_eef = len(
@@ -151,6 +160,20 @@ class DataKey:
 
             if key in (DataKey.MEASURED_EEF_POSE, DataKey.COMMAND_EEF_POSE):
                 return 7 * num_eef
+            elif key in (
+                DataKey.SUBSTEP_MEASURED_EEF_WRENCH,
+                DataKey.SUBSTEP_COMPENSATED_EEF_WRENCH,
+                DataKey.SUBSTEP_COMPENSATED_LPF_EEF_WRENCH,
+            ):
+                n_physics_per_admittance = int(
+                    np.round(
+                        env.unwrapped.admittance_timestep / env.unwrapped.sim_timestep
+                    )
+                )
+                return (
+                    env.unwrapped.frame_skip // n_physics_per_admittance,
+                    6 * num_eef,
+                )
             else:
                 return 6 * num_eef
         elif key in (DataKey.MEASURED_MOBILE_OMNI_VEL, DataKey.COMMAND_MOBILE_OMNI_VEL):

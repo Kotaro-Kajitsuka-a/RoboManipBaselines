@@ -43,6 +43,13 @@ class OperationDataMixin:
                 key, self.data_manager.calc_rel_data(key)
             )
 
+        if hasattr(self.env.unwrapped, "get_substep_wrench_data_to_save"):
+            for (
+                key,
+                data,
+            ) in self.env.unwrapped.get_substep_wrench_data_to_save().items():
+                self.data_manager.append_single_data(key, data)
+
         # Add image
         for camera_name in self.env.unwrapped.camera_names:
             self.data_manager.append_single_data(

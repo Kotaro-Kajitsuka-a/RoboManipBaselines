@@ -16,6 +16,7 @@ from .manager.DataManagerVec import DataManagerVec
 
 from .body.BodyManagerBase import BodyConfigBase, BodyManagerBase
 from .body.ArmManager import ArmConfig, ArmManager
+from .body.EefAdmittanceArmManager import EefAdmittanceArmManager
 from .body.MobileOmniManager import MobileOmniConfig, MobileOmniManager
 
 from .mixin.DpStyleDatasetMixin import DpStyleDatasetMixin

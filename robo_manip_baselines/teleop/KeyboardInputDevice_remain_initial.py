@@ -103,7 +103,7 @@ class KeyboardInputDevice(InputDeviceBase):
         if target_z < threshhold_z:
             target_z = threshhold_z
 
-        target_se3.translation = np.array([0.208189, 3.00184e-06, target_z])
+        target_se3.translation = np.array([0.208189, 3.00184e-06, 1.0199730490988117])
         target_se3.rotation = np.array(
             [
                 [1, 5.26999e-06, 5.87127e-12],

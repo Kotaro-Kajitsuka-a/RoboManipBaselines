@@ -42,7 +42,7 @@
                     <!-- The original gripper model can not grasp an object stably, so the mechanism and parameters are updated. -->
                     <body name="left/xarm_gripper_base_link" quat="0 0 0 1">
                       <site name="left/force_sensor" euler="0 0 1.5708"
-                            type="box" size="0.005 0.005 0.01" rgba="0.6 0.1 0.1 1" group="2"/>
+                            type="box" size="0.005 0.005 0.01" rgba="0 0 0 1" group="2"/>
                       <inertial pos="-0.00065489 -0.0018497 0.048028" quat="0.997403 -0.0717512 -0.0061836 0.000477479"
                         mass="0.54156" diaginertia="0.000471093 0.000332307 0.000254799"/>
                       <geom mesh="base_link"/>

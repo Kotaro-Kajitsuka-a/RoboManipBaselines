@@ -1,5 +1,6 @@
 <mujoco model="xarm7_dual_box">
   <include file="../xarm7/env_xarm7_common.xml"/>
+  <option timestep="0.004" integrator="implicitfast"/>
 
   <visual>
     <!-- Make contact-force vectors easier to see at low mass contacts. -->
