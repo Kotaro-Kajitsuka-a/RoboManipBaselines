@@ -131,6 +131,30 @@ class MotionManager:
 
     def draw_markers(self):
         """Draw markers of the current states."""
+        admittance_arm_manager_list = getattr(
+            self.env.unwrapped, "_admittance_arm_manager_list", None
+        )
+        if admittance_arm_manager_list is None:
+            admittance_arm_manager = getattr(
+                self.env.unwrapped, "_admittance_arm_manager", None
+            )
+            if admittance_arm_manager is None:
+                for body_manager in self.body_manager_list:
+                    body_manager.draw_markers()
+                return
+            admittance_arm_manager_list = [admittance_arm_manager]
+
+        admittance_eef_idxes = {
+            body_manager.body_config.eef_idx
+            for body_manager in admittance_arm_manager_list
+        }
 
         for body_manager in self.body_manager_list:
+            if isinstance(body_manager, ArmManager) and (
+                body_manager.body_config.eef_idx in admittance_eef_idxes
+            ):
+                continue
+            body_manager.draw_markers()
+
+        for body_manager in admittance_arm_manager_list:
             body_manager.draw_markers()
