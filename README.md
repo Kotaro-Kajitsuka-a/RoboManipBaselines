@@ -115,7 +115,8 @@ Please check individual files or directories (especially `third_party` and `asse
 
 ## 📖 Citation
 
-If you use RoboManipBaselines in your work, please cite [our paper](https://arxiv.org/abs/2509.17057):
+If you use RoboManipBaselines in your work, please cite our paper:  
+[arXiv](https://arxiv.org/abs/2509.17057) | [Hugging Face](https://huggingface.co/papers/2509.17057):
 
 ```bibtex
 @article{RoboManipBaselines_Murooka_2025,

@@ -393,24 +393,28 @@ class ConvertRmbDataToLerobot:
 
         data_num = len(self.dataset)
         q01, q99 = {}, {}
-        data_dir = {}
+        data_dir = {
+            key: []
+            for key, pattern in stats_patterns.items()
+            if key not in self.dataset.meta.camera_keys
+        }
 
-        for key, pattern in stats_patterns.items():
-            if key in self.dataset.meta.camera_keys:
-                continue
-            data_dir[key] = []
-            for i in range(data_num):
-                data_dir[key].append(self.dataset[i][key].float())
+        for i in range(data_num):
+            sample = self.dataset[i]
+            for key in data_dir:
+                data_dir[key].append(sample[key].float())
+
+        for key in data_dir:
             data_dir[key] = torch.stack(data_dir[key], dim=0)
 
-            q01[key] = torch.quantile(data_dir[key], 0.01, 0)
-            q99[key] = torch.quantile(data_dir[key], 0.99, 0)
+            q01[key] = torch.quantile(data_dir[key], 0.01, dim=0)
+            q99[key] = torch.quantile(data_dir[key], 0.99, dim=0)
 
         for key in stats_patterns:
             if key in self.dataset.meta.camera_keys:
                 continue
-            meta_stats[key]["q01"] = q01[key]
-            meta_stats[key]["q99"] = q99[key]
+            meta_stats[key]["q01"] = np.atleast_1d(q01[key].numpy())
+            meta_stats[key]["q99"] = np.atleast_1d(q99[key].numpy())
 
         serialized_stats = self.serialize_dict(meta_stats)
 
