@@ -109,7 +109,7 @@ $ # Connect a SpaceMouse to your PC
 $ python ./bin/Teleop.py MujocoUR5eCable --world_idx_list 0 5 --input_device keyboard
 ```
 
-If you want to use spacemouse change "keyboard" to "spacemouse". However, you need to do some setups for it.
+If you want to use spacemouse change "keyboard" to "spacemouse". However, you need to do the setup for it. You can check instruction from below link. \
 https://github.com/JakubAndrysek/PySpaceMouse?tab=readme-ov-file#dependencies-required
 
 In our experience, models can be trained stably with roughly 30 data sets.
