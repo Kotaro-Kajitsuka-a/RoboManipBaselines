@@ -241,3 +241,5 @@ python ./robo_manip_baselines/bin/Teleop.py \
 python ./bin/Teleop.py MujocoXarm7DualBox --input_device keyboard --world_idx_list 0 1
 
 python ./robo_manip_baselines/bin/Teleop.py MujocoXarm7DualAdmittanceBox --input_device_config ./robo_manip_baselines/teleop/configs/SpaceMouseDual.yaml --world_idx_list 0 1
+
+python ./robo_manip_baselines/bin/Teleop.py MujocoXarm7DualAdmittanceBox --input_device_config --input_device vive ./robo_manip_baselines/teleop/configs/ViveDual.yaml --world_idx_list 0 1
