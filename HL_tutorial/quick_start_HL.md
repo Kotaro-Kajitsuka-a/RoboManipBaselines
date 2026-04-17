@@ -109,10 +109,8 @@ $ # Connect a SpaceMouse to your PC
 $ python ./bin/Teleop.py MujocoUR5eCable --world_idx_list 0 5 --input_device keyboard
 ```
 
-if you want to use spacemouse change "keyboard" to "spacemouse"
-
-> [!TIP]
-> A teleoperation input device such as a 3D mouse can be used instead of a keyboard. See [here](../robo_manip_baselines/teleop/README.md).
+If you want to use spacemouse change "keyboard" to "spacemouse". However, you need to do some setups for it.
+https://github.com/JakubAndrysek/PySpaceMouse?tab=readme-ov-file#dependencies-required
 
 In our experience, models can be trained stably with roughly 30 data sets.
 The teleoperation data is saved in the `robo_manip_baselines/dataset/MujocoUR5eCable_<date_suffix>` directory (e.g., `MujocoUR5eCable_20240101_120000`).
