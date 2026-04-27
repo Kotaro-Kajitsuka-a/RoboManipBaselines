@@ -12,7 +12,7 @@ from policy import ACTPolicy
 from robo_manip_baselines.common import RolloutBase, denormalize_data
 
 
-class RolloutAct(RolloutBase):
+class RolloutWrenchPredictor(RolloutBase):
     def set_additional_args(self, parser):
         parser.add_argument(
             "--no_temp_ensem",
