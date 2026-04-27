@@ -64,6 +64,14 @@ register(
     id="robo_manip_baselines/MujocoXarm7AdmittancePushtEnv-v0",
     entry_point="robo_manip_baselines.envs.mujoco:MujocoXarm7AdmittancePushtEnv",
 )
+register(
+    id="robo_manip_baselines/MujocoXarm7AdmittancePusht1Env-v0",
+    entry_point="robo_manip_baselines.envs.mujoco:MujocoXarm7AdmittancePusht1Env",
+)
+register(
+    id="robo_manip_baselines/MujocoXarm7AdmittancePusht2Env-v0",
+    entry_point="robo_manip_baselines.envs.mujoco:MujocoXarm7AdmittancePusht2Env",
+)
 
 ## xArm7-Dual
 register(

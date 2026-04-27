@@ -234,12 +234,3 @@ python robo_manip_baselines/misc/EvalBoxRotation.py /path/to/dataset_dir
 
 
 
-#teleop xarm mujoco with spacemouse
-python ./robo_manip_baselines/bin/Teleop.py \
- MujocoXarm7DualBox --input_device_config ./robo_manip_baselines/teleop/configs/SpaceMouseDual.yaml --world_idx_list 0 1
-#keyboard
-python ./bin/Teleop.py MujocoXarm7DualBox --input_device keyboard --world_idx_list 0 1
-
-python ./robo_manip_baselines/bin/Teleop.py MujocoXarm7DualAdmittanceBox --input_device_config ./robo_manip_baselines/teleop/configs/SpaceMouseDual.yaml --world_idx_list 0 1
-
-python ./robo_manip_baselines/bin/Teleop.py MujocoXarm7DualAdmittanceBox --input_device_config --input_device vive ./robo_manip_baselines/teleop/configs/ViveDual.yaml --world_idx_list 0 1
