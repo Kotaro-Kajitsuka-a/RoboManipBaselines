@@ -513,6 +513,10 @@ class RealEnvBase(EnvDataMixin, gym.Env, ABC):
         """Get end-effector wrench (fx, fy, fz, nx, ny, nz) from observation."""
         return obs["wrench"]
 
+    def get_eef_wrench_moving_average_from_obs(self, obs):
+        """Get moving average end-effector wrench (fx, fy, fz, nx, ny, nz) from observation."""
+        return obs["wrench_moving_average"]
+
     def get_time(self):
         """Get real-world time. [s]"""
         return time.time() - self.init_time

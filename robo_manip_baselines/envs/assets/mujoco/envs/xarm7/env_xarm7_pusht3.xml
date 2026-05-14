@@ -1,4 +1,4 @@
-<mujoco model="xarm7_pusht1">
+<mujoco model="xarm7_pusht3">
   <include file="./env_xarm7_common.xml"/>
 
   <asset>
@@ -36,8 +36,8 @@
 
     <body name="tblock" pos="0.15 0.0 0.76" euler="0 0 1.4">
       <freejoint name="tblock_freejoint"/>
-      <geom name="tblock1" type="box" size="0.1 0.02 0.02" pos="0.0 0.0 0.0" material="tblock" density="2000"/>
-      <geom name="tblock2" type="box" size="0.02 0.08 0.02" pos="0.0 0.1 0.0" material="tblock" density="500"/>
+      <geom name="tblock1" type="box" size="0.1 0.02 0.02" pos="0.0 0.0 0.0" material="tblock" density="5000"/>
+      <geom name="tblock2" type="box" size="0.02 0.08 0.02" pos="0.0 0.1 0.0" material="tblock" density="5000"/>
     </body>
 
     <body name="target_region" pos="0.0 0.1 0.74" euler="0 0 -1">

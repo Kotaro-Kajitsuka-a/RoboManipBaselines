@@ -381,12 +381,6 @@ class TeleopBase(OperationDataMixin, ABC):
             default=None,
             help="command data keys when replaying log motion",
         )
-        parser.add_argument(
-            "--ignore_replay_world_idx",
-            action="store_true",
-            help="whether to ignore world_idx in replay log and use --world_idx_list",
-        )
-
         parser.add_argument("--seed", type=int, default=-1, help="random seed")
 
         self.set_additional_args(parser)
@@ -547,8 +541,7 @@ class TeleopBase(OperationDataMixin, ABC):
                 f"({self.replay_file_idx+1}/{len(self.replay_filenames)}): {replay_file}\n"
                 f"  - replay keys: {self.args.replay_keys}"
             )
-            if not self.args.ignore_replay_world_idx:
-                world_idx = self.replay_data_manager.get_meta_data("world_idx")
+            world_idx = self.replay_data_manager.get_meta_data("world_idx")
 
         # Reset environment
         self.env.unwrapped.world_random_scale = self.args.world_random_scale

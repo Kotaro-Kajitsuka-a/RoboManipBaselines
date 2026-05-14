@@ -7,7 +7,7 @@ from .MujocoXarm7AdmittanceEnvBase import MujocoXarm7AdmittanceEnvBase
 from .MujocoXarm7PushtEnv import MujocoXarm7PushtEnv
 
 
-class MujocoXarm7AdmittancePusht2Env(
+class MujocoXarm7AdmittancePusht3Env(
     MujocoXarm7AdmittanceEnvBase, MujocoXarm7PushtEnv
 ):
     metadata = MujocoXarm7AdmittanceEnvBase.metadata.copy()
@@ -17,7 +17,7 @@ class MujocoXarm7AdmittancePusht2Env(
             self,
             path.join(
                 path.dirname(__file__),
-                "../../assets/mujoco/envs/xarm7/env_xarm7_pusht2.xml",
+                "../../assets/mujoco/envs/xarm7/env_xarm7_pusht3.xml",
             ),
             np.array([0.0, 0.0, 0.0, 0.8, 0.0, 0.8, 0.0, *[0.0] * 6]),
             **kwargs,

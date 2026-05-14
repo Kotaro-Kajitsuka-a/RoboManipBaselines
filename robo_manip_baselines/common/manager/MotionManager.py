@@ -82,6 +82,8 @@ class MotionManager:
             return np.concatenate(measured_eef_pose_list)
         elif key == DataKey.MEASURED_EEF_WRENCH:
             return self.env.unwrapped.get_eef_wrench_from_obs(obs)
+        elif key == DataKey.MEASURED_EEF_WRENCH_MOVING_AVERAGE:
+            return self.env.unwrapped.get_eef_wrench_moving_average_from_obs(obs)
         elif key == DataKey.MEASURED_MOBILE_OMNI_VEL:
             return self.env.unwrapped.get_mobile_vel_from_obs(obs)
         else:

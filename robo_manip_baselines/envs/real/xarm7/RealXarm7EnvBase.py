@@ -211,8 +211,6 @@ class RealXarm7EnvBase(RealEnvBase):
 
         # Get wrench from force sensor
         wrench = np.array(self.xarm_api.get_ft_sensor_data()[1], dtype=np.float64)
-        force = wrench[0:3]
-        torque = wrench[3:6]
 
         return {
             "joint_pos": np.concatenate(
@@ -221,5 +219,5 @@ class RealXarm7EnvBase(RealEnvBase):
             "joint_vel": np.concatenate(
                 (arm_joint_vel, gripper_joint_vel), dtype=np.float64
             ),
-            "wrench": np.concatenate((force, torque), dtype=np.float64),
+            "wrench": wrench,
         }
