@@ -1,3 +1,6 @@
 from .WrenchPredictorDataset import WrenchPredictorDataset
 from .TrainWrenchPredictor import TrainWrenchPredictor
-from .RolloutWrenchPredictor import RolloutWrenchPredictor
+
+
+class TrainWrenchPredictor2(TrainWrenchPredictor):
+    pass
