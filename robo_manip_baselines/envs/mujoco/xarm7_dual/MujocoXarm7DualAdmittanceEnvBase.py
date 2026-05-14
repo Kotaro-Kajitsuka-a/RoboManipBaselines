@@ -1,4 +1,5 @@
 import numpy as np
+from gymnasium.spaces import Box, Dict
 
 from robo_manip_baselines.common import DataKey, EefAdmittanceArmManager
 
@@ -7,6 +8,17 @@ from .MujocoXarm7DualEnvBase import MujocoXarm7DualEnvBase
 
 
 class MujocoXarm7DualAdmittanceEnvBase(MujocoMultiRateEnvBase, MujocoXarm7DualEnvBase):
+    observation_space = Dict(
+        {
+            "joint_pos": Box(low=-np.inf, high=np.inf, shape=(16,), dtype=np.float64),
+            "joint_vel": Box(low=-np.inf, high=np.inf, shape=(16,), dtype=np.float64),
+            "wrench": Box(low=-np.inf, high=np.inf, shape=(12,), dtype=np.float64),
+            "wrench_moving_average": Box(
+                low=-np.inf, high=np.inf, shape=(12,), dtype=np.float64
+            ),
+        }
+    )
+
     def __init__(self, xml_file, init_qpos, **kwargs):
         super().__init__(xml_file, init_qpos, **kwargs)
         substep_wrench_shape = DataKey.get_dim(
@@ -47,9 +59,25 @@ class MujocoXarm7DualAdmittanceEnvBase(MujocoMultiRateEnvBase, MujocoXarm7DualEn
     def command_keys_to_save(self):
         return [DataKey.COMMAND_EEF_POSE, DataKey.COMMAND_GRIPPER_JOINT_POS]
 
+    @property
+    def measured_keys_to_save(self):
+        return [
+            DataKey.MEASURED_JOINT_POS,
+            DataKey.MEASURED_JOINT_VEL,
+            DataKey.MEASURED_GRIPPER_JOINT_POS,
+            DataKey.MEASURED_EEF_POSE,
+            DataKey.MEASURED_EEF_WRENCH,
+            DataKey.MEASURED_EEF_WRENCH_MOVING_AVERAGE,
+        ]
+
     def reset_model(self):
         obs = super().reset_model()
         self._reset_multirate_state(obs)
+        return obs
+
+    def _get_obs(self):
+        obs = super()._get_obs()
+        obs["wrench_moving_average"] = self._get_wrench_moving_average()
         return obs
 
     def get_substep_wrench_data_to_save(self):
@@ -109,6 +137,18 @@ class MujocoXarm7DualAdmittanceEnvBase(MujocoMultiRateEnvBase, MujocoXarm7DualEn
 
     def _apply_ctrl(self):
         self.data.ctrl[:] = self._current_ctrl
+
+    def _get_wrench_moving_average(self):
+        if self._substep_measured_eef_wrench_idx == 0:
+            return np.zeros(12, dtype=np.float64)
+
+        return np.mean(
+            self._substep_measured_eef_wrench_seq[
+                : self._substep_measured_eef_wrench_idx
+            ],
+            axis=0,
+            dtype=np.float64,
+        )
 
     def _reset_multirate_state(self, obs):
         measured_joint_pos = self.get_joint_pos_from_obs(obs)

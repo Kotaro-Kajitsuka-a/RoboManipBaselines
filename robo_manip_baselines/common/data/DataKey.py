@@ -59,6 +59,12 @@ class DataKey:
 
     # Measured end-effector wrench (fx, fy, fz, nx, ny, nz)
     MEASURED_EEF_WRENCH = "measured_eef_wrench"
+    # Moving average of measured end-effector wrench (fx, fy, fz, nx, ny, nz)
+    MEASURED_EEF_WRENCH_MOVING_AVERAGE = "measured_eef_wrench_moving_average"
+    # Percentile-clipped moving average of measured end-effector wrench (fx, fy, fz, nx, ny, nz)
+    MEASURED_EEF_WRENCH_MOVING_AVERAGE_PERCENTILE_CLIP = (
+        "measured_eef_wrench_moving_average_percentile_clip"
+    )
     # Measured end-effector raw wrench in sensor frame for all admittance substeps within one env step
     SUBSTEP_MEASURED_EEF_WRENCH = "substep_measured_eef_wrench"
     # Gravity-compensated end-effector wrench in sensor frame for all admittance substeps within one env step
@@ -85,6 +91,8 @@ class DataKey:
         MEASURED_EEF_POSE_REL,
         # MEASURED_EEF_VEL,
         MEASURED_EEF_WRENCH,
+        MEASURED_EEF_WRENCH_MOVING_AVERAGE,
+        MEASURED_EEF_WRENCH_MOVING_AVERAGE_PERCENTILE_CLIP,
         MEASURED_MOBILE_OMNI_VEL,
     ]
 
@@ -144,6 +152,8 @@ class DataKey:
             DataKey.MEASURED_EEF_VEL,
             DataKey.COMMAND_EEF_VEL,
             DataKey.MEASURED_EEF_WRENCH,
+            DataKey.MEASURED_EEF_WRENCH_MOVING_AVERAGE,
+            DataKey.MEASURED_EEF_WRENCH_MOVING_AVERAGE_PERCENTILE_CLIP,
             DataKey.SUBSTEP_MEASURED_EEF_WRENCH,
             DataKey.SUBSTEP_COMPENSATED_EEF_WRENCH,
             DataKey.SUBSTEP_COMPENSATED_LPF_EEF_WRENCH,
