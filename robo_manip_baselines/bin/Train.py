@@ -15,6 +15,7 @@ class TrainMain:
         "FlowPolicy",
         "ManiFlowPolicy",
         "WrenchPredictor2",
+        "WrenchPredictor3",
     ]
 
     def __init__(self):
