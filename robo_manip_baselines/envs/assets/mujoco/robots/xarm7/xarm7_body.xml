@@ -61,7 +61,6 @@
                           <inertial pos="0 -0.016413 0.029258" quat="0.697634 0.115353 -0.115353 0.697634"
                                     mass="0.048304" diaginertia="1.88037e-05 1.7493e-05 3.56792e-06"/>
                           <joint name="left_finger_joint" axis="-1 0 0" class="follower"/>
-                          <geom material="black" mesh="left_finger" contype="0" conaffinity="0" pos="0 0.015 -0.015"/>
                           <body pos="0.0 -0.006 0.0275" euler="0.05 0 0">
                             <geom type="box" pos="0.0 0.0 0.009" size="0.014 0.005 0.009" friction="0.7"
                                   solimp="0.95 0.99 0.001" solref="0.004 1" priority="1" condim="3" group="3"
@@ -91,7 +90,6 @@
                           <inertial pos="0 0.016413 0.029258" quat="0.697634 -0.115356 0.115356 0.697634"
                             mass="0.048304" diaginertia="1.88038e-05 1.7493e-05 3.56779e-06"/>
                           <joint name="right_finger_joint" axis="1 0 0" class="follower"/>
-                          <geom material="black" mesh="right_finger" contype="0" conaffinity="0" pos="0 -0.015 -0.015"/>
                           <body pos="0.0 0.006 0.0275" euler="-0.05 0 0">
                             <geom type="box" pos="0.0 0.0 0.009" size="0.014 0.005 0.009" friction="0.7"
                                   solimp="0.95 0.99 0.001" solref="0.004 1" priority="1" condim="3" group="3"
