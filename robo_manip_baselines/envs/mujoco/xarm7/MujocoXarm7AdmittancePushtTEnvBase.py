@@ -7,33 +7,28 @@ from .MujocoXarm7AdmittanceEnvBase import MujocoXarm7AdmittanceEnvBase
 from .MujocoXarm7PushtEnv import MujocoXarm7PushtEnv
 
 
-class MujocoXarm7AdmittancePusht3Env(
+class MujocoXarm7AdmittancePushtTEnvBase(
     MujocoXarm7AdmittanceEnvBase, MujocoXarm7PushtEnv
 ):
     metadata = MujocoXarm7AdmittanceEnvBase.metadata.copy()
-    world_idx_range = range(300, 400)
+    xml_filename = None
+    world_idx_range = None
 
     def __init__(self, **kwargs):
+        assert self.xml_filename is not None
+        assert self.world_idx_range is not None
+
         MujocoXarm7AdmittanceEnvBase.__init__(
             self,
             path.join(
                 path.dirname(__file__),
-                "../../assets/mujoco/envs/xarm7/env_xarm7_pusht3.xml",
+                "../../assets/mujoco/envs/xarm7",
+                self.xml_filename,
             ),
             np.array([0.0, 0.0, 0.0, 0.8, 0.0, 0.8, 0.0, *[0.0] * 6]),
             **kwargs,
         )
         self.original_tblock_pos = self.model.body("tblock").pos.copy()
-        self.tblock_pos_offsets = np.array(
-            [
-                [0.0, -0.06, 0.0],
-                [0.0, -0.03, 0.0],
-                [0.0, 0.0, 0.0],
-                [0.0, 0.03, 0.0],
-                [0.0, 0.06, 0.0],
-                [0.0, 0.09, 0.0],
-            ]
-        )
 
     def modify_world(self, world_idx=None, cumulative_idx=None):
         assert world_idx is not None

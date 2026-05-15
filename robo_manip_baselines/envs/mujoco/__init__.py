@@ -20,6 +20,21 @@ from .xarm7.MujocoXarm7AdmittancePushtEnv import MujocoXarm7AdmittancePushtEnv
 from .xarm7.MujocoXarm7AdmittancePusht1Env import MujocoXarm7AdmittancePusht1Env
 from .xarm7.MujocoXarm7AdmittancePusht2Env import MujocoXarm7AdmittancePusht2Env
 from .xarm7.MujocoXarm7AdmittancePusht3Env import MujocoXarm7AdmittancePusht3Env
+from .xarm7.MujocoXarm7AdmittancePusht_T0Env import (
+    MujocoXarm7AdmittancePusht_T0Env,
+)
+from .xarm7.MujocoXarm7AdmittancePusht_T1Env import (
+    MujocoXarm7AdmittancePusht_T1Env,
+)
+from .xarm7.MujocoXarm7AdmittancePusht_T2Env import (
+    MujocoXarm7AdmittancePusht_T2Env,
+)
+from .xarm7.MujocoXarm7AdmittancePusht_T3Env import (
+    MujocoXarm7AdmittancePusht_T3Env,
+)
+from .xarm7.MujocoXarm7AdmittancePusht_T4Env import (
+    MujocoXarm7AdmittancePusht_T4Env,
+)
 from .xarm7_dual.MujocoXarm7DualBoxEnv import MujocoXarm7DualBoxEnv
 from .xarm7_dual.MujocoXarm7DualAdmittanceBoxEnv import MujocoXarm7DualAdmittanceBoxEnv
 

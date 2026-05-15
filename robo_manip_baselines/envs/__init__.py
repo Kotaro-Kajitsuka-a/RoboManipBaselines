@@ -88,6 +88,26 @@ register(
     id="robo_manip_baselines/MujocoXarm7AdmittancePusht3Env-v0",
     entry_point="robo_manip_baselines.envs.mujoco:MujocoXarm7AdmittancePusht3Env",
 )
+register(
+    id="robo_manip_baselines/MujocoXarm7AdmittancePusht_T0Env-v0",
+    entry_point="robo_manip_baselines.envs.mujoco:MujocoXarm7AdmittancePusht_T0Env",
+)
+register(
+    id="robo_manip_baselines/MujocoXarm7AdmittancePusht_T1Env-v0",
+    entry_point="robo_manip_baselines.envs.mujoco:MujocoXarm7AdmittancePusht_T1Env",
+)
+register(
+    id="robo_manip_baselines/MujocoXarm7AdmittancePusht_T2Env-v0",
+    entry_point="robo_manip_baselines.envs.mujoco:MujocoXarm7AdmittancePusht_T2Env",
+)
+register(
+    id="robo_manip_baselines/MujocoXarm7AdmittancePusht_T3Env-v0",
+    entry_point="robo_manip_baselines.envs.mujoco:MujocoXarm7AdmittancePusht_T3Env",
+)
+register(
+    id="robo_manip_baselines/MujocoXarm7AdmittancePusht_T4Env-v0",
+    entry_point="robo_manip_baselines.envs.mujoco:MujocoXarm7AdmittancePusht_T4Env",
+)
 
 ## xArm7-Dual
 register(

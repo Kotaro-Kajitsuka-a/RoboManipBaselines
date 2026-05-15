@@ -36,7 +36,7 @@ class MujocoXarm7AdmittancePushtEnv(MujocoXarm7AdmittanceEnvBase, MujocoXarm7Pus
     def modify_world(self, world_idx=None, cumulative_idx=None):
         assert world_idx is not None
         assert world_idx in self.world_idx_range, world_idx
-        rng = np.random.default_rng(world_idx)
+        rng = np.random.Generator(np.random.PCG64(world_idx))
 
         tblock_pos = self.original_tblock_pos.copy()
         tblock_pos[:2] += rng.uniform(
