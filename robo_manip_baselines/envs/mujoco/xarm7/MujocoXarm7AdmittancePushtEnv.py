@@ -9,6 +9,7 @@ from .MujocoXarm7PushtEnv import MujocoXarm7PushtEnv
 
 class MujocoXarm7AdmittancePushtEnv(MujocoXarm7AdmittanceEnvBase, MujocoXarm7PushtEnv):
     metadata = MujocoXarm7AdmittanceEnvBase.metadata.copy()
+    world_idx_range = range(0, 100)
 
     def __init__(self, **kwargs):
         MujocoXarm7AdmittanceEnvBase.__init__(
@@ -33,12 +34,12 @@ class MujocoXarm7AdmittancePushtEnv(MujocoXarm7AdmittanceEnvBase, MujocoXarm7Pus
         )
 
     def modify_world(self, world_idx=None, cumulative_idx=None):
-        if world_idx is None:
-            world_idx = 0
-        assert world_idx == 0, world_idx
+        assert world_idx is not None
+        assert world_idx in self.world_idx_range, world_idx
+        rng = np.random.default_rng(world_idx)
 
         tblock_pos = self.original_tblock_pos.copy()
-        tblock_pos[:2] += np.random.uniform(
+        tblock_pos[:2] += rng.uniform(
             low=[-0.05, -0.09],
             high=[0.05, 0.12],
         )
@@ -47,7 +48,7 @@ class MujocoXarm7AdmittancePushtEnv(MujocoXarm7AdmittanceEnvBase, MujocoXarm7Pus
         )
         tblock_qpos_addr = self.model.jnt_qposadr[tblock_joint_id]
         self.init_qpos[tblock_qpos_addr : tblock_qpos_addr + 3] = tblock_pos
-        yaw = np.random.uniform(low=-np.pi, high=np.pi)
+        yaw = rng.uniform(low=-np.pi, high=np.pi)
         self.init_qpos[tblock_qpos_addr + 3 : tblock_qpos_addr + 7] = np.array(
             [np.cos(yaw / 2.0), 0.0, 0.0, np.sin(yaw / 2.0)]
         )
