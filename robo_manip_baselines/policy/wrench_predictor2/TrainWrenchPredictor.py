@@ -6,6 +6,9 @@ from robo_manip_baselines.common import TrainBase
 from robo_manip_baselines.common.data.DataKey import DataKey
 from robo_manip_baselines.common.data.RmbData import RmbData
 from robo_manip_baselines.common.utils.DataUtils import get_skipped_data_seq
+from robo_manip_baselines.misc.AddPercentileClippedWrenchToRmbData import (
+    AddPercentileClippedWrenchToRmbData,
+)
 
 from .MaterialPropertyUtils import build_material_object_key_to_id
 from .WrenchPredictorDataset import WrenchPredictorDataset
@@ -44,6 +47,11 @@ class TrainWrenchPredictor(TrainBase):
         }
 
     def set_data_stats(self):
+        AddPercentileClippedWrenchToRmbData(
+            self.args.dataset_dir,
+            overwrite=True,
+        ).run()
+
         all_state = []
         all_wrench = []
         rgb_image_example = None
