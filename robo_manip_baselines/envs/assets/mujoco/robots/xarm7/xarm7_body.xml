@@ -113,6 +113,12 @@
                       <geom material="gray" mesh="d435_with_cam_stand_visual" contype="0" conaffinity="0"/>
                       <geom material="gray" mesh="d435_with_cam_stand_collision" group="3"/>
                       <camera name="hand" fovy="62" pos="0.06746 0.0 0.0237" euler="0.0 3.1415 1.5708"/>
+                    </body> 
+                    <body name="hand_camera_link_2">
+                      <!-- <geom material="gray" mesh="d435_with_cam_stand_visual" contype="0" conaffinity="0"/>
+                      // <geom material="gray" mesh="d435_with_cam_stand_collision" group="3"/>
+                      -->
+                      <camera name="hand_2" fovy="62" pos="-0.06746 0.0 0.0237" euler="0.0 3.1415 1.5708"/>
                     </body>
                   </body>
                 </body>
