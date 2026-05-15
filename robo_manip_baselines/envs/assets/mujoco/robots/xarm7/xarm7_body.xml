@@ -66,9 +66,13 @@
                             <geom type="box" pos="0.0 0.0 0.009" size="0.014 0.005 0.009" friction="0.7"
                                   solimp="0.95 0.99 0.001" solref="0.004 1" priority="1" condim="3" group="3"
                                   rgba="0.55 0.55 0.55 1"/>
+                            <geom type="box" pos="0.0 0.0 0.009" size="0.014 0.005 0.009"
+                                  material="black" contype="0" conaffinity="0"/>
                             <geom type="box" pos="0.0 0.0 -0.009" size="0.014 0.005 0.009" friction="0.6"
                                   solimp="0.95 0.99 0.001" solref="0.004 1" priority="1" condim="3" group="3"
                                   rgba="0.45 0.45 0.45 1"/>
+                            <geom type="box" pos="0.0 0.0 -0.009" size="0.014 0.005 0.009"
+                                  material="black" contype="0" conaffinity="0"/>
                           </body>
                         </body>
                       </body>
@@ -92,9 +96,13 @@
                             <geom type="box" pos="0.0 0.0 0.009" size="0.014 0.005 0.009" friction="0.7"
                                   solimp="0.95 0.99 0.001" solref="0.004 1" priority="1" condim="3" group="3"
                                   rgba="0.55 0.55 0.55 1"/>
+                            <geom type="box" pos="0.0 0.0 0.009" size="0.014 0.005 0.009"
+                                  material="black" contype="0" conaffinity="0"/>
                             <geom type="box" pos="0.0 0.0 -0.009" size="0.014 0.005 0.009" friction="0.6"
                                   solimp="0.95 0.99 0.001" solref="0.004 1" priority="1" condim="3" group="3"
                                   rgba="0.45 0.45 0.45 1"/>
+                            <geom type="box" pos="0.0 0.0 -0.009" size="0.014 0.005 0.009"
+                                  material="black" contype="0" conaffinity="0"/>
                           </body>
                         </body>
                       </body>
