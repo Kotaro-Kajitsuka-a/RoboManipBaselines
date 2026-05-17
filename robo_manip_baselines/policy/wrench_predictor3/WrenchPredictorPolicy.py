@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
+import torchvision.transforms as transforms
 
 from .WrenchPredictorModel import WrenchPredictorModel
 
@@ -25,8 +26,12 @@ class WrenchPredictorPolicy(nn.Module):
             state_dim=state_dim,
             wrench_dim=wrench_dim,
             chunk_size=self.policy_args["chunk_size"],
+            camera_names=self.policy_args["camera_names"],
+            image_shape=self.policy_args["image_shape"],
             hidden_dim=self.policy_args["hidden_dim"],
             dim_feedforward=self.policy_args["dim_feedforward"],
+            enc_layers=self.policy_args["enc_layers"],
+            nheads=self.policy_args["nheads"],
         )
 
         n_parameters = sum(p.numel() for p in self.parameters() if p.requires_grad)
@@ -35,29 +40,34 @@ class WrenchPredictorPolicy(nn.Module):
     def forward(
         self,
         state,
+        image,
         material_object_id=None,
         wrench=None,
         is_pad=None,
         material_property=None,
     ):
+        # If material_property is given, use it. 
+        # Otherwise, use material_object_id to get the material property embedding.
         if material_property is None:
-            assert material_object_id is not None
+            assert material_object_id is not None, "Either material_object_id or material_property must be provided."
             material_property = self.material_property_embedding(material_object_id)
-
-        if wrench is not None:
+        normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                         std=[0.229, 0.224, 0.225])
+        image = normalize(image)
+        if wrench is not None: # training time
             assert is_pad is not None
-            wrench = wrench[:, : self.model.chunk_size]
-            is_pad = is_pad[:, : self.model.chunk_size]
+            wrench = wrench[:, :self.model.chunk_size]
+            is_pad = is_pad[:, :self.model.chunk_size]
 
-            wrench_hat = self.model(state, material_property)
-            loss_dict = {}
-            all_l1 = F.l1_loss(wrench, wrench_hat, reduction="none")
+            wrench_hat = self.model(state, image, material_property)
+            loss_dict = dict()
+            all_l1 = F.l1_loss(wrench, wrench_hat, reduction='none')
             l1 = (all_l1 * ~is_pad.unsqueeze(-1)).mean()
-            loss_dict["l1"] = l1
-            loss_dict["loss"] = loss_dict["l1"]
+            loss_dict['l1'] = l1
+            loss_dict['loss'] = loss_dict['l1']
             return loss_dict
-
-        return self.model(state, material_property)
+        else: # inference time
+            return self.model(state, image, material_property)
 
     def configure_optimizers(self):
         param_dicts = [
@@ -65,7 +75,8 @@ class WrenchPredictorPolicy(nn.Module):
                 "params": [
                     p
                     for n, p in self.named_parameters()
-                    if n.startswith("material_property_embedding") and p.requires_grad
+                    if n.startswith("material_property_embedding")
+                    and p.requires_grad
                 ],
                 "lr": self.policy_args["lr_material_property"],
             },
@@ -74,8 +85,17 @@ class WrenchPredictorPolicy(nn.Module):
                     p
                     for n, p in self.named_parameters()
                     if not n.startswith("material_property_embedding")
+                    and not n.startswith("model.cnn")
                     and p.requires_grad
                 ]
+            },
+            {
+                "params": [
+                    p
+                    for n, p in self.named_parameters()
+                    if n.startswith("model.cnn") and p.requires_grad
+                ],
+                "lr": self.policy_args["lr_backbone"],
             },
         ]
         return torch.optim.AdamW(

@@ -1,3 +1,4 @@
+from .WrenchPredictorDataset import WrenchPredictorDataset
 from .TrainWrenchPredictor import TrainWrenchPredictor
 
 

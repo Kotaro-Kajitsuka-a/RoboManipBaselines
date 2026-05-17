@@ -9,10 +9,8 @@ from robo_manip_baselines.common.utils.DataUtils import get_skipped_data_seq
 from robo_manip_baselines.misc.AddPercentileClippedWrenchToRmbData import (
     AddPercentileClippedWrenchToRmbData,
 )
-from robo_manip_baselines.policy.wrench_predictor2.MaterialPropertyUtils import (
-    build_material_object_key_to_id,
-)
 
+from .MaterialPropertyUtils import build_material_object_key_to_id
 from .WrenchPredictorDataset import WrenchPredictorDataset
 from .WrenchPredictorPolicy import WrenchPredictorPolicy
 
@@ -22,7 +20,8 @@ class TrainWrenchPredictor(TrainBase):
 
     def set_additional_args(self, parser):
         parser.set_defaults(enable_rmb_cache=True)
-        parser.set_defaults(camera_names=[])
+
+        parser.set_defaults(image_aug_std=0.1)
 
         parser.set_defaults(batch_size=64)
         parser.set_defaults(num_epochs=1000)
@@ -55,6 +54,8 @@ class TrainWrenchPredictor(TrainBase):
 
         all_state = []
         all_wrench = []
+        rgb_image_example = None
+        depth_image_example = None
         episode_len_list = []
         clip_min = None
         clip_max = None
@@ -117,6 +118,21 @@ class TrainWrenchPredictor(TrainBase):
                 all_state.append(state_seq)
                 all_wrench.append(wrench_seq)
 
+                if rgb_image_example is None:
+                    rgb_image_example = {
+                        camera_name: rmb_data[DataKey.get_rgb_image_key(camera_name)][0]
+                        for camera_name in self.args.camera_names
+                        if DataKey.get_rgb_image_key(camera_name) in rmb_data
+                    }
+                if depth_image_example is None:
+                    depth_image_example = {
+                        camera_name: rmb_data[DataKey.get_depth_image_key(camera_name)][
+                            0
+                        ]
+                        for camera_name in self.args.camera_names
+                        if DataKey.get_depth_image_key(camera_name) in rmb_data
+                    }
+
         all_state = np.concatenate(all_state, dtype=np.float64)
         all_wrench = np.concatenate(all_wrench, dtype=np.float64)
 
@@ -130,8 +146,8 @@ class TrainWrenchPredictor(TrainBase):
         }
         self.model_meta_info["image"].update(
             {
-                "rgb_example": {},
-                "depth_example": {},
+                "rgb_example": rgb_image_example,
+                "depth_example": depth_image_example,
             }
         )
         self.model_meta_info["data"].update(
@@ -143,6 +159,12 @@ class TrainWrenchPredictor(TrainBase):
         )
 
     def setup_policy(self):
+        first_camera_name = self.args.camera_names[0]
+        image_height, image_width = self.model_meta_info["image"]["rgb_example"][
+            first_camera_name
+        ].shape[:2]
+
+        # Set policy args
         self.model_meta_info["policy"]["args"] = {
             "lr": self.args.lr,
             "lr_material_property": 1e-3,
@@ -150,8 +172,14 @@ class TrainWrenchPredictor(TrainBase):
             "chunk_size": self.args.chunk_size,
             "hidden_dim": self.args.hidden_dim,
             "dim_feedforward": self.args.dim_feedforward,
+            "lr_backbone": 1e-5,
+            "enc_layers": 4,
+            "nheads": 8,
+            "camera_names": self.args.camera_names,
+            "image_shape": (image_height, image_width),
         }
 
+        # Construct policy
         self.policy = WrenchPredictorPolicy(
             state_dim=len(self.model_meta_info["state"]["example"]),
             wrench_dim=len(self.model_meta_info["action"]["example"]),
@@ -163,8 +191,10 @@ class TrainWrenchPredictor(TrainBase):
         )
         self.policy.cuda()
 
+        # Construct optimizer
         self.optimizer = self.policy.configure_optimizers()
 
+        # Print policy information
         self.print_policy_info()
         print(f"  - chunk size: {self.args.chunk_size}")
         print(
@@ -184,6 +214,7 @@ class TrainWrenchPredictor(TrainBase):
 
     def train_loop(self):
         for epoch in tqdm(range(self.args.num_epochs)):
+            # Run train step
             self.policy.train()
             batch_result_list = []
             for data in self.train_dataloader:
@@ -195,6 +226,7 @@ class TrainWrenchPredictor(TrainBase):
                 batch_result_list.append(self.detach_batch_result(batch_result))
             self.log_epoch_summary(batch_result_list, "train", epoch)
 
+            # Run validation step
             with torch.inference_mode():
                 self.policy.eval()
                 batch_result_list = []
@@ -203,11 +235,17 @@ class TrainWrenchPredictor(TrainBase):
                     batch_result_list.append(self.detach_batch_result(batch_result))
                 epoch_summary = self.log_epoch_summary(batch_result_list, "val", epoch)
 
+                # Update best checkpoint
                 self.update_best_ckpt(epoch_summary)
-                self.print_material_property_embedding(epoch)
 
+            # Save current checkpoint
             if epoch % max(self.args.num_epochs // 10, 1) == 0:
+                self.print_material_property_embedding(epoch)
                 self.save_current_ckpt(f"epoch{epoch:0>3}")
 
+        # Save last checkpoint
+        self.print_material_property_embedding("last")
         self.save_current_ckpt("last")
+
+        # Save best checkpoint
         self.save_best_ckpt()
