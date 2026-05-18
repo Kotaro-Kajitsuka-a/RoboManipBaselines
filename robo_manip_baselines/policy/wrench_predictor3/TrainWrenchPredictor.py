@@ -17,6 +17,7 @@ from .WrenchPredictorPolicy import WrenchPredictorPolicy
 
 class TrainWrenchPredictor(TrainBase):
     DatasetClass = WrenchPredictorDataset
+    IMAGE_SIZE = (320, 240)  # (width, height)
 
     def set_additional_args(self, parser):
         parser.set_defaults(enable_rmb_cache=True)
@@ -40,6 +41,7 @@ class TrainWrenchPredictor(TrainBase):
     def setup_model_meta_info(self):
         super().setup_model_meta_info()
 
+        self.model_meta_info["data"]["image_size"] = self.IMAGE_SIZE
         self.model_meta_info["data"]["chunk_size"] = self.args.chunk_size
         self.model_meta_info["material_property"] = {
             "dim": 9,
@@ -60,7 +62,7 @@ class TrainWrenchPredictor(TrainBase):
         clip_min = None
         clip_max = None
         for filename in self.all_filenames:
-            with RmbData(filename) as rmb_data:
+            with RmbData(filename, image_size=self.IMAGE_SIZE) as rmb_data:
                 episode_len = rmb_data[DataKey.TIME][:: self.args.skip].shape[0]
                 episode_len_list.append(episode_len)
                 try:
@@ -197,6 +199,7 @@ class TrainWrenchPredictor(TrainBase):
         # Print policy information
         self.print_policy_info()
         print(f"  - chunk size: {self.args.chunk_size}")
+        print(f"  - image size: {self.IMAGE_SIZE}")
         print(
             f"  - material objects: {self.model_meta_info['material_property']['object_key_to_id']}"
         )

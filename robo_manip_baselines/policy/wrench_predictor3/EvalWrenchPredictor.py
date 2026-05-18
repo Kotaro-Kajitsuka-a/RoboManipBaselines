@@ -229,7 +229,8 @@ class EvalWrenchPredictor:
         return images_tensor
 
     def evaluate(self):
-        with RmbData(self.rmb_filename) as rmb_data:
+        image_size = self.model_meta_info["data"]["image_size"]
+        with RmbData(self.rmb_filename, image_size=image_size) as rmb_data:
             skip = self.model_meta_info["data"]["skip"]
             time_seq = np.asarray(rmb_data[DataKey.TIME][::skip], dtype=np.float64)
             gt_wrench_seq = np.asarray(

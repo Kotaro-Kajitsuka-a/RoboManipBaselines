@@ -33,6 +33,7 @@ class WrenchPredictorDataset(DatasetBase):
     def __getitem__(self, sample_idx):
         skip = self.model_meta_info["data"]["skip"]
         chunk_size = self.model_meta_info["data"]["chunk_size"]
+        image_size = self.model_meta_info["data"]["image_size"]
         episode_idx, start_time_idx = self.sample_index_list[sample_idx]
         filename = self.filenames[episode_idx]
         material_object_id = get_material_object_id(
@@ -40,7 +41,9 @@ class WrenchPredictorDataset(DatasetBase):
             self.model_meta_info["material_property"]["object_key_to_id"],
         )
 
-        with RmbData(filename, self.enable_rmb_cache) as rmb_data:
+        with RmbData(
+            filename, self.enable_rmb_cache, image_size=image_size
+        ) as rmb_data:
             # Load state
             if len(self.model_meta_info["state"]["keys"]) == 0:
                 state = np.zeros(0, dtype=np.float64)
