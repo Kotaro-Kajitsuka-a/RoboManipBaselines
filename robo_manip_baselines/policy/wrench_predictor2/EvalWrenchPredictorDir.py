@@ -120,14 +120,18 @@ class EvalWrenchPredictorDir:
             print(f"[{self.__class__.__name__}] {rmb_name} MAE:")
             for label, value in zip(labels, mae):
                 print(f"  - {label}: {value:.6f}")
-            print(f"  - mean: {mae.mean():.6f}")
+            print(f"  - Fz only: {mae[2]:.6f}")
+            print(f"  - Fx/Fy mean: {mae[:2].mean():.6f}")
+            print(f"  - torque mean: {mae[3:].mean():.6f}")
 
         all_abs_error_seq = np.concatenate(abs_error_seq_list, axis=0)
         all_mae = np.mean(all_abs_error_seq, axis=0)
         print(f"[{self.__class__.__name__}] All episodes MAE:")
         for label, value in zip(labels, all_mae):
             print(f"  - {label}: {value:.6f}")
-        print(f"  - mean: {all_mae.mean():.6f}")
+        print(f"  - Fz only: {all_mae[2]:.6f}")
+        print(f"  - Fx/Fy mean: {all_mae[:2].mean():.6f}")
+        print(f"  - torque mean: {all_mae[3:].mean():.6f}")
 
 
 if __name__ == "__main__":

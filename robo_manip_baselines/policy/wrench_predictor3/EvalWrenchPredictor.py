@@ -314,10 +314,15 @@ class EvalWrenchPredictor:
 
     def print_metrics(self, mae):
         labels = ["Fx", "Fy", "Fz", "Nx", "Ny", "Nz"]
+        force_xy_mae = mae[:2].mean()
+        torque_mae = mae[3:].mean()
+
         print(f"[{self.__class__.__name__}] MAE:")
         for label, value in zip(labels, mae):
             print(f"  - {label}: {value:.6f}")
-        print(f"  - mean: {mae.mean():.6f}")
+        print(f"  - Fz only: {mae[2]:.6f}")
+        print(f"  - Fx/Fy mean: {force_xy_mae:.6f}")
+        print(f"  - torque mean: {torque_mae:.6f}")
 
 
 if __name__ == "__main__":

@@ -36,3 +36,6 @@ python ./bin/Train.py DiffusionPolicy \
 python ./robo_manip_baselines/bin/Rollout.py DiffusionPolicy MujocoXarm7AdmittancePusht \
   --checkpoint robo_manip_baselines/checkpoint/DiffusionPolicy/ \
   --wait_before_start --skip_draw 50000 --save_rollout --world_idx_repeat_count 10
+
+# Run WrenchPredictor3 Coll training/evaluation locally without submitting a PBS job
+bash scripts/train_WrenchPred_Coll.sh
