@@ -25,7 +25,7 @@ class WrenchPredictorPolicy(nn.Module):
         self.model = WrenchPredictorModel(
             state_dim=state_dim,
             wrench_dim=wrench_dim,
-            chunk_size=self.policy_args["chunk_size"],
+            horizon=self.policy_args["horizon"],
             camera_names=self.policy_args["camera_names"],
             image_shape=self.policy_args["image_shape"],
             hidden_dim=self.policy_args["hidden_dim"],
@@ -43,30 +43,27 @@ class WrenchPredictorPolicy(nn.Module):
         image,
         material_object_id=None,
         wrench=None,
-        is_pad=None,
         material_property=None,
     ):
-        # If material_property is given, use it. 
+        # If material_property is given, use it.
         # Otherwise, use material_object_id to get the material property embedding.
         if material_property is None:
-            assert material_object_id is not None, "Either material_object_id or material_property must be provided."
+            assert material_object_id is not None, (
+                "Either material_object_id or material_property must be provided."
+            )
             material_property = self.material_property_embedding(material_object_id)
-        normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                         std=[0.229, 0.224, 0.225])
+        normalize = transforms.Normalize(
+            mean=[0.485, 0.456, 0.406],
+            std=[0.229, 0.224, 0.225],
+        )
         image = normalize(image)
-        if wrench is not None: # training time
-            assert is_pad is not None
-            wrench = wrench[:, :self.model.chunk_size]
-            is_pad = is_pad[:, :self.model.chunk_size]
-
+        if wrench is not None:  # training time
             wrench_hat = self.model(state, image, material_property)
             loss_dict = dict()
-            all_l1 = F.l1_loss(wrench, wrench_hat, reduction='none')
-            l1 = (all_l1 * ~is_pad.unsqueeze(-1)).mean()
-            loss_dict['l1'] = l1
-            loss_dict['loss'] = loss_dict['l1']
+            loss_dict["l1"] = F.l1_loss(wrench, wrench_hat)
+            loss_dict["loss"] = loss_dict["l1"]
             return loss_dict
-        else: # inference time
+        else:  # inference time
             return self.model(state, image, material_property)
 
     def configure_optimizers(self):
@@ -75,8 +72,7 @@ class WrenchPredictorPolicy(nn.Module):
                 "params": [
                     p
                     for n, p in self.named_parameters()
-                    if n.startswith("material_property_embedding")
-                    and p.requires_grad
+                    if n.startswith("material_property_embedding") and p.requires_grad
                 ],
                 "lr": self.policy_args["lr_material_property"],
             },

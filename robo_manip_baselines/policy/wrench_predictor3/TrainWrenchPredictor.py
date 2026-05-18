@@ -5,7 +5,6 @@ from tqdm import tqdm
 from robo_manip_baselines.common import TrainBase
 from robo_manip_baselines.common.data.DataKey import DataKey
 from robo_manip_baselines.common.data.RmbData import RmbData
-from robo_manip_baselines.common.utils.DataUtils import get_skipped_data_seq
 from robo_manip_baselines.misc.AddPercentileClippedWrenchToRmbData import (
     AddPercentileClippedWrenchToRmbData,
 )
@@ -13,6 +12,7 @@ from robo_manip_baselines.misc.AddPercentileClippedWrenchToRmbData import (
 from .MaterialPropertyUtils import build_material_object_key_to_id
 from .WrenchPredictorDataset import WrenchPredictorDataset
 from .WrenchPredictorPolicy import WrenchPredictorPolicy
+from .WrenchPredictorSequenceUtils import build_condition, build_wrench_target
 
 
 class TrainWrenchPredictor(TrainBase):
@@ -29,9 +29,6 @@ class TrainWrenchPredictor(TrainBase):
         parser.set_defaults(lr=1e-5)
 
         parser.add_argument(
-            "--chunk_size", type=int, default=25, help="wrench prediction chunking size"
-        )
-        parser.add_argument(
             "--hidden_dim", type=int, default=512, help="hidden dimension"
         )
         parser.add_argument(
@@ -42,7 +39,7 @@ class TrainWrenchPredictor(TrainBase):
         super().setup_model_meta_info()
 
         self.model_meta_info["data"]["image_size"] = self.IMAGE_SIZE
-        self.model_meta_info["data"]["chunk_size"] = self.args.chunk_size
+        self.model_meta_info["data"]["horizon"] = self.args.skip
         self.model_meta_info["material_property"] = {
             "dim": 9,
             "object_key_to_id": build_material_object_key_to_id(self.all_filenames),
@@ -59,11 +56,12 @@ class TrainWrenchPredictor(TrainBase):
         rgb_image_example = None
         depth_image_example = None
         episode_len_list = []
+        horizon = self.args.skip
         clip_min = None
         clip_max = None
         for filename in self.all_filenames:
             with RmbData(filename, image_size=self.IMAGE_SIZE) as rmb_data:
-                episode_len = rmb_data[DataKey.TIME][:: self.args.skip].shape[0]
+                episode_len = rmb_data[DataKey.TIME].shape[0]
                 episode_len_list.append(episode_len)
                 try:
                     file_clip_min = np.asarray(
@@ -89,35 +87,28 @@ class TrainWrenchPredictor(TrainBase):
                     assert np.allclose(clip_min, file_clip_min), filename
                     assert np.allclose(clip_max, file_clip_max), filename
 
-                state_seq = np.concatenate(
+                assert episode_len >= 2 * horizon + 1, filename
+                center_time_idxes = range(horizon, episode_len - horizon, horizon)
+                condition_seq = np.stack(
                     [
-                        *[
-                            get_skipped_data_seq(
-                                rmb_data[key][:],
-                                key,
-                                self.args.skip,
-                            )
-                            for key in self.args.state_keys
-                        ],
-                        *[
-                            get_skipped_data_seq(
-                                rmb_data[key][:],
-                                key,
-                                self.args.skip,
-                            )
-                            for key in self.args.action_keys
-                        ],
+                        build_condition(
+                            rmb_data,
+                            self.args.state_keys,
+                            self.args.action_keys,
+                            center_time_idx,
+                            horizon,
+                        )
+                        for center_time_idx in center_time_idxes
+                    ]
+                )
+                wrench_seq = np.concatenate(
+                    [
+                        build_wrench_target(rmb_data, center_time_idx, horizon)
+                        for center_time_idx in center_time_idxes
                     ],
-                    axis=1,
+                    axis=0,
                 )
-                wrench_seq = get_skipped_data_seq(
-                    rmb_data[
-                        DataKey.MEASURED_EEF_WRENCH_MOVING_AVERAGE_PERCENTILE_CLIP
-                    ][:],
-                    DataKey.MEASURED_EEF_WRENCH_MOVING_AVERAGE_PERCENTILE_CLIP,
-                    self.args.skip,
-                )
-                all_state.append(state_seq)
+                all_state.append(condition_seq)
                 all_wrench.append(wrench_seq)
 
                 if rgb_image_example is None:
@@ -171,7 +162,7 @@ class TrainWrenchPredictor(TrainBase):
             "lr": self.args.lr,
             "lr_material_property": 1e-3,
             "weight_decay": 1e-4,
-            "chunk_size": self.args.chunk_size,
+            "horizon": self.model_meta_info["data"]["horizon"],
             "hidden_dim": self.args.hidden_dim,
             "dim_feedforward": self.args.dim_feedforward,
             "lr_backbone": 1e-5,
@@ -198,7 +189,7 @@ class TrainWrenchPredictor(TrainBase):
 
         # Print policy information
         self.print_policy_info()
-        print(f"  - chunk size: {self.args.chunk_size}")
+        print(f"  - horizon: {self.model_meta_info['data']['horizon']}")
         print(f"  - image size: {self.IMAGE_SIZE}")
         print(
             f"  - material objects: {self.model_meta_info['material_property']['object_key_to_id']}"

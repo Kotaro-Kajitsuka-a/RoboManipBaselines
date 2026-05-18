@@ -20,7 +20,6 @@ python robo_manip_baselines/bin/Train.py WrenchPredictor3 \
     --checkpoint_dir ${CHECKPOINT_DIR} \
     --state_keys measured_eef_pose measured_eef_pose_rel \
     --action_keys command_eef_pose \
-    --chunk_size 1 \
     --lr 3e-5 \
     --num_epochs 100 \
     --batch_size 64 \

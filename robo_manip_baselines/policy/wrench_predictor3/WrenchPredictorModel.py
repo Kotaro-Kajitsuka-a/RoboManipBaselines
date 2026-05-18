@@ -12,7 +12,7 @@ class WrenchPredictorModel(nn.Module):
         self,
         state_dim,
         wrench_dim,
-        chunk_size,
+        horizon,
         camera_names,
         image_shape,
         hidden_dim,
@@ -24,7 +24,7 @@ class WrenchPredictorModel(nn.Module):
     ):
         super().__init__()
         self.wrench_dim = wrench_dim
-        self.chunk_size = chunk_size
+        self.horizon = horizon
         self.camera_names = camera_names
 
         resnet = resnet18(
@@ -33,9 +33,7 @@ class WrenchPredictorModel(nn.Module):
         )
         self.cnn = nn.Sequential(*list(resnet.children())[:-2])
         resnet_out_dim = 512
-        self.input_proj_image = nn.Conv2d(
-            resnet_out_dim, hidden_dim, kernel_size=1
-        )
+        self.input_proj_image = nn.Conv2d(resnet_out_dim, hidden_dim, kernel_size=1)
         self.input_proj_robot_state = nn.Linear(state_dim, hidden_dim)
         self.input_proj_material_property = nn.Linear(
             self.MATERIAL_PROPERTY_DIM, hidden_dim
@@ -75,7 +73,7 @@ class WrenchPredictorModel(nn.Module):
             nn.Linear(3 * hidden_dim, hidden_dim),
             nn.ReLU(inplace=True),
             nn.Dropout(dropout),
-            nn.Linear(hidden_dim, chunk_size * self.wrench_dim),
+            nn.Linear(hidden_dim, horizon * self.wrench_dim),
         )
 
     def forward(self, state, image, material_property):
@@ -122,12 +120,10 @@ class WrenchPredictorModel(nn.Module):
 
         robot_state_context = tokens[:, 0]
         image_context = tokens[:, 1:].mean(dim=1)
-        material_property_context = self.input_proj_material_property(
-            material_property
-        )
+        material_property_context = self.input_proj_material_property(material_property)
         context = torch.cat(
             [robot_state_context, image_context, material_property_context], dim=1
         )
         wrench_hat = self.output_mlp(context)
-        wrench_hat = wrench_hat.reshape(batch_size, self.chunk_size, self.wrench_dim)
+        wrench_hat = wrench_hat.reshape(batch_size, self.horizon, self.wrench_dim)
         return wrench_hat

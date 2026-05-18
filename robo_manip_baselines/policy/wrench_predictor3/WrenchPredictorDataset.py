@@ -5,11 +5,10 @@ from robo_manip_baselines.common import (
     DataKey,
     DatasetBase,
     RmbData,
-    get_skipped_data_seq,
-    get_skipped_single_data,
 )
 
 from .MaterialPropertyUtils import get_material_object_id
+from .WrenchPredictorSequenceUtils import build_condition, build_wrench_target
 
 
 class WrenchPredictorDataset(DatasetBase):
@@ -32,9 +31,10 @@ class WrenchPredictorDataset(DatasetBase):
 
     def __getitem__(self, sample_idx):
         skip = self.model_meta_info["data"]["skip"]
-        chunk_size = self.model_meta_info["data"]["chunk_size"]
         image_size = self.model_meta_info["data"]["image_size"]
+        horizon = skip
         episode_idx, start_time_idx = self.sample_index_list[sample_idx]
+        center_time_idx = start_time_idx * skip
         filename = self.filenames[episode_idx]
         material_object_id = get_material_object_id(
             filename,
@@ -44,40 +44,14 @@ class WrenchPredictorDataset(DatasetBase):
         with RmbData(
             filename, self.enable_rmb_cache, image_size=image_size
         ) as rmb_data:
-            # Load state
-            if len(self.model_meta_info["state"]["keys"]) == 0:
-                state = np.zeros(0, dtype=np.float64)
-            else:
-                state_list = [
-                    get_skipped_single_data(
-                        rmb_data[key],
-                        start_time_idx * skip,
-                        key,
-                        skip,
-                    )
-                    for key in self.model_meta_info["state"]["keys"]
-                ]
-
-                action_list = [
-                    get_skipped_single_data(
-                        rmb_data[key],
-                        start_time_idx * skip,
-                        key,
-                        skip,
-                    )
-                    for key in self.model_meta_info["action"]["keys"]
-                ]
-
-                state = np.concatenate(state_list + action_list)
-
-            # Load wrench
-            wrench = get_skipped_data_seq(
-                rmb_data[DataKey.MEASURED_EEF_WRENCH_MOVING_AVERAGE_PERCENTILE_CLIP][
-                    (start_time_idx + 1) * skip :
-                ],
-                DataKey.MEASURED_EEF_WRENCH_MOVING_AVERAGE_PERCENTILE_CLIP,
-                skip,
+            condition = build_condition(
+                rmb_data,
+                self.model_meta_info["state"]["keys"],
+                self.model_meta_info["action"]["keys"],
+                center_time_idx,
+                horizon,
             )
+            wrench = build_wrench_target(rmb_data, center_time_idx, horizon)
 
             # Load images
             image_time_idxes = np.array([start_time_idx - 1, start_time_idx])
@@ -103,35 +77,24 @@ class WrenchPredictorDataset(DatasetBase):
                 axis=0,
             )
 
-        # Chunk wrench
-        wrench_len = min(wrench.shape[0], chunk_size)
-        wrench_chunked = np.zeros((chunk_size, wrench.shape[1]), dtype=np.float64)
-        wrench_chunked[:wrench_len] = wrench[:wrench_len]
-        is_pad = np.zeros(chunk_size, dtype=bool)
-        is_pad[wrench_len:] = True
-
         # Pre-convert data
-        state, wrench_chunked, images = self.pre_convert_data(
-            state, wrench_chunked, images
-        )
+        condition, wrench, images = self.pre_convert_data(condition, wrench, images)
 
         # Convert to tensor
-        state_tensor = torch.tensor(state, dtype=torch.float32)
-        wrench_tensor = torch.tensor(wrench_chunked, dtype=torch.float32)
+        condition_tensor = torch.tensor(condition, dtype=torch.float32)
+        wrench_tensor = torch.tensor(wrench, dtype=torch.float32)
         images_tensor = torch.tensor(images, dtype=torch.uint8)
-        is_pad_tensor = torch.tensor(is_pad, dtype=torch.bool)
         material_object_id_tensor = torch.tensor(material_object_id, dtype=torch.long)
 
         # Augment data
-        state_tensor, wrench_tensor, images_tensor = self.augment_data(
-            state_tensor, wrench_tensor, images_tensor
+        condition_tensor, wrench_tensor, images_tensor = self.augment_data(
+            condition_tensor, wrench_tensor, images_tensor
         )
 
         # Sort in the order of policy inputs and outputs
         return (
-            state_tensor,
+            condition_tensor,
             images_tensor,
             material_object_id_tensor,
             wrench_tensor,
-            is_pad_tensor,
         )

@@ -15,8 +15,6 @@ from robo_manip_baselines.common import (
     RmbData,
     denormalize_data,
     find_rmb_files,
-    get_skipped_data_seq,
-    get_skipped_single_data,
     normalize_data,
 )
 from robo_manip_baselines.policy.wrench_predictor3.WrenchPredictorPolicy import (
@@ -24,6 +22,9 @@ from robo_manip_baselines.policy.wrench_predictor3.WrenchPredictorPolicy import 
 )
 from robo_manip_baselines.policy.wrench_predictor3.MaterialPropertyUtils import (
     extract_material_object_key,
+)
+from robo_manip_baselines.policy.wrench_predictor3.WrenchPredictorSequenceUtils import (
+    build_condition,
 )
 
 
@@ -174,38 +175,23 @@ class EvalWrenchPredictor:
         clip_info = self.model_meta_info["action"]["percentile_clip"]
         return np.clip(wrench, clip_info["min"], clip_info["max"])
 
-    def get_state_data(self, rmb_data, key, time_idx):
-        skip = self.model_meta_info["data"]["skip"]
-        if key == DataKey.MEASURED_EEF_WRENCH_MOVING_AVERAGE_PERCENTILE_CLIP:
-            wrench = get_skipped_single_data(
-                rmb_data[DataKey.MEASURED_EEF_WRENCH_MOVING_AVERAGE],
-                time_idx * skip,
-                DataKey.MEASURED_EEF_WRENCH_MOVING_AVERAGE,
-                skip,
-            )
-            return self.get_percentile_clipped_wrench(wrench)
-
-        return get_skipped_single_data(rmb_data[key], time_idx * skip, key, skip)
-
-    def build_state(self, rmb_data, time_idx):
-        state_list = [
-            self.get_state_data(rmb_data, key, time_idx)
-            for key in self.model_meta_info["state"]["keys"]
-        ]
-        action_list = [
-            self.get_state_data(rmb_data, key, time_idx)
-            for key in self.model_meta_info["action"]["keys"]
-        ]
-        state = np.concatenate(state_list + action_list)
-        state = normalize_data(state, self.model_meta_info["state"])
-        state_tensor = torch.tensor(
-            state[np.newaxis], dtype=torch.float32, device=self.device
+    def build_condition_tensor(self, rmb_data, center_time_idx):
+        horizon = self.model_meta_info["data"]["horizon"]
+        condition = build_condition(
+            rmb_data,
+            self.model_meta_info["state"]["keys"],
+            self.model_meta_info["action"]["keys"],
+            center_time_idx,
+            horizon,
         )
-        return state_tensor
+        condition = normalize_data(condition, self.model_meta_info["state"])
+        return torch.tensor(
+            condition[np.newaxis], dtype=torch.float32, device=self.device
+        )
 
-    def build_images(self, rmb_data, time_idx):
-        skip = self.model_meta_info["data"]["skip"]
-        image_time_idxes = np.array([max(time_idx - 1, 0), time_idx])
+    def build_images(self, rmb_data, center_time_idx):
+        horizon = self.model_meta_info["data"]["horizon"]
+        image_time_idxes = np.array([center_time_idx - horizon, center_time_idx])
         image_keys = [
             DataKey.get_rgb_image_key(camera_name)
             for camera_name in self.model_meta_info["image"]["camera_names"]
@@ -214,8 +200,8 @@ class EvalWrenchPredictor:
             [
                 np.stack(
                     [
-                        rmb_data[key][int(time_idx * skip)]
-                        for time_idx in image_time_idxes
+                        rmb_data[key][int(image_time_idx)]
+                        for image_time_idx in image_time_idxes
                     ],
                     axis=0,
                 )
@@ -231,28 +217,27 @@ class EvalWrenchPredictor:
     def evaluate(self):
         image_size = self.model_meta_info["data"]["image_size"]
         with RmbData(self.rmb_filename, image_size=image_size) as rmb_data:
-            skip = self.model_meta_info["data"]["skip"]
-            time_seq = np.asarray(rmb_data[DataKey.TIME][::skip], dtype=np.float64)
-            gt_wrench_seq = np.asarray(
-                get_skipped_data_seq(
+            horizon = self.model_meta_info["data"]["horizon"]
+            time_seq = np.asarray(rmb_data[DataKey.TIME][:], dtype=np.float64)
+            gt_wrench_seq = self.get_percentile_clipped_wrench(
+                np.asarray(
                     rmb_data[DataKey.MEASURED_EEF_WRENCH_MOVING_AVERAGE][:],
-                    DataKey.MEASURED_EEF_WRENCH_MOVING_AVERAGE,
-                    skip,
-                ),
-                dtype=np.float64,
+                    dtype=np.float64,
+                )
             )
-            gt_wrench_seq = self.get_percentile_clipped_wrench(gt_wrench_seq)
-            assert len(time_seq) >= 2
-            valid_episode_len = len(time_seq) - 1
+            assert len(time_seq) >= 2 * horizon + 1
 
+            target_time_list = []
+            gt_wrench_list = []
             pred_wrench_list = []
-            for time_idx in range(valid_episode_len):
-                state = self.build_state(rmb_data, time_idx)
-                images = self.build_images(rmb_data, time_idx)
+            center_time_idxes = range(horizon, len(time_seq) - horizon, horizon)
+            for center_time_idx in center_time_idxes:
+                condition = self.build_condition_tensor(rmb_data, center_time_idx)
+                images = self.build_images(rmb_data, center_time_idx)
                 with torch.inference_mode():
                     pred_wrench_chunk = (
                         self.policy(
-                            state,
+                            condition,
                             images,
                             material_property=self.material_property_tensor,
                         )[0]
@@ -260,20 +245,29 @@ class EvalWrenchPredictor:
                         .cpu()
                         .numpy()
                     )
-                pred_wrench = denormalize_data(
-                    pred_wrench_chunk[0], self.model_meta_info["action"]
+                pred_wrench_chunk = denormalize_data(
+                    pred_wrench_chunk, self.model_meta_info["action"]
                 )
-                pred_wrench_list.append(pred_wrench)
+                target_slice = slice(center_time_idx + 1, center_time_idx + horizon + 1)
+                target_time_list.append(time_seq[target_slice])
+                gt_wrench_list.append(gt_wrench_seq[target_slice])
+                pred_wrench_list.append(pred_wrench_chunk)
 
-        pred_wrench_seq = np.asarray(pred_wrench_list, dtype=np.float64)
-        time_seq = time_seq[1:]
-        gt_wrench_seq = gt_wrench_seq[1:]
-        time_interval_seq = np.diff(time_seq)
-        print(
-            f"[{self.__class__.__name__}] time interval: "
-            f"mean={time_interval_seq.mean():.6f} [s], "
-            f"std={time_interval_seq.std():.6f} [s]"
-        )
+        time_seq = np.concatenate(target_time_list, axis=0)
+        gt_wrench_seq = np.concatenate(gt_wrench_list, axis=0)
+        pred_wrench_seq = np.concatenate(pred_wrench_list, axis=0)
+        if len(time_seq) > 1:
+            time_interval_seq = np.diff(time_seq)
+            print(
+                f"[{self.__class__.__name__}] time interval: "
+                f"mean={time_interval_seq.mean():.6f} [s], "
+                f"std={time_interval_seq.std():.6f} [s]"
+            )
+        else:
+            print(
+                f"[{self.__class__.__name__}] time interval: "
+                "not available for a single target sample"
+            )
         abs_error_seq = np.abs(pred_wrench_seq - gt_wrench_seq)
         mae = np.mean(abs_error_seq, axis=0)
         return time_seq, gt_wrench_seq, pred_wrench_seq, abs_error_seq, mae
