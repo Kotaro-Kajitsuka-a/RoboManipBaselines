@@ -5,13 +5,13 @@ from torchvision.ops.misc import FrozenBatchNorm2d
 
 
 class WrenchPredictorModel(nn.Module):
-    MATERIAL_PROPERTY_DIM = 9
     IMAGE_HISTORY_SIZE = 2
 
     def __init__(
         self,
         state_dim,
         wrench_dim,
+        material_property_dim,
         horizon,
         camera_names,
         image_shape,
@@ -24,6 +24,7 @@ class WrenchPredictorModel(nn.Module):
     ):
         super().__init__()
         self.wrench_dim = wrench_dim
+        self.material_property_dim = material_property_dim
         self.horizon = horizon
         self.camera_names = camera_names
 
@@ -36,7 +37,7 @@ class WrenchPredictorModel(nn.Module):
         self.input_proj_image = nn.Conv2d(resnet_out_dim, hidden_dim, kernel_size=1)
         self.input_proj_robot_state = nn.Linear(state_dim, hidden_dim)
         self.input_proj_material_property = nn.Linear(
-            self.MATERIAL_PROPERTY_DIM, hidden_dim
+            self.material_property_dim, hidden_dim
         )
         image_height, image_width = image_shape
         with torch.no_grad():

@@ -25,6 +25,7 @@ class WrenchPredictorPolicy(nn.Module):
         self.model = WrenchPredictorModel(
             state_dim=state_dim,
             wrench_dim=wrench_dim,
+            material_property_dim=material_property_dim,
             horizon=self.policy_args["horizon"],
             camera_names=self.policy_args["camera_names"],
             image_shape=self.policy_args["image_shape"],
