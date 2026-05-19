@@ -160,7 +160,6 @@ class TrainWrenchPredictor(TrainBase):
         # Set policy args
         self.model_meta_info["policy"]["args"] = {
             "lr": self.args.lr,
-            "lr_material_property": 1e-3,
             "weight_decay": 1e-4,
             "horizon": self.model_meta_info["data"]["horizon"],
             "hidden_dim": self.args.hidden_dim,

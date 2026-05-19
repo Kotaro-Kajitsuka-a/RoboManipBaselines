@@ -73,17 +73,7 @@ class WrenchPredictorPolicy(nn.Module):
                 "params": [
                     p
                     for n, p in self.named_parameters()
-                    if n.startswith("material_property_embedding") and p.requires_grad
-                ],
-                "lr": self.policy_args["lr_material_property"],
-            },
-            {
-                "params": [
-                    p
-                    for n, p in self.named_parameters()
-                    if not n.startswith("material_property_embedding")
-                    and not n.startswith("model.cnn")
-                    and p.requires_grad
+                    if not n.startswith("model.cnn") and p.requires_grad
                 ]
             },
             {
