@@ -35,9 +35,8 @@ class WrenchPredictorModel(nn.Module):
         self.cnn = nn.Sequential(*list(resnet.children())[:-2])
         resnet_out_dim = 512
         self.input_proj_image = nn.Conv2d(resnet_out_dim, hidden_dim, kernel_size=1)
-        self.input_proj_robot_state = nn.Linear(state_dim, hidden_dim)
-        self.input_proj_material_property = nn.Linear(
-            self.material_property_dim, hidden_dim
+        self.input_proj_condition = nn.Linear(
+            state_dim + self.material_property_dim, hidden_dim
         )
         image_height, image_width = image_shape
         with torch.no_grad():
@@ -70,8 +69,8 @@ class WrenchPredictorModel(nn.Module):
             norm=nn.LayerNorm(hidden_dim),
         )
         self.output_mlp = nn.Sequential(
-            nn.LayerNorm(3 * hidden_dim),
-            nn.Linear(3 * hidden_dim, hidden_dim),
+            nn.LayerNorm(2 * hidden_dim),
+            nn.Linear(2 * hidden_dim, hidden_dim),
             nn.ReLU(inplace=True),
             nn.Dropout(dropout),
             nn.Linear(hidden_dim, horizon * self.wrench_dim),
@@ -113,18 +112,15 @@ class WrenchPredictorModel(nn.Module):
         )
         image_tokens = tokens.reshape(batch_size, -1, tokens.shape[-1])
 
-        robot_state_token = self.input_proj_robot_state(state)
-        prefix_tokens = robot_state_token.unsqueeze(1)
+        condition = torch.cat([state, material_property], dim=1)
+        condition_token = self.input_proj_condition(condition)
 
-        tokens = torch.cat([prefix_tokens, image_tokens], dim=1)
+        tokens = torch.cat([condition_token.unsqueeze(1), image_tokens], dim=1)
         tokens = self.transformer_encoder(tokens)
 
-        robot_state_context = tokens[:, 0]
+        condition_context = tokens[:, 0]
         image_context = tokens[:, 1:].mean(dim=1)
-        material_property_context = self.input_proj_material_property(material_property)
-        context = torch.cat(
-            [robot_state_context, image_context, material_property_context], dim=1
-        )
+        context = torch.cat([condition_context, image_context], dim=1)
         wrench_hat = self.output_mlp(context)
         wrench_hat = wrench_hat.reshape(batch_size, self.horizon, self.wrench_dim)
         return wrench_hat
