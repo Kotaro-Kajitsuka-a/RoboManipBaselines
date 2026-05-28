@@ -24,6 +24,9 @@ if __package__ in (None, ""):
         ARUCO_DICT_ID,
         BASE_CENTER_T_PATH,
         GRIDBOARD_BOX_RZ_OFFSET_RAD,
+        HANDLE_BOARD_DICT_ID,
+        HANDLE_BOARD_MARKER_IDS,
+        HANDLE_BOARD_MARKER_LENGTH_M,
         MARKER_LENGTH_M,
         MARKER_SEPARATION_M,
         MARKERS_X,
@@ -32,14 +35,11 @@ if __package__ in (None, ""):
         RES_H,
         RES_W,
         FPS,
-        SINGLE_MARKER_DICT_ID,
-        SINGLE_MARKER_ID,
-        SINGLE_MARKER_LENGTH_M,
         USE_SERIAL,
+        _build_handle_board,
         _detect_markers,
-        _estimate_single_marker_pose,
+        _estimate_handle_board_pose,
         _get_aruco_dictionary,
-        _offset_single_marker_pose,
         _rotation_z,
         _rotmat_to_rpy_deg,
     )
@@ -48,6 +48,9 @@ else:
         ARUCO_DICT_ID,
         BASE_CENTER_T_PATH,
         GRIDBOARD_BOX_RZ_OFFSET_RAD,
+        HANDLE_BOARD_DICT_ID,
+        HANDLE_BOARD_MARKER_IDS,
+        HANDLE_BOARD_MARKER_LENGTH_M,
         MARKER_LENGTH_M,
         MARKER_SEPARATION_M,
         MARKERS_X,
@@ -56,14 +59,11 @@ else:
         RES_H,
         RES_W,
         FPS,
-        SINGLE_MARKER_DICT_ID,
-        SINGLE_MARKER_ID,
-        SINGLE_MARKER_LENGTH_M,
         USE_SERIAL,
+        _build_handle_board,
         _detect_markers,
-        _estimate_single_marker_pose,
+        _estimate_handle_board_pose,
         _get_aruco_dictionary,
-        _offset_single_marker_pose,
         _rotation_z,
         _rotmat_to_rpy_deg,
     )
@@ -88,7 +88,8 @@ def main():
         aruco_dict = aruco.getPredefinedDictionary(ARUCO_DICT_ID)
     except AttributeError:
         aruco_dict = aruco.Dictionary_get(ARUCO_DICT_ID)
-    single_marker_dict = _get_aruco_dictionary(SINGLE_MARKER_DICT_ID)
+    handle_board_dict = _get_aruco_dictionary(HANDLE_BOARD_DICT_ID)
+    handle_board = _build_handle_board(handle_board_dict)
     try:
         parameters = aruco.DetectorParameters_create()
     except AttributeError:
@@ -141,58 +142,54 @@ def main():
             box_center_cam = None
             box_center_base = None
             rpy_base_box = None
-            single_marker_center_base = None
-            single_marker_rpy_base = None
-            single_marker_found = False
+            handle_board_center_base = None
+            handle_board_rpy_base = None
+            handle_board_found = False
             used_ids = []
 
-            single_corners, single_ids, _ = _detect_markers(
-                gray, single_marker_dict, parameters
+            handle_corners, handle_ids, _ = _detect_markers(
+                gray, handle_board_dict, parameters
             )
-            single_rvec, single_tvec = _estimate_single_marker_pose(
-                single_corners,
-                single_ids,
-                SINGLE_MARKER_ID,
-                SINGLE_MARKER_LENGTH_M,
+            handle_rvec, handle_tvec = _estimate_handle_board_pose(
+                handle_corners,
+                handle_ids,
+                handle_board,
                 K,
                 dist_coeffs,
             )
-            if single_rvec is not None and single_tvec is not None:
-                single_marker_found = True
-                aruco.drawDetectedMarkers(img, single_corners, single_ids)
-                R_target, t_target = _offset_single_marker_pose(
-                    single_rvec, single_tvec
-                )
-                target_rvec, _ = cv2.Rodrigues(R_target)
+            if handle_rvec is not None and handle_tvec is not None:
+                handle_board_found = True
+                aruco.drawDetectedMarkers(img, handle_corners, handle_ids)
+                R_handle, _ = cv2.Rodrigues(handle_rvec)
                 draw_axes(
                     img,
                     K,
-                    target_rvec,
-                    t_target,
-                    axis_len=SINGLE_MARKER_LENGTH_M * 1.5,
+                    handle_rvec,
+                    handle_tvec,
+                    axis_len=HANDLE_BOARD_MARKER_LENGTH_M * 1.5,
                     thickness=4,
                 )
 
-                cam_T_target = np.eye(4, dtype=np.float32)
-                cam_T_target[:3, :3] = R_target
-                cam_T_target[:3, 3] = t_target.flatten()
-                base_T_target = base_T_cam @ cam_T_target
-                single_marker_center_base = base_T_target[:3, 3]
-                single_marker_rpy_base = _rotmat_to_rpy_deg(base_T_target[:3, :3])
+                cam_T_handle = np.eye(4, dtype=np.float32)
+                cam_T_handle[:3, :3] = R_handle.astype(np.float32)
+                cam_T_handle[:3, 3] = handle_tvec.flatten().astype(np.float32)
+                base_T_handle = base_T_cam @ cam_T_handle
+                handle_board_center_base = base_T_handle[:3, 3]
+                handle_board_rpy_base = _rotmat_to_rpy_deg(base_T_handle[:3, :3])
 
-                marker_center_px, _ = cv2.projectPoints(
+                handle_center_px, _ = cv2.projectPoints(
                     np.array([[0.0, 0.0, 0.0]], dtype=np.float32),
-                    target_rvec,
-                    t_target,
+                    handle_rvec,
+                    handle_tvec,
                     K,
                     dist_coeffs,
                 )
-                marker_cx, marker_cy = marker_center_px[0, 0].astype(int)
-                cv2.circle(img, (marker_cx, marker_cy), 9, (255, 0, 255), -1)
+                handle_cx, handle_cy = handle_center_px[0, 0].astype(int)
+                cv2.circle(img, (handle_cx, handle_cy), 9, (255, 0, 255), -1)
                 cv2.putText(
                     img,
-                    f"ID {SINGLE_MARKER_ID} target",
-                    (marker_cx + 10, marker_cy - 10),
+                    f"Handle board {HANDLE_BOARD_MARKER_IDS}",
+                    (handle_cx + 10, handle_cy - 10),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.75,
                     (255, 0, 255),
@@ -247,16 +244,16 @@ def main():
                         print(f"box center (base): {box_center_base}")
                         print(f"box rpy (base deg): {rpy_base_box}")
                         if (
-                            single_marker_center_base is not None
-                            and single_marker_rpy_base is not None
+                            handle_board_center_base is not None
+                            and handle_board_rpy_base is not None
                         ):
                             print(
-                                f"single marker {SINGLE_MARKER_ID} target center (base): "
-                                f"{single_marker_center_base}"
+                                f"handle board {HANDLE_BOARD_MARKER_IDS} center (base): "
+                                f"{handle_board_center_base}"
                             )
                             print(
-                                f"single marker {SINGLE_MARKER_ID} target rpy (base deg): "
-                                f"{single_marker_rpy_base}"
+                                f"handle board {HANDLE_BOARD_MARKER_IDS} rpy (base deg): "
+                                f"{handle_board_rpy_base}"
                             )
                         print(f"board dist={dist_board:.3f} rpy={rpy_board}")
                         last_print = time.time()
@@ -384,10 +381,10 @@ def main():
                 )
                 y += 24
 
-            if single_marker_found:
+            if handle_board_found:
                 cv2.putText(
                     img,
-                    f"Single marker {SINGLE_MARKER_ID}: OK",
+                    f"Handle board {HANDLE_BOARD_MARKER_IDS}: OK",
                     (12, y),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.60,
@@ -396,14 +393,14 @@ def main():
                     cv2.LINE_AA,
                 )
                 y += 24
-                if single_marker_center_base is not None:
+                if handle_board_center_base is not None:
                     cv2.putText(
                         img,
                         (
-                            "Marker target (base): "
-                            f"({single_marker_center_base[0]:.3f}, "
-                            f"{single_marker_center_base[1]:.3f}, "
-                            f"{single_marker_center_base[2]:.3f}) m"
+                            "Handle board center (base): "
+                            f"({handle_board_center_base[0]:.3f}, "
+                            f"{handle_board_center_base[1]:.3f}, "
+                            f"{handle_board_center_base[2]:.3f}) m"
                         ),
                         (12, y),
                         cv2.FONT_HERSHEY_SIMPLEX,
@@ -413,14 +410,14 @@ def main():
                         cv2.LINE_AA,
                     )
                     y += 24
-                if single_marker_rpy_base is not None:
+                if handle_board_rpy_base is not None:
                     cv2.putText(
                         img,
                         (
-                            "Target RPY (base): "
-                            f"({single_marker_rpy_base[0]:.1f}, "
-                            f"{single_marker_rpy_base[1]:.1f}, "
-                            f"{single_marker_rpy_base[2]:.1f}) deg"
+                            "Handle board RPY (base): "
+                            f"({handle_board_rpy_base[0]:.1f}, "
+                            f"{handle_board_rpy_base[1]:.1f}, "
+                            f"{handle_board_rpy_base[2]:.1f}) deg"
                         ),
                         (12, y),
                         cv2.FONT_HERSHEY_SIMPLEX,
@@ -433,7 +430,7 @@ def main():
             else:
                 cv2.putText(
                     img,
-                    f"Single marker {SINGLE_MARKER_ID}: ---",
+                    f"Handle board {HANDLE_BOARD_MARKER_IDS}: ---",
                     (12, y),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.60,
