@@ -31,7 +31,13 @@ if __package__ in (None, ""):
         RES_H,
         RES_W,
         FPS,
+        SINGLE_MARKER_DICT_ID,
+        SINGLE_MARKER_ID,
+        SINGLE_MARKER_LENGTH_M,
         USE_SERIAL,
+        _detect_markers,
+        _estimate_single_marker_pose,
+        _get_aruco_dictionary,
         _rotmat_to_rpy_deg,
     )
 else:
@@ -46,7 +52,13 @@ else:
         RES_H,
         RES_W,
         FPS,
+        SINGLE_MARKER_DICT_ID,
+        SINGLE_MARKER_ID,
+        SINGLE_MARKER_LENGTH_M,
         USE_SERIAL,
+        _detect_markers,
+        _estimate_single_marker_pose,
+        _get_aruco_dictionary,
         _rotmat_to_rpy_deg,
     )
 
@@ -70,6 +82,7 @@ def main():
         aruco_dict = aruco.getPredefinedDictionary(ARUCO_DICT_ID)
     except AttributeError:
         aruco_dict = aruco.Dictionary_get(ARUCO_DICT_ID)
+    single_marker_dict = _get_aruco_dictionary(SINGLE_MARKER_DICT_ID)
     try:
         parameters = aruco.DetectorParameters_create()
     except AttributeError:
@@ -121,7 +134,61 @@ def main():
             box_center_cam = None
             box_center_base = None
             rpy_base_box = None
+            single_marker_center_base = None
+            single_marker_rpy_base = None
+            single_marker_found = False
             used_ids = []
+
+            single_corners, single_ids, _ = _detect_markers(
+                gray, single_marker_dict, parameters
+            )
+            single_rvec, single_tvec = _estimate_single_marker_pose(
+                single_corners,
+                single_ids,
+                SINGLE_MARKER_ID,
+                SINGLE_MARKER_LENGTH_M,
+                K,
+                dist_coeffs,
+            )
+            if single_rvec is not None and single_tvec is not None:
+                single_marker_found = True
+                aruco.drawDetectedMarkers(img, single_corners, single_ids)
+                draw_axes(
+                    img,
+                    K,
+                    single_rvec,
+                    single_tvec,
+                    axis_len=SINGLE_MARKER_LENGTH_M * 1.5,
+                    thickness=4,
+                )
+
+                R_marker, _ = cv2.Rodrigues(single_rvec)
+                cam_T_marker = np.eye(4, dtype=np.float32)
+                cam_T_marker[:3, :3] = R_marker.astype(np.float32)
+                cam_T_marker[:3, 3] = single_tvec.flatten().astype(np.float32)
+                base_T_marker = base_T_cam @ cam_T_marker
+                single_marker_center_base = base_T_marker[:3, 3]
+                single_marker_rpy_base = _rotmat_to_rpy_deg(base_T_marker[:3, :3])
+
+                marker_center_px, _ = cv2.projectPoints(
+                    np.array([[0.0, 0.0, 0.0]], dtype=np.float32),
+                    single_rvec,
+                    single_tvec,
+                    K,
+                    dist_coeffs,
+                )
+                marker_cx, marker_cy = marker_center_px[0, 0].astype(int)
+                cv2.circle(img, (marker_cx, marker_cy), 9, (255, 0, 255), -1)
+                cv2.putText(
+                    img,
+                    f"ID {SINGLE_MARKER_ID}",
+                    (marker_cx + 10, marker_cy - 10),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.75,
+                    (255, 0, 255),
+                    2,
+                    cv2.LINE_AA,
+                )
 
             if ids is not None and len(ids) > 0:
                 used_ids = ids.flatten().tolist()
@@ -286,6 +353,65 @@ def main():
                 cv2.putText(
                     img,
                     "Board pose: ---",
+                    (12, y),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.60,
+                    (200, 200, 200),
+                    2,
+                    cv2.LINE_AA,
+                )
+                y += 24
+
+            if single_marker_found:
+                cv2.putText(
+                    img,
+                    f"Single marker {SINGLE_MARKER_ID}: OK",
+                    (12, y),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.60,
+                    (255, 180, 255),
+                    2,
+                    cv2.LINE_AA,
+                )
+                y += 24
+                if single_marker_center_base is not None:
+                    cv2.putText(
+                        img,
+                        (
+                            "Marker center (base): "
+                            f"({single_marker_center_base[0]:.3f}, "
+                            f"{single_marker_center_base[1]:.3f}, "
+                            f"{single_marker_center_base[2]:.3f}) m"
+                        ),
+                        (12, y),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.55,
+                        (255, 180, 255),
+                        2,
+                        cv2.LINE_AA,
+                    )
+                    y += 24
+                if single_marker_rpy_base is not None:
+                    cv2.putText(
+                        img,
+                        (
+                            "Marker RPY (base): "
+                            f"({single_marker_rpy_base[0]:.1f}, "
+                            f"{single_marker_rpy_base[1]:.1f}, "
+                            f"{single_marker_rpy_base[2]:.1f}) deg"
+                        ),
+                        (12, y),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.55,
+                        (255, 180, 255),
+                        2,
+                        cv2.LINE_AA,
+                    )
+                    y += 24
+            else:
+                cv2.putText(
+                    img,
+                    f"Single marker {SINGLE_MARKER_ID}: ---",
                     (12, y),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.60,

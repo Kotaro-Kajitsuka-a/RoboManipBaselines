@@ -29,7 +29,7 @@ from .gripper_utils import (
     gripper_q_robomanip_to_maniskill,
     gripper_qvel_robomanip_to_maniskill,
 )
-from .marker_detection import (
+from .single_AprilTag_detection import (
     DEFAULT_TAG_SIZE_M,
     MarkerManager,
     load_base_to_camera_transform,

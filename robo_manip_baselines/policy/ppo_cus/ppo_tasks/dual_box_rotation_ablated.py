@@ -20,6 +20,9 @@ MARKER_SEPARATION_M = 0.0050
 MARKERS_X = 5
 MARKERS_Y = 7
 ARUCO_DICT_ID = aruco.DICT_4X4_50
+SINGLE_MARKER_DICT_ID = aruco.DICT_4X4_250
+SINGLE_MARKER_ID = 100
+SINGLE_MARKER_LENGTH_M = MARKER_LENGTH_M
 BOX_DEPTH_M = 0.1140
 BASE_CENTER_T_PATH = Path("robo_manip_baselines/calib/base_center_T.calib")
 RES_W, RES_H, FPS = 1920, 1080, 30
@@ -37,6 +40,43 @@ def _rotmat_to_rpy_deg(R: np.ndarray) -> np.ndarray:
         roll = np.arctan2(-R[1, 2], R[1, 1])
         yaw = 0.0
     return np.degrees([roll, pitch, yaw])
+
+
+def _get_aruco_dictionary(dict_id):
+    try:
+        return aruco.getPredefinedDictionary(dict_id)
+    except AttributeError:
+        return aruco.Dictionary_get(dict_id)
+
+
+def _get_aruco_parameters():
+    try:
+        return aruco.DetectorParameters_create()
+    except AttributeError:
+        return aruco.DetectorParameters()
+
+
+def _detect_markers(gray, aruco_dict, aruco_params):
+    if hasattr(aruco, "ArucoDetector"):
+        detector = aruco.ArucoDetector(aruco_dict, aruco_params)
+        return detector.detectMarkers(gray)
+    return aruco.detectMarkers(gray, aruco_dict, parameters=aruco_params)
+
+
+def _estimate_single_marker_pose(corners, ids, marker_id, marker_length_m, K, dist_coeffs):
+    if ids is None or len(ids) == 0:
+        return None, None
+
+    flat_ids = ids.reshape(-1)
+    matches = np.where(flat_ids == marker_id)[0]
+    if matches.size == 0:
+        return None, None
+
+    marker_corners = [corners[int(matches[0])]]
+    rvecs, tvecs, _ = aruco.estimatePoseSingleMarkers(
+        marker_corners, marker_length_m, K, dist_coeffs
+    )
+    return rvecs[0].reshape(3, 1), tvecs[0].reshape(3, 1)
 
 
 class BoxPoseProvider:
@@ -59,18 +99,15 @@ class BoxPoseProvider:
         self._stop_event = threading.Event()
         self._thread: Optional[threading.Thread] = None
         self._latest_transform: Optional[np.ndarray] = None
+        self._latest_single_marker_transform: Optional[np.ndarray] = None
         self._latest_timestamp: Optional[float] = None
+        self._latest_single_marker_timestamp: Optional[float] = None
         self._lock = threading.Lock()
 
         # Board setup
-        try:
-            self._aruco_dict = aruco.getPredefinedDictionary(ARUCO_DICT_ID)
-        except AttributeError:
-            self._aruco_dict = aruco.Dictionary_get(ARUCO_DICT_ID)
-        try:
-            self._aruco_params = aruco.DetectorParameters_create()
-        except AttributeError:
-            self._aruco_params = aruco.DetectorParameters()
+        self._aruco_dict = _get_aruco_dictionary(ARUCO_DICT_ID)
+        self._single_marker_dict = _get_aruco_dictionary(SINGLE_MARKER_DICT_ID)
+        self._aruco_params = _get_aruco_parameters()
         self._board = aruco.GridBoard(
             (MARKERS_X, MARKERS_Y), MARKER_LENGTH_M, MARKER_SEPARATION_M, self._aruco_dict
         )
@@ -99,6 +136,12 @@ class BoxPoseProvider:
             T = self._latest_transform.copy()
             #T[2, 3] = -0.03175  # force z to fixed value at the source
             return T, self._latest_timestamp
+
+    def get_latest_single_marker_transform(self) -> Tuple[Optional[np.ndarray], Optional[float]]:
+        with self._lock:
+            if self._latest_single_marker_transform is None:
+                return None, None
+            return self._latest_single_marker_transform.copy(), self._latest_single_marker_timestamp
 
     def _run(self) -> None:
         pipeline = rs.pipeline()
@@ -132,10 +175,29 @@ class BoxPoseProvider:
                     continue
                 img = np.asanyarray(cf.get_data())
                 gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-                
 
-                detector = aruco.ArucoDetector(self._aruco_dict, self._aruco_params)
-                corners, ids, _ = detector.detectMarkers(gray)
+                single_corners, single_ids, _ = _detect_markers(
+                    gray, self._single_marker_dict, self._aruco_params
+                )
+                single_rvec, single_tvec = _estimate_single_marker_pose(
+                    single_corners,
+                    single_ids,
+                    SINGLE_MARKER_ID,
+                    SINGLE_MARKER_LENGTH_M,
+                    K,
+                    dist_coeffs,
+                )
+                if single_rvec is not None and single_tvec is not None:
+                    R_marker, _ = cv2.Rodrigues(single_rvec)
+                    cam_T_marker = np.eye(4, dtype=np.float32)
+                    cam_T_marker[:3, :3] = R_marker.astype(np.float32)
+                    cam_T_marker[:3, 3] = single_tvec.flatten().astype(np.float32)
+                    base_T_marker = self._base_T_cam @ cam_T_marker
+                    with self._lock:
+                        self._latest_single_marker_transform = base_T_marker.copy()
+                        self._latest_single_marker_timestamp = time.time()
+
+                corners, ids, _ = _detect_markers(gray, self._aruco_dict, self._aruco_params)
 
                 if ids is None or len(ids) == 0:
                     continue
@@ -238,6 +300,7 @@ def run():
         while True:
             frame_idx += 1
             T_base_to_box, ts = provider.get_latest_box_transform()
+            T_base_to_marker, marker_ts = provider.get_latest_single_marker_transform()
             if T_base_to_box is not None:
                 rpy = _rotmat_to_rpy_deg(T_base_to_box[:3, :3])
                 translation_fixed = T_base_to_box[:3, 3].copy()
@@ -249,6 +312,15 @@ def run():
                         f"[BoxPoseProvider] fps~{fps:.1f} ts={ts_str} box center_fixed={translation_fixed} rpy(deg)={rpy}",
                         flush=True,
                     )
+            if T_base_to_marker is not None and frame_idx % 20 == 0:
+                marker_rpy = _rotmat_to_rpy_deg(T_base_to_marker[:3, :3])
+                marker_translation = T_base_to_marker[:3, 3].copy()
+                marker_ts_str = f"{marker_ts:.3f}" if marker_ts is not None else "n/a"
+                print(
+                    f"[SingleMarker] id={SINGLE_MARKER_ID} ts={marker_ts_str} "
+                    f"center={marker_translation} rpy(deg)={marker_rpy}",
+                    flush=True,
+                )
             time.sleep(0.05)
     except KeyboardInterrupt:
         pass
