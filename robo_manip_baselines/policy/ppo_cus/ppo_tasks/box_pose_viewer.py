@@ -246,6 +246,18 @@ def main():
                         print(base_T_box)
                         print(f"box center (base): {box_center_base}")
                         print(f"box rpy (base deg): {rpy_base_box}")
+                        if (
+                            single_marker_center_base is not None
+                            and single_marker_rpy_base is not None
+                        ):
+                            print(
+                                f"single marker {SINGLE_MARKER_ID} target center (base): "
+                                f"{single_marker_center_base}"
+                            )
+                            print(
+                                f"single marker {SINGLE_MARKER_ID} target rpy (base deg): "
+                                f"{single_marker_rpy_base}"
+                            )
                         print(f"board dist={dist_board:.3f} rpy={rpy_board}")
                         last_print = time.time()
 
