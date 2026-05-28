@@ -24,7 +24,10 @@ SINGLE_MARKER_DICT_ID = aruco.DICT_4X4_250
 SINGLE_MARKER_ID = 100
 SINGLE_MARKER_LENGTH_M = MARKER_LENGTH_M
 SINGLE_MARKER_TARGET_OFFSET_M = np.array([0.083, -0.023, -0.001], dtype=np.float32)
+SINGLE_MARKER_TARGET_RX_OFFSET_RAD = np.deg2rad(-90.0)
+SINGLE_MARKER_TARGET_RZ_OFFSET_RAD = np.deg2rad(90.0)
 BOX_DEPTH_M = 0.1140
+GRIDBOARD_BOX_RZ_OFFSET_RAD = np.deg2rad(90.0)
 BASE_CENTER_T_PATH = Path("robo_manip_baselines/calib/base_center_T.calib")
 RES_W, RES_H, FPS = 1920, 1080, 30
 USE_SERIAL = "314422070401"
@@ -41,6 +44,32 @@ def _rotmat_to_rpy_deg(R: np.ndarray) -> np.ndarray:
         roll = np.arctan2(-R[1, 2], R[1, 1])
         yaw = 0.0
     return np.degrees([roll, pitch, yaw])
+
+
+def _rotation_z(rad: float) -> np.ndarray:
+    c = np.cos(rad)
+    s = np.sin(rad)
+    return np.array(
+        [
+            [c, -s, 0.0],
+            [s, c, 0.0],
+            [0.0, 0.0, 1.0],
+        ],
+        dtype=np.float32,
+    )
+
+
+def _rotation_x(rad: float) -> np.ndarray:
+    c = np.cos(rad)
+    s = np.sin(rad)
+    return np.array(
+        [
+            [1.0, 0.0, 0.0],
+            [0.0, c, -s],
+            [0.0, s, c],
+        ],
+        dtype=np.float32,
+    )
 
 
 def _get_aruco_dictionary(dict_id):
@@ -83,7 +112,11 @@ def _estimate_single_marker_pose(corners, ids, marker_id, marker_length_m, K, di
 def _offset_single_marker_pose(rvec, tvec):
     R_marker, _ = cv2.Rodrigues(rvec)
     t_target = R_marker @ SINGLE_MARKER_TARGET_OFFSET_M.reshape(3, 1) + tvec.reshape(3, 1)
-    return R_marker.astype(np.float32), t_target.astype(np.float32)
+    R_target_offset = _rotation_x(SINGLE_MARKER_TARGET_RX_OFFSET_RAD) @ _rotation_z(
+        SINGLE_MARKER_TARGET_RZ_OFFSET_RAD
+    )
+    R_target = R_marker @ R_target_offset
+    return R_target.astype(np.float32), t_target.astype(np.float32)
 
 
 class BoxPoseProvider:
@@ -171,6 +204,7 @@ class BoxPoseProvider:
         dist_coeffs = np.array(intr.coeffs[:5], dtype=np.float32)
 
         R_flip_x = np.array([[1, 0, 0], [0, -1, 0], [0, 0, -1]], dtype=np.float32)
+        R_box_z_offset = _rotation_z(GRIDBOARD_BOX_RZ_OFFSET_RAD)
         center_offset = np.array([self._board_w * 0.5, self._board_h * 0.5, 0.0], dtype=np.float32)
         z_offset = np.array([0.0, 0.0, -BOX_DEPTH_M * 0.5], dtype=np.float32)
 
@@ -216,7 +250,7 @@ class BoxPoseProvider:
 
                 R_board, _ = cv2.Rodrigues(rvec)
                 t_board_box = center_offset + R_flip_x @ z_offset
-                R_cam_box = R_board @ R_flip_x
+                R_cam_box = R_board @ R_flip_x @ R_box_z_offset
                 t_cam_box = R_board @ t_board_box.reshape(3, 1) + tvec.reshape(3, 1)
 
                 cam_T_box = np.eye(4, dtype=np.float32)

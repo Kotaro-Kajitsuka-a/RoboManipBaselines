@@ -24,6 +24,7 @@ if __package__ in (None, ""):
         ARUCO_DICT_ID,
         BASE_CENTER_T_PATH,
         BOX_DEPTH_M,
+        GRIDBOARD_BOX_RZ_OFFSET_RAD,
         MARKER_LENGTH_M,
         MARKER_SEPARATION_M,
         MARKERS_X,
@@ -39,6 +40,7 @@ if __package__ in (None, ""):
         _estimate_single_marker_pose,
         _get_aruco_dictionary,
         _offset_single_marker_pose,
+        _rotation_z,
         _rotmat_to_rpy_deg,
     )
 else:
@@ -46,6 +48,7 @@ else:
         ARUCO_DICT_ID,
         BASE_CENTER_T_PATH,
         BOX_DEPTH_M,
+        GRIDBOARD_BOX_RZ_OFFSET_RAD,
         MARKER_LENGTH_M,
         MARKER_SEPARATION_M,
         MARKERS_X,
@@ -61,6 +64,7 @@ else:
         _estimate_single_marker_pose,
         _get_aruco_dictionary,
         _offset_single_marker_pose,
+        _rotation_z,
         _rotmat_to_rpy_deg,
     )
 
@@ -115,6 +119,7 @@ def main():
     print(" dist   =", dist_coeffs)
 
     R_flip_x = np.array([[1, 0, 0], [0, -1, 0], [0, 0, -1]], dtype=np.float32)
+    R_box_z_offset = _rotation_z(GRIDBOARD_BOX_RZ_OFFSET_RAD)
     center_offset = np.array([board_w * 0.5, board_h * 0.5, 0.0], dtype=np.float32)
     z_offset = np.array([0.0, 0.0, -BOX_DEPTH_M * 0.5], dtype=np.float32)
 
@@ -213,7 +218,7 @@ def main():
                     draw_axes(img, K, rvec, tvec, axis_len=board_size_max * 0.6, thickness=3)
 
                     t_board_box = center_offset + R_flip_x @ z_offset
-                    R_cam_box = R_board @ R_flip_x
+                    R_cam_box = R_board @ R_flip_x @ R_box_z_offset
                     t_cam_box = R_board @ t_board_box.reshape(3, 1) + tvec.reshape(3, 1)
 
                     cam_T_box = np.eye(4, dtype=np.float32)
