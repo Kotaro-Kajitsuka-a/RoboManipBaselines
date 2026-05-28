@@ -102,30 +102,53 @@ def _estimate_single_marker_pose(corners, ids, marker_id, marker_length_m, K, di
     if matches.size == 0:
         return None, None
 
-    marker_corners = [corners[int(matches[0])]]
-    rvecs, tvecs, _ = aruco.estimatePoseSingleMarkers(
-        marker_corners, marker_length_m, K, dist_coeffs
+    half = float(marker_length_m) * 0.5
+    object_points = np.array(
+        [
+            [-half, half, 0.0],
+            [half, half, 0.0],
+            [half, -half, 0.0],
+            [-half, -half, 0.0],
+        ],
+        dtype=np.float32,
     )
-    return rvecs[0].reshape(3, 1), tvecs[0].reshape(3, 1)
+    image_points = corners[int(matches[0])].reshape(4, 2).astype(np.float32)
+    result = cv2.solvePnPGeneric(
+        object_points,
+        image_points,
+        K,
+        dist_coeffs,
+        flags=cv2.SOLVEPNP_IPPE_SQUARE,
+    )
 
+    if not result or not result[0]:
+        return None, None
+    rvecs = result[1]
+    tvecs = result[2]
+    errors = result[3] if len(result) > 3 else None
 
-def _rebuild_rotation_from_xy(rotation: np.ndarray) -> np.ndarray:
-    x_axis = rotation[:, 0].astype(np.float32)
-    y_axis = rotation[:, 1].astype(np.float32)
+    best_idx = None
+    best_error = None
+    for idx, rvec in enumerate(rvecs):
+        R_marker, _ = cv2.Rodrigues(rvec)
+        z_axis_cam = R_marker[:, 2]
+        if z_axis_cam[2] >= 0.0:
+            continue
+        if errors is None:
+            error = 0.0
+        else:
+            error = float(np.asarray(errors[idx]).reshape(-1)[0])
+        if best_error is None or error < best_error:
+            best_idx = idx
+            best_error = error
 
-    x_axis = x_axis / (np.linalg.norm(x_axis) + 1e-8)
-    y_axis = y_axis / (np.linalg.norm(y_axis) + 1e-8)
-    z_axis = np.cross(x_axis, y_axis)
-    z_axis = z_axis / (np.linalg.norm(z_axis) + 1e-8)
-    y_axis = np.cross(z_axis, x_axis)
-    y_axis = y_axis / (np.linalg.norm(y_axis) + 1e-8)
-
-    return np.stack([x_axis, y_axis, z_axis], axis=1).astype(np.float32)
+    if best_idx is None:
+        return None, None
+    return rvecs[best_idx].reshape(3, 1), tvecs[best_idx].reshape(3, 1)
 
 
 def _offset_single_marker_pose(rvec, tvec):
     R_marker, _ = cv2.Rodrigues(rvec)
-    R_marker = _rebuild_rotation_from_xy(R_marker)
     t_target = R_marker @ SINGLE_MARKER_TARGET_OFFSET_M.reshape(3, 1) + tvec.reshape(3, 1)
     R_target_offset = _rotation_x(SINGLE_MARKER_TARGET_RX_OFFSET_RAD) @ _rotation_z(
         SINGLE_MARKER_TARGET_RZ_OFFSET_RAD
