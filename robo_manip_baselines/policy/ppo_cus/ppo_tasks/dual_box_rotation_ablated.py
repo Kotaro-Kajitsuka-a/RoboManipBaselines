@@ -29,6 +29,8 @@ SMALL_BOARD_W_M = (
     + SMALL_BOARD_MARKER_GAP_M * (len(SMALL_BOARD_MARKER_IDS) - 1)
 )
 SMALL_BOARD_H_M = SMALL_BOARD_MARKER_LENGTH_M
+SMALL_BOARD_TARGET_Y_OFFSET_M = -0.0825
+SMALL_BOARD_TARGET_RY_OFFSET_RAD = np.deg2rad(-90.0)
 BIG_PANEL_Z_OFFSET_M = 0.003
 BIG_BOARD_RZ_OFFSET_RAD = np.deg2rad(90.0)
 BASE_CENTER_T_PATH = Path("robo_manip_baselines/calib/base_center_T.calib")
@@ -57,6 +59,19 @@ def _rotation_z(rad: float) -> np.ndarray:
             [c, -s, 0.0],
             [s, c, 0.0],
             [0.0, 0.0, 1.0],
+        ],
+        dtype=np.float32,
+    )
+
+
+def _rotation_y(rad: float) -> np.ndarray:
+    c = np.cos(rad)
+    s = np.sin(rad)
+    return np.array(
+        [
+            [c, 0.0, s],
+            [0.0, 1.0, 0.0],
+            [-s, 0.0, c],
         ],
         dtype=np.float32,
     )
@@ -108,7 +123,13 @@ def _estimate_small_board_pose(corners, ids, board, K, dist_coeffs):
         [SMALL_BOARD_W_M * 0.5, SMALL_BOARD_H_M * 0.5, 0.0], dtype=np.float32
     )
     t_center = R_board @ center_offset.reshape(3, 1) + tvec.reshape(3, 1)
-    return rvec.reshape(3, 1), t_center.reshape(3, 1)
+    target_offset = np.array(
+        [0.0, SMALL_BOARD_TARGET_Y_OFFSET_M, 0.0], dtype=np.float32
+    )
+    R_target = R_board @ _rotation_y(SMALL_BOARD_TARGET_RY_OFFSET_RAD)
+    t_target = R_board @ target_offset.reshape(3, 1) + t_center.reshape(3, 1)
+    rvec_target, _ = cv2.Rodrigues(R_target)
+    return rvec_target.reshape(3, 1), t_target.reshape(3, 1)
 
 
 class BoxPoseProvider:
