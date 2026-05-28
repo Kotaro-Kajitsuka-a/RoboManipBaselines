@@ -26,7 +26,7 @@ SINGLE_MARKER_LENGTH_M = MARKER_LENGTH_M
 SINGLE_MARKER_TARGET_OFFSET_M = np.array([0.083, -0.023, -0.001], dtype=np.float32)
 SINGLE_MARKER_TARGET_RX_OFFSET_RAD = np.deg2rad(-90.0)
 SINGLE_MARKER_TARGET_RZ_OFFSET_RAD = np.deg2rad(90.0)
-BOX_DEPTH_M = 0.1140
+PANEL_Z_OFFSET_M = 0.003
 GRIDBOARD_BOX_RZ_OFFSET_RAD = np.deg2rad(90.0)
 BASE_CENTER_T_PATH = Path("robo_manip_baselines/calib/base_center_T.calib")
 RES_W, RES_H, FPS = 1920, 1080, 30
@@ -109,8 +109,23 @@ def _estimate_single_marker_pose(corners, ids, marker_id, marker_length_m, K, di
     return rvecs[0].reshape(3, 1), tvecs[0].reshape(3, 1)
 
 
+def _rebuild_rotation_from_xy(rotation: np.ndarray) -> np.ndarray:
+    x_axis = rotation[:, 0].astype(np.float32)
+    y_axis = rotation[:, 1].astype(np.float32)
+
+    x_axis = x_axis / (np.linalg.norm(x_axis) + 1e-8)
+    y_axis = y_axis / (np.linalg.norm(y_axis) + 1e-8)
+    z_axis = np.cross(x_axis, y_axis)
+    z_axis = z_axis / (np.linalg.norm(z_axis) + 1e-8)
+    y_axis = np.cross(z_axis, x_axis)
+    y_axis = y_axis / (np.linalg.norm(y_axis) + 1e-8)
+
+    return np.stack([x_axis, y_axis, z_axis], axis=1).astype(np.float32)
+
+
 def _offset_single_marker_pose(rvec, tvec):
     R_marker, _ = cv2.Rodrigues(rvec)
+    R_marker = _rebuild_rotation_from_xy(R_marker)
     t_target = R_marker @ SINGLE_MARKER_TARGET_OFFSET_M.reshape(3, 1) + tvec.reshape(3, 1)
     R_target_offset = _rotation_x(SINGLE_MARKER_TARGET_RX_OFFSET_RAD) @ _rotation_z(
         SINGLE_MARKER_TARGET_RZ_OFFSET_RAD
@@ -206,7 +221,7 @@ class BoxPoseProvider:
         R_flip_x = np.array([[1, 0, 0], [0, -1, 0], [0, 0, -1]], dtype=np.float32)
         R_box_z_offset = _rotation_z(GRIDBOARD_BOX_RZ_OFFSET_RAD)
         center_offset = np.array([self._board_w * 0.5, self._board_h * 0.5, 0.0], dtype=np.float32)
-        z_offset = np.array([0.0, 0.0, -BOX_DEPTH_M * 0.5], dtype=np.float32)
+        z_offset = np.array([0.0, 0.0, -PANEL_Z_OFFSET_M], dtype=np.float32)
 
         try:
             while not self._stop_event.is_set():

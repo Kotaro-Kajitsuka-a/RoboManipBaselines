@@ -23,11 +23,11 @@ if __package__ in (None, ""):
     from robo_manip_baselines.policy.ppo_cus.ppo_tasks.dual_box_rotation_ablated import (
         ARUCO_DICT_ID,
         BASE_CENTER_T_PATH,
-        BOX_DEPTH_M,
         GRIDBOARD_BOX_RZ_OFFSET_RAD,
         MARKER_LENGTH_M,
         MARKER_SEPARATION_M,
         MARKERS_X,
+        PANEL_Z_OFFSET_M,
         MARKERS_Y,
         RES_H,
         RES_W,
@@ -47,11 +47,11 @@ else:
     from .dual_box_rotation_ablated import (
         ARUCO_DICT_ID,
         BASE_CENTER_T_PATH,
-        BOX_DEPTH_M,
         GRIDBOARD_BOX_RZ_OFFSET_RAD,
         MARKER_LENGTH_M,
         MARKER_SEPARATION_M,
         MARKERS_X,
+        PANEL_Z_OFFSET_M,
         MARKERS_Y,
         RES_H,
         RES_W,
@@ -121,7 +121,7 @@ def main():
     R_flip_x = np.array([[1, 0, 0], [0, -1, 0], [0, 0, -1]], dtype=np.float32)
     R_box_z_offset = _rotation_z(GRIDBOARD_BOX_RZ_OFFSET_RAD)
     center_offset = np.array([board_w * 0.5, board_h * 0.5, 0.0], dtype=np.float32)
-    z_offset = np.array([0.0, 0.0, -BOX_DEPTH_M * 0.5], dtype=np.float32)
+    z_offset = np.array([0.0, 0.0, -PANEL_Z_OFFSET_M], dtype=np.float32)
 
     t_prev, fps_est = time.time(), 0.0
     last_print = 0.0
