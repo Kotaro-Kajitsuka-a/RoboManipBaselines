@@ -23,6 +23,7 @@ ARUCO_DICT_ID = aruco.DICT_4X4_50
 SINGLE_MARKER_DICT_ID = aruco.DICT_4X4_250
 SINGLE_MARKER_ID = 100
 SINGLE_MARKER_LENGTH_M = MARKER_LENGTH_M
+SINGLE_MARKER_TARGET_OFFSET_M = np.array([0.083, -0.023, -0.001], dtype=np.float32)
 BOX_DEPTH_M = 0.1140
 BASE_CENTER_T_PATH = Path("robo_manip_baselines/calib/base_center_T.calib")
 RES_W, RES_H, FPS = 1920, 1080, 30
@@ -77,6 +78,12 @@ def _estimate_single_marker_pose(corners, ids, marker_id, marker_length_m, K, di
         marker_corners, marker_length_m, K, dist_coeffs
     )
     return rvecs[0].reshape(3, 1), tvecs[0].reshape(3, 1)
+
+
+def _offset_single_marker_pose(rvec, tvec):
+    R_marker, _ = cv2.Rodrigues(rvec)
+    t_target = R_marker @ SINGLE_MARKER_TARGET_OFFSET_M.reshape(3, 1) + tvec.reshape(3, 1)
+    return R_marker.astype(np.float32), t_target.astype(np.float32)
 
 
 class BoxPoseProvider:
@@ -188,13 +195,15 @@ class BoxPoseProvider:
                     dist_coeffs,
                 )
                 if single_rvec is not None and single_tvec is not None:
-                    R_marker, _ = cv2.Rodrigues(single_rvec)
-                    cam_T_marker = np.eye(4, dtype=np.float32)
-                    cam_T_marker[:3, :3] = R_marker.astype(np.float32)
-                    cam_T_marker[:3, 3] = single_tvec.flatten().astype(np.float32)
-                    base_T_marker = self._base_T_cam @ cam_T_marker
+                    R_target, t_target = _offset_single_marker_pose(
+                        single_rvec, single_tvec
+                    )
+                    cam_T_target = np.eye(4, dtype=np.float32)
+                    cam_T_target[:3, :3] = R_target
+                    cam_T_target[:3, 3] = t_target.flatten()
+                    base_T_target = self._base_T_cam @ cam_T_target
                     with self._lock:
-                        self._latest_single_marker_transform = base_T_marker.copy()
+                        self._latest_single_marker_transform = base_T_target.copy()
                         self._latest_single_marker_timestamp = time.time()
 
                 corners, ids, _ = _detect_markers(gray, self._aruco_dict, self._aruco_params)

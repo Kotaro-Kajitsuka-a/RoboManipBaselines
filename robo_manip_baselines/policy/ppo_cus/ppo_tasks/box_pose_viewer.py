@@ -38,6 +38,7 @@ if __package__ in (None, ""):
         _detect_markers,
         _estimate_single_marker_pose,
         _get_aruco_dictionary,
+        _offset_single_marker_pose,
         _rotmat_to_rpy_deg,
     )
 else:
@@ -59,6 +60,7 @@ else:
         _detect_markers,
         _estimate_single_marker_pose,
         _get_aruco_dictionary,
+        _offset_single_marker_pose,
         _rotmat_to_rpy_deg,
     )
 
@@ -153,27 +155,30 @@ def main():
             if single_rvec is not None and single_tvec is not None:
                 single_marker_found = True
                 aruco.drawDetectedMarkers(img, single_corners, single_ids)
+                R_target, t_target = _offset_single_marker_pose(
+                    single_rvec, single_tvec
+                )
+                target_rvec, _ = cv2.Rodrigues(R_target)
                 draw_axes(
                     img,
                     K,
-                    single_rvec,
-                    single_tvec,
+                    target_rvec,
+                    t_target,
                     axis_len=SINGLE_MARKER_LENGTH_M * 1.5,
                     thickness=4,
                 )
 
-                R_marker, _ = cv2.Rodrigues(single_rvec)
-                cam_T_marker = np.eye(4, dtype=np.float32)
-                cam_T_marker[:3, :3] = R_marker.astype(np.float32)
-                cam_T_marker[:3, 3] = single_tvec.flatten().astype(np.float32)
-                base_T_marker = base_T_cam @ cam_T_marker
-                single_marker_center_base = base_T_marker[:3, 3]
-                single_marker_rpy_base = _rotmat_to_rpy_deg(base_T_marker[:3, :3])
+                cam_T_target = np.eye(4, dtype=np.float32)
+                cam_T_target[:3, :3] = R_target
+                cam_T_target[:3, 3] = t_target.flatten()
+                base_T_target = base_T_cam @ cam_T_target
+                single_marker_center_base = base_T_target[:3, 3]
+                single_marker_rpy_base = _rotmat_to_rpy_deg(base_T_target[:3, :3])
 
                 marker_center_px, _ = cv2.projectPoints(
                     np.array([[0.0, 0.0, 0.0]], dtype=np.float32),
-                    single_rvec,
-                    single_tvec,
+                    target_rvec,
+                    t_target,
                     K,
                     dist_coeffs,
                 )
@@ -181,7 +186,7 @@ def main():
                 cv2.circle(img, (marker_cx, marker_cy), 9, (255, 0, 255), -1)
                 cv2.putText(
                     img,
-                    f"ID {SINGLE_MARKER_ID}",
+                    f"ID {SINGLE_MARKER_ID} target",
                     (marker_cx + 10, marker_cy - 10),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.75,
@@ -378,7 +383,7 @@ def main():
                     cv2.putText(
                         img,
                         (
-                            "Marker center (base): "
+                            "Marker target (base): "
                             f"({single_marker_center_base[0]:.3f}, "
                             f"{single_marker_center_base[1]:.3f}, "
                             f"{single_marker_center_base[2]:.3f}) m"
@@ -395,7 +400,7 @@ def main():
                     cv2.putText(
                         img,
                         (
-                            "Marker RPY (base): "
+                            "Target RPY (base): "
                             f"({single_marker_rpy_base[0]:.1f}, "
                             f"{single_marker_rpy_base[1]:.1f}, "
                             f"{single_marker_rpy_base[2]:.1f}) deg"
