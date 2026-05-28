@@ -16,6 +16,8 @@ from reportlab.pdfgen import canvas
 #
 # Marker size:
 #   30 mm
+#   実際に印刷すると、現在のプリンタ設定ではマーカー一辺が
+#   0.0287 m 程度だったので、使用前に実物を確認すること。
 #
 # Gap:
 #   5 mm

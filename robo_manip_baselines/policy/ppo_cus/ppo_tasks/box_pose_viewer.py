@@ -21,48 +21,48 @@ if __package__ in (None, ""):
     repo_root = Path(__file__).resolve().parents[3]
     sys.path.append(str(repo_root))
     from robo_manip_baselines.policy.ppo_cus.ppo_tasks.dual_box_rotation_ablated import (
-        ARUCO_DICT_ID,
+        BIG_ARUCO_DICT_ID,
         BASE_CENTER_T_PATH,
-        GRIDBOARD_BOX_RZ_OFFSET_RAD,
-        HANDLE_BOARD_DICT_ID,
-        HANDLE_BOARD_MARKER_IDS,
-        HANDLE_BOARD_MARKER_LENGTH_M,
-        MARKER_LENGTH_M,
-        MARKER_SEPARATION_M,
-        MARKERS_X,
-        PANEL_Z_OFFSET_M,
-        MARKERS_Y,
+        BIG_BOARD_RZ_OFFSET_RAD,
+        SMALL_BOARD_DICT_ID,
+        SMALL_BOARD_MARKER_IDS,
+        SMALL_BOARD_MARKER_LENGTH_M,
+        BIG_MARKER_LENGTH_M,
+        BIG_MARKER_SEPARATION_M,
+        BIG_MARKERS_X,
+        BIG_PANEL_Z_OFFSET_M,
+        BIG_MARKERS_Y,
         RES_H,
         RES_W,
         FPS,
         USE_SERIAL,
-        _build_handle_board,
+        _build_small_board,
         _detect_markers,
-        _estimate_handle_board_pose,
+        _estimate_small_board_pose,
         _get_aruco_dictionary,
         _rotation_z,
         _rotmat_to_rpy_deg,
     )
 else:
     from .dual_box_rotation_ablated import (
-        ARUCO_DICT_ID,
+        BIG_ARUCO_DICT_ID,
         BASE_CENTER_T_PATH,
-        GRIDBOARD_BOX_RZ_OFFSET_RAD,
-        HANDLE_BOARD_DICT_ID,
-        HANDLE_BOARD_MARKER_IDS,
-        HANDLE_BOARD_MARKER_LENGTH_M,
-        MARKER_LENGTH_M,
-        MARKER_SEPARATION_M,
-        MARKERS_X,
-        PANEL_Z_OFFSET_M,
-        MARKERS_Y,
+        BIG_BOARD_RZ_OFFSET_RAD,
+        SMALL_BOARD_DICT_ID,
+        SMALL_BOARD_MARKER_IDS,
+        SMALL_BOARD_MARKER_LENGTH_M,
+        BIG_MARKER_LENGTH_M,
+        BIG_MARKER_SEPARATION_M,
+        BIG_MARKERS_X,
+        BIG_PANEL_Z_OFFSET_M,
+        BIG_MARKERS_Y,
         RES_H,
         RES_W,
         FPS,
         USE_SERIAL,
-        _build_handle_board,
+        _build_small_board,
         _detect_markers,
-        _estimate_handle_board_pose,
+        _estimate_small_board_pose,
         _get_aruco_dictionary,
         _rotation_z,
         _rotmat_to_rpy_deg,
@@ -85,20 +85,20 @@ def main():
 
     # ArUco/board setup
     try:
-        aruco_dict = aruco.getPredefinedDictionary(ARUCO_DICT_ID)
+        aruco_dict = aruco.getPredefinedDictionary(BIG_ARUCO_DICT_ID)
     except AttributeError:
-        aruco_dict = aruco.Dictionary_get(ARUCO_DICT_ID)
-    handle_board_dict = _get_aruco_dictionary(HANDLE_BOARD_DICT_ID)
-    handle_board = _build_handle_board(handle_board_dict)
+        aruco_dict = aruco.Dictionary_get(BIG_ARUCO_DICT_ID)
+    small_board_dict = _get_aruco_dictionary(SMALL_BOARD_DICT_ID)
+    small_board = _build_small_board(small_board_dict)
     try:
         parameters = aruco.DetectorParameters_create()
     except AttributeError:
         parameters = aruco.DetectorParameters()
     board = aruco.GridBoard(
-        (MARKERS_X, MARKERS_Y), MARKER_LENGTH_M, MARKER_SEPARATION_M, aruco_dict
+        (BIG_MARKERS_X, BIG_MARKERS_Y), BIG_MARKER_LENGTH_M, BIG_MARKER_SEPARATION_M, aruco_dict
     )
-    board_w = MARKERS_X * MARKER_LENGTH_M + (MARKERS_X - 1) * MARKER_SEPARATION_M
-    board_h = MARKERS_Y * MARKER_LENGTH_M + (MARKERS_Y - 1) * MARKER_SEPARATION_M
+    board_w = BIG_MARKERS_X * BIG_MARKER_LENGTH_M + (BIG_MARKERS_X - 1) * BIG_MARKER_SEPARATION_M
+    board_h = BIG_MARKERS_Y * BIG_MARKER_LENGTH_M + (BIG_MARKERS_Y - 1) * BIG_MARKER_SEPARATION_M
 
     pipeline = rs.pipeline()
     config = rs.config()
@@ -120,9 +120,9 @@ def main():
     print(" dist   =", dist_coeffs)
 
     R_flip_x = np.array([[1, 0, 0], [0, -1, 0], [0, 0, -1]], dtype=np.float32)
-    R_box_z_offset = _rotation_z(GRIDBOARD_BOX_RZ_OFFSET_RAD)
+    R_box_z_offset = _rotation_z(BIG_BOARD_RZ_OFFSET_RAD)
     center_offset = np.array([board_w * 0.5, board_h * 0.5, 0.0], dtype=np.float32)
-    z_offset = np.array([0.0, 0.0, -PANEL_Z_OFFSET_M], dtype=np.float32)
+    z_offset = np.array([0.0, 0.0, -BIG_PANEL_Z_OFFSET_M], dtype=np.float32)
 
     t_prev, fps_est = time.time(), 0.0
     last_print = 0.0
@@ -142,54 +142,54 @@ def main():
             box_center_cam = None
             box_center_base = None
             rpy_base_box = None
-            handle_board_center_base = None
-            handle_board_rpy_base = None
-            handle_board_found = False
+            small_board_center_base = None
+            small_board_rpy_base = None
+            small_board_found = False
             used_ids = []
 
-            handle_corners, handle_ids, _ = _detect_markers(
-                gray, handle_board_dict, parameters
+            small_corners, small_ids, _ = _detect_markers(
+                gray, small_board_dict, parameters
             )
-            handle_rvec, handle_tvec = _estimate_handle_board_pose(
-                handle_corners,
-                handle_ids,
-                handle_board,
+            small_rvec, small_tvec = _estimate_small_board_pose(
+                small_corners,
+                small_ids,
+                small_board,
                 K,
                 dist_coeffs,
             )
-            if handle_rvec is not None and handle_tvec is not None:
-                handle_board_found = True
-                aruco.drawDetectedMarkers(img, handle_corners, handle_ids)
-                R_handle, _ = cv2.Rodrigues(handle_rvec)
+            if small_rvec is not None and small_tvec is not None:
+                small_board_found = True
+                aruco.drawDetectedMarkers(img, small_corners, small_ids)
+                R_small, _ = cv2.Rodrigues(small_rvec)
                 draw_axes(
                     img,
                     K,
-                    handle_rvec,
-                    handle_tvec,
-                    axis_len=HANDLE_BOARD_MARKER_LENGTH_M * 1.5,
+                    small_rvec,
+                    small_tvec,
+                    axis_len=SMALL_BOARD_MARKER_LENGTH_M * 1.5,
                     thickness=4,
                 )
 
-                cam_T_handle = np.eye(4, dtype=np.float32)
-                cam_T_handle[:3, :3] = R_handle.astype(np.float32)
-                cam_T_handle[:3, 3] = handle_tvec.flatten().astype(np.float32)
-                base_T_handle = base_T_cam @ cam_T_handle
-                handle_board_center_base = base_T_handle[:3, 3]
-                handle_board_rpy_base = _rotmat_to_rpy_deg(base_T_handle[:3, :3])
+                cam_T_small = np.eye(4, dtype=np.float32)
+                cam_T_small[:3, :3] = R_small.astype(np.float32)
+                cam_T_small[:3, 3] = small_tvec.flatten().astype(np.float32)
+                base_T_small = base_T_cam @ cam_T_small
+                small_board_center_base = base_T_small[:3, 3]
+                small_board_rpy_base = _rotmat_to_rpy_deg(base_T_small[:3, :3])
 
-                handle_center_px, _ = cv2.projectPoints(
+                small_center_px, _ = cv2.projectPoints(
                     np.array([[0.0, 0.0, 0.0]], dtype=np.float32),
-                    handle_rvec,
-                    handle_tvec,
+                    small_rvec,
+                    small_tvec,
                     K,
                     dist_coeffs,
                 )
-                handle_cx, handle_cy = handle_center_px[0, 0].astype(int)
-                cv2.circle(img, (handle_cx, handle_cy), 9, (255, 0, 255), -1)
+                small_cx, small_cy = small_center_px[0, 0].astype(int)
+                cv2.circle(img, (small_cx, small_cy), 9, (255, 0, 255), -1)
                 cv2.putText(
                     img,
-                    f"Handle board {HANDLE_BOARD_MARKER_IDS}",
-                    (handle_cx + 10, handle_cy - 10),
+                    f"Small board {SMALL_BOARD_MARKER_IDS}",
+                    (small_cx + 10, small_cy - 10),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.75,
                     (255, 0, 255),
@@ -209,8 +209,8 @@ def main():
                     rpy_board = _rotmat_to_rpy_deg(R_board)
                     dist_board = float(np.linalg.norm(tvec))
 
-                    board_size_max = max(MARKERS_X, MARKERS_Y) * (
-                        MARKER_LENGTH_M + MARKER_SEPARATION_M
+                    board_size_max = max(BIG_MARKERS_X, BIG_MARKERS_Y) * (
+                        BIG_MARKER_LENGTH_M + BIG_MARKER_SEPARATION_M
                     )
                     draw_axes(img, K, rvec, tvec, axis_len=board_size_max * 0.6, thickness=3)
 
@@ -244,16 +244,16 @@ def main():
                         print(f"box center (base): {box_center_base}")
                         print(f"box rpy (base deg): {rpy_base_box}")
                         if (
-                            handle_board_center_base is not None
-                            and handle_board_rpy_base is not None
+                            small_board_center_base is not None
+                            and small_board_rpy_base is not None
                         ):
                             print(
-                                f"handle board {HANDLE_BOARD_MARKER_IDS} center (base): "
-                                f"{handle_board_center_base}"
+                                f"small board {SMALL_BOARD_MARKER_IDS} center (base): "
+                                f"{small_board_center_base}"
                             )
                             print(
-                                f"handle board {HANDLE_BOARD_MARKER_IDS} rpy (base deg): "
-                                f"{handle_board_rpy_base}"
+                                f"small board {SMALL_BOARD_MARKER_IDS} rpy (base deg): "
+                                f"{small_board_rpy_base}"
                             )
                         print(f"board dist={dist_board:.3f} rpy={rpy_board}")
                         last_print = time.time()
@@ -286,7 +286,7 @@ def main():
             y = 86
             cv2.putText(
                 img,
-                f"ArUco GridBoard {MARKERS_X}x{MARKERS_Y}  len={MARKER_LENGTH_M*1000:.2f}mm",
+                f"ArUco GridBoard {BIG_MARKERS_X}x{BIG_MARKERS_Y}  len={BIG_MARKER_LENGTH_M*1000:.2f}mm",
                 (12, y),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.60,
@@ -381,10 +381,10 @@ def main():
                 )
                 y += 24
 
-            if handle_board_found:
+            if small_board_found:
                 cv2.putText(
                     img,
-                    f"Handle board {HANDLE_BOARD_MARKER_IDS}: OK",
+                    f"Small board {SMALL_BOARD_MARKER_IDS}: OK",
                     (12, y),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.60,
@@ -393,14 +393,14 @@ def main():
                     cv2.LINE_AA,
                 )
                 y += 24
-                if handle_board_center_base is not None:
+                if small_board_center_base is not None:
                     cv2.putText(
                         img,
                         (
-                            "Handle board center (base): "
-                            f"({handle_board_center_base[0]:.3f}, "
-                            f"{handle_board_center_base[1]:.3f}, "
-                            f"{handle_board_center_base[2]:.3f}) m"
+                            "Small board center (base): "
+                            f"({small_board_center_base[0]:.3f}, "
+                            f"{small_board_center_base[1]:.3f}, "
+                            f"{small_board_center_base[2]:.3f}) m"
                         ),
                         (12, y),
                         cv2.FONT_HERSHEY_SIMPLEX,
@@ -410,14 +410,14 @@ def main():
                         cv2.LINE_AA,
                     )
                     y += 24
-                if handle_board_rpy_base is not None:
+                if small_board_rpy_base is not None:
                     cv2.putText(
                         img,
                         (
-                            "Handle board RPY (base): "
-                            f"({handle_board_rpy_base[0]:.1f}, "
-                            f"{handle_board_rpy_base[1]:.1f}, "
-                            f"{handle_board_rpy_base[2]:.1f}) deg"
+                            "Small board RPY (base): "
+                            f"({small_board_rpy_base[0]:.1f}, "
+                            f"{small_board_rpy_base[1]:.1f}, "
+                            f"{small_board_rpy_base[2]:.1f}) deg"
                         ),
                         (12, y),
                         cv2.FONT_HERSHEY_SIMPLEX,
@@ -430,7 +430,7 @@ def main():
             else:
                 cv2.putText(
                     img,
-                    f"Handle board {HANDLE_BOARD_MARKER_IDS}: ---",
+                    f"Small board {SMALL_BOARD_MARKER_IDS}: ---",
                     (12, y),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.60,

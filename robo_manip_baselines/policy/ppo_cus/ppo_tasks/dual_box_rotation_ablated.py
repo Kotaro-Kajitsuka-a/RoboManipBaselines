@@ -15,22 +15,22 @@ BOX_MARKER_ID = 2  # must match the hard-coded marker in RolloutPpoCus
 # Downward offset (marker frame -> box frame) along marker -Z axis [m]
 BOX_MARKER_Z_OFFSET_M = 0.05625
 # ArUco/GridBoard parameters (copied from bin/box_detection.py)
-MARKER_LENGTH_M = 0.02940
-MARKER_SEPARATION_M = 0.0050
-MARKERS_X = 5
-MARKERS_Y = 7
-ARUCO_DICT_ID = aruco.DICT_4X4_50
-HANDLE_BOARD_DICT_ID = aruco.DICT_5X5_250
-HANDLE_BOARD_MARKER_IDS = [100, 101, 102]
-HANDLE_BOARD_MARKER_LENGTH_M = 0.030
-HANDLE_BOARD_MARKER_GAP_M = 0.005
-HANDLE_BOARD_W_M = (
-    HANDLE_BOARD_MARKER_LENGTH_M * len(HANDLE_BOARD_MARKER_IDS)
-    + HANDLE_BOARD_MARKER_GAP_M * (len(HANDLE_BOARD_MARKER_IDS) - 1)
+BIG_MARKER_LENGTH_M = 0.02940
+BIG_MARKER_SEPARATION_M = 0.0050
+BIG_MARKERS_X = 5
+BIG_MARKERS_Y = 7
+BIG_ARUCO_DICT_ID = aruco.DICT_4X4_50
+SMALL_BOARD_DICT_ID = aruco.DICT_5X5_250
+SMALL_BOARD_MARKER_IDS = [100, 101, 102]
+SMALL_BOARD_MARKER_LENGTH_M = 0.0287
+SMALL_BOARD_MARKER_GAP_M = 0.005
+SMALL_BOARD_W_M = (
+    SMALL_BOARD_MARKER_LENGTH_M * len(SMALL_BOARD_MARKER_IDS)
+    + SMALL_BOARD_MARKER_GAP_M * (len(SMALL_BOARD_MARKER_IDS) - 1)
 )
-HANDLE_BOARD_H_M = HANDLE_BOARD_MARKER_LENGTH_M
-PANEL_Z_OFFSET_M = 0.003
-GRIDBOARD_BOX_RZ_OFFSET_RAD = np.deg2rad(90.0)
+SMALL_BOARD_H_M = SMALL_BOARD_MARKER_LENGTH_M
+BIG_PANEL_Z_OFFSET_M = 0.003
+BIG_BOARD_RZ_OFFSET_RAD = np.deg2rad(90.0)
 BASE_CENTER_T_PATH = Path("robo_manip_baselines/calib/base_center_T.calib")
 RES_W, RES_H, FPS = 1920, 1080, 30
 USE_SERIAL = "314422070401"
@@ -83,17 +83,17 @@ def _detect_markers(gray, aruco_dict, aruco_params):
     return aruco.detectMarkers(gray, aruco_dict, parameters=aruco_params)
 
 
-def _build_handle_board(handle_board_dict):
+def _build_small_board(small_board_dict):
     return aruco.GridBoard(
-        (len(HANDLE_BOARD_MARKER_IDS), 1),
-        HANDLE_BOARD_MARKER_LENGTH_M,
-        HANDLE_BOARD_MARKER_GAP_M,
-        handle_board_dict,
-        np.array(HANDLE_BOARD_MARKER_IDS, dtype=np.int32),
+        (len(SMALL_BOARD_MARKER_IDS), 1),
+        SMALL_BOARD_MARKER_LENGTH_M,
+        SMALL_BOARD_MARKER_GAP_M,
+        small_board_dict,
+        np.array(SMALL_BOARD_MARKER_IDS, dtype=np.int32),
     )
 
 
-def _estimate_handle_board_pose(corners, ids, board, K, dist_coeffs):
+def _estimate_small_board_pose(corners, ids, board, K, dist_coeffs):
     if ids is None or len(ids) == 0:
         return None, None
 
@@ -105,7 +105,7 @@ def _estimate_handle_board_pose(corners, ids, board, K, dist_coeffs):
 
     R_board, _ = cv2.Rodrigues(rvec)
     center_offset = np.array(
-        [HANDLE_BOARD_W_M * 0.5, HANDLE_BOARD_H_M * 0.5, 0.0], dtype=np.float32
+        [SMALL_BOARD_W_M * 0.5, SMALL_BOARD_H_M * 0.5, 0.0], dtype=np.float32
     )
     t_center = R_board @ center_offset.reshape(3, 1) + tvec.reshape(3, 1)
     return rvec.reshape(3, 1), t_center.reshape(3, 1)
@@ -131,21 +131,21 @@ class BoxPoseProvider:
         self._stop_event = threading.Event()
         self._thread: Optional[threading.Thread] = None
         self._latest_transform: Optional[np.ndarray] = None
-        self._latest_handle_board_transform: Optional[np.ndarray] = None
+        self._latest_small_board_transform: Optional[np.ndarray] = None
         self._latest_timestamp: Optional[float] = None
-        self._latest_handle_board_timestamp: Optional[float] = None
+        self._latest_small_board_timestamp: Optional[float] = None
         self._lock = threading.Lock()
 
         # Board setup
-        self._aruco_dict = _get_aruco_dictionary(ARUCO_DICT_ID)
-        self._handle_board_dict = _get_aruco_dictionary(HANDLE_BOARD_DICT_ID)
+        self._aruco_dict = _get_aruco_dictionary(BIG_ARUCO_DICT_ID)
+        self._small_board_dict = _get_aruco_dictionary(SMALL_BOARD_DICT_ID)
         self._aruco_params = _get_aruco_parameters()
-        self._handle_board = _build_handle_board(self._handle_board_dict)
+        self._small_board = _build_small_board(self._small_board_dict)
         self._board = aruco.GridBoard(
-            (MARKERS_X, MARKERS_Y), MARKER_LENGTH_M, MARKER_SEPARATION_M, self._aruco_dict
+            (BIG_MARKERS_X, BIG_MARKERS_Y), BIG_MARKER_LENGTH_M, BIG_MARKER_SEPARATION_M, self._aruco_dict
         )
-        self._board_w = MARKERS_X * MARKER_LENGTH_M + (MARKERS_X - 1) * MARKER_SEPARATION_M
-        self._board_h = MARKERS_Y * MARKER_LENGTH_M + (MARKERS_Y - 1) * MARKER_SEPARATION_M
+        self._board_w = BIG_MARKERS_X * BIG_MARKER_LENGTH_M + (BIG_MARKERS_X - 1) * BIG_MARKER_SEPARATION_M
+        self._board_h = BIG_MARKERS_Y * BIG_MARKER_LENGTH_M + (BIG_MARKERS_Y - 1) * BIG_MARKER_SEPARATION_M
 
         self._base_T_cam = np.loadtxt(self.calib_path).astype(np.float32)
 
@@ -170,11 +170,11 @@ class BoxPoseProvider:
             #T[2, 3] = -0.03175  # force z to fixed value at the source
             return T, self._latest_timestamp
 
-    def get_latest_handle_board_transform(self) -> Tuple[Optional[np.ndarray], Optional[float]]:
+    def get_latest_small_board_transform(self) -> Tuple[Optional[np.ndarray], Optional[float]]:
         with self._lock:
-            if self._latest_handle_board_transform is None:
+            if self._latest_small_board_transform is None:
                 return None, None
-            return self._latest_handle_board_transform.copy(), self._latest_handle_board_timestamp
+            return self._latest_small_board_transform.copy(), self._latest_small_board_timestamp
 
     def _run(self) -> None:
         pipeline = rs.pipeline()
@@ -197,9 +197,9 @@ class BoxPoseProvider:
         dist_coeffs = np.array(intr.coeffs[:5], dtype=np.float32)
 
         R_flip_x = np.array([[1, 0, 0], [0, -1, 0], [0, 0, -1]], dtype=np.float32)
-        R_box_z_offset = _rotation_z(GRIDBOARD_BOX_RZ_OFFSET_RAD)
+        R_box_z_offset = _rotation_z(BIG_BOARD_RZ_OFFSET_RAD)
         center_offset = np.array([self._board_w * 0.5, self._board_h * 0.5, 0.0], dtype=np.float32)
-        z_offset = np.array([0.0, 0.0, -PANEL_Z_OFFSET_M], dtype=np.float32)
+        z_offset = np.array([0.0, 0.0, -BIG_PANEL_Z_OFFSET_M], dtype=np.float32)
 
         try:
             while not self._stop_event.is_set():
@@ -210,25 +210,25 @@ class BoxPoseProvider:
                 img = np.asanyarray(cf.get_data())
                 gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-                handle_corners, handle_ids, _ = _detect_markers(
-                    gray, self._handle_board_dict, self._aruco_params
+                small_corners, small_ids, _ = _detect_markers(
+                    gray, self._small_board_dict, self._aruco_params
                 )
-                handle_rvec, handle_tvec = _estimate_handle_board_pose(
-                    handle_corners,
-                    handle_ids,
-                    self._handle_board,
+                small_rvec, small_tvec = _estimate_small_board_pose(
+                    small_corners,
+                    small_ids,
+                    self._small_board,
                     K,
                     dist_coeffs,
                 )
-                if handle_rvec is not None and handle_tvec is not None:
-                    R_handle, _ = cv2.Rodrigues(handle_rvec)
-                    cam_T_handle = np.eye(4, dtype=np.float32)
-                    cam_T_handle[:3, :3] = R_handle.astype(np.float32)
-                    cam_T_handle[:3, 3] = handle_tvec.flatten().astype(np.float32)
-                    base_T_handle = self._base_T_cam @ cam_T_handle
+                if small_rvec is not None and small_tvec is not None:
+                    R_small, _ = cv2.Rodrigues(small_rvec)
+                    cam_T_small = np.eye(4, dtype=np.float32)
+                    cam_T_small[:3, :3] = R_small.astype(np.float32)
+                    cam_T_small[:3, 3] = small_tvec.flatten().astype(np.float32)
+                    base_T_small = self._base_T_cam @ cam_T_small
                     with self._lock:
-                        self._latest_handle_board_transform = base_T_handle.copy()
-                        self._latest_handle_board_timestamp = time.time()
+                        self._latest_small_board_transform = base_T_small.copy()
+                        self._latest_small_board_timestamp = time.time()
 
                 corners, ids, _ = _detect_markers(gray, self._aruco_dict, self._aruco_params)
 
@@ -333,7 +333,7 @@ def run():
         while True:
             frame_idx += 1
             T_base_to_box, ts = provider.get_latest_box_transform()
-            T_base_to_handle, handle_ts = provider.get_latest_handle_board_transform()
+            T_base_to_small, small_ts = provider.get_latest_small_board_transform()
             if T_base_to_box is not None:
                 rpy = _rotmat_to_rpy_deg(T_base_to_box[:3, :3])
                 translation_fixed = T_base_to_box[:3, 3].copy()
@@ -345,13 +345,13 @@ def run():
                         f"[BoxPoseProvider] fps~{fps:.1f} ts={ts_str} box center_fixed={translation_fixed} rpy(deg)={rpy}",
                         flush=True,
                     )
-            if T_base_to_handle is not None and frame_idx % 20 == 0:
-                handle_rpy = _rotmat_to_rpy_deg(T_base_to_handle[:3, :3])
-                handle_translation = T_base_to_handle[:3, 3].copy()
-                handle_ts_str = f"{handle_ts:.3f}" if handle_ts is not None else "n/a"
+            if T_base_to_small is not None and frame_idx % 20 == 0:
+                small_rpy = _rotmat_to_rpy_deg(T_base_to_small[:3, :3])
+                small_translation = T_base_to_small[:3, 3].copy()
+                small_ts_str = f"{small_ts:.3f}" if small_ts is not None else "n/a"
                 print(
-                    f"[HandleBoard] ids={HANDLE_BOARD_MARKER_IDS} ts={handle_ts_str} "
-                    f"center={handle_translation} rpy(deg)={handle_rpy}",
+                    f"[SmallBoard] ids={SMALL_BOARD_MARKER_IDS} ts={small_ts_str} "
+                    f"center={small_translation} rpy(deg)={small_rpy}",
                     flush=True,
                 )
             time.sleep(0.05)
