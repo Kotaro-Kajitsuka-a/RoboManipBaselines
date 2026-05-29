@@ -32,6 +32,14 @@ EXPECTED_STATE_DIM = 33
 EXPECTED_ACTION_DIM = 8
 ARM_JOINT_DELTA_LIMIT = 0.03
 GRIPPER_JOINT_DELTA_LIMIT = 0.1
+STATE_COMPONENTS = [
+    ("agent/qpos", 8),
+    ("agent/qvel", 7),
+    ("extra/inner_marker_panel_position", 3),
+    ("extra/inner_marker_panel_rotation_6d", 6),
+    ("extra/outer_marker_panel_position", 3),
+    ("extra/outer_marker_panel_rotation_6d", 6),
+]
 
 _NORMALIZED_ACTION_LOW = torch.tensor(-1.0, dtype=torch.float32)
 _NORMALIZED_ACTION_HIGH = torch.tensor(1.0, dtype=torch.float32)
@@ -42,6 +50,18 @@ def _layer_init(layer, std=np.sqrt(2), bias_const=0.0):
     nn.init.orthogonal_(layer.weight, std)
     nn.init.constant_(layer.bias, bias_const)
     return layer
+
+
+def _state_csv_headers():
+    headers = []
+    for name, dim in STATE_COMPONENTS:
+        safe_name = name.replace("/", "_")
+        headers.extend([f"state_{safe_name}_{idx}" for idx in range(dim)])
+    return headers
+
+
+def _action_csv_headers():
+    return [f"action_command_joint_pos_{idx}" for idx in range(EXPECTED_ACTION_DIM)]
 
 
 class ManiSkillPpoAgent(nn.Module):
@@ -176,11 +196,21 @@ class RolloutRLPolicy(RolloutBase):
             self._get_action_delta_limits()
         )
 
+        checkpoint_dir = Path(os.path.dirname(os.path.abspath(self.args.checkpoint)))
+        self._state_action_csv_path = checkpoint_dir / "rl_policy_state_action.csv"
+        with open(self._state_action_csv_path, "w", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(
+                ["episode_idx", "rollout_step", "time"]
+                + _state_csv_headers()
+                + _action_csv_headers()
+            )
+
         self._log_path: Optional[Path] = None
         if self.args.rl_log_tsv:
-            self._log_path = Path(
-                os.path.dirname(os.path.abspath(self.args.checkpoint))
-            ) / (f"{self.__class__.__name__.lower()}_debug_log.tsv")
+            self._log_path = checkpoint_dir / (
+                f"{self.__class__.__name__.lower()}_debug_log.tsv"
+            )
             with open(self._log_path, "w", newline="") as f:
                 writer = csv.writer(f, delimiter="\t")
                 writer.writerow(
@@ -189,6 +219,9 @@ class RolloutRLPolicy(RolloutBase):
 
         print(
             f"[{self.__class__.__name__}] Load ManiSkill PPO checkpoint on {self.device}"
+        )
+        print(
+            f"[{self.__class__.__name__}] Save state/action CSV: {self._state_action_csv_path}"
         )
 
     def _get_physical_joint_limits(self):
@@ -340,6 +373,7 @@ class RolloutRLPolicy(RolloutBase):
             )
 
             physical_np = direct_joint_command.detach().cpu().numpy().astype(np.float64)
+            self._append_state_action_csv(physical_np)
             if self._log_path is not None:
                 with open(self._log_path, "a", newline="") as f:
                     writer = csv.writer(f, delimiter="\t")
@@ -361,6 +395,18 @@ class RolloutRLPolicy(RolloutBase):
         self.policy_action_list = np.concatenate(
             [self.policy_action_list, self.policy_action[np.newaxis]]
         )
+
+    def _append_state_action_csv(self, action: np.ndarray):
+        rollout_step = int(getattr(self, "rollout_time_idx", 0))
+        episode_idx = int(getattr(self.data_manager, "episode_idx", 0))
+        elapsed_time = self.phase_manager.phase.get_elapsed_duration()
+        with open(self._state_action_csv_path, "a", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(
+                [episode_idx, rollout_step, float(elapsed_time)]
+                + self.state_for_policy.astype(float).tolist()
+                + np.asarray(action, dtype=float).reshape(-1).tolist()
+            )
 
     @staticmethod
     def _call_optional_handler_method(handler, method_names):
