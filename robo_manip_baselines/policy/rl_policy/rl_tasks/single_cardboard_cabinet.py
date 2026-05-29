@@ -1,0 +1,321 @@
+from __future__ import annotations
+
+import threading
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import TYPE_CHECKING, Dict, Mapping, Optional, Tuple
+
+import cv2
+import numpy as np
+import pyrealsense2 as rs
+from cv2 import aruco
+
+from robo_manip_baselines.policy.ppo_cus.ppo_tasks.dual_box_rotation_ablated import (
+    BASE_CENTER_T_PATH,
+    BIG_ARUCO_DICT_ID,
+    BIG_BOARD_RZ_OFFSET_RAD,
+    BIG_MARKER_LENGTH_M,
+    BIG_MARKER_SEPARATION_M,
+    BIG_MARKERS_X,
+    BIG_MARKERS_Y,
+    BIG_PANEL_Z_OFFSET_M,
+    FPS,
+    RES_H,
+    RES_W,
+    SMALL_BOARD_DICT_ID,
+    USE_SERIAL,
+    _build_small_board,
+    _detect_markers,
+    _estimate_small_board_pose,
+    _get_aruco_dictionary,
+    _get_aruco_parameters,
+    _rotation_z,
+)
+
+if TYPE_CHECKING:
+    from robo_manip_baselines.policy.rl_policy.RolloutRLPolicy import RolloutRLPolicy
+
+
+def _center_crop_4x3(img: np.ndarray) -> np.ndarray:
+    h, w = img.shape[:2]
+    target_w = int(round(h * (4.0 / 3.0)))
+    if target_w >= w:
+        return img
+    x0 = max((w - target_w) // 2, 0)
+    return img[:, x0 : x0 + target_w]
+
+
+def _rotation_matrix_to_6d(rotation: np.ndarray) -> np.ndarray:
+    x_axis = rotation[:, 0]
+    y_axis = rotation[:, 1]
+    x_axis = x_axis / (np.linalg.norm(x_axis) + 1e-8)
+    y_axis = y_axis - np.dot(x_axis, y_axis) * x_axis
+    y_axis = y_axis / (np.linalg.norm(y_axis) + 1e-8)
+    return np.concatenate([x_axis, y_axis]).astype(np.float32)
+
+
+class CabinetMarkerPoseProvider:
+    def __init__(
+        self,
+        serial: str = USE_SERIAL,
+        calib_path: Path = BASE_CENTER_T_PATH,
+        res_w: int = RES_W,
+        res_h: int = RES_H,
+        fps: int = FPS,
+    ) -> None:
+        self.serial = serial
+        self.calib_path = Path(calib_path)
+        self.res_w = int(res_w)
+        self.res_h = int(res_h)
+        self.fps = int(fps)
+
+        self._stop_event = threading.Event()
+        self._thread: Optional[threading.Thread] = None
+        self._latest_outer_transform: Optional[np.ndarray] = None
+        self._latest_inner_transform: Optional[np.ndarray] = None
+        self._latest_front_rgb: Optional[np.ndarray] = None
+        self._latest_outer_marker_seq = 0
+        self._latest_inner_marker_seq = 0
+        self._latest_image_seq = 0
+        self._lock = threading.Lock()
+
+        self._big_dict = _get_aruco_dictionary(BIG_ARUCO_DICT_ID)
+        self._small_dict = _get_aruco_dictionary(SMALL_BOARD_DICT_ID)
+        self._aruco_params = _get_aruco_parameters()
+        self._small_board = _build_small_board(self._small_dict)
+        self._big_board = aruco.GridBoard(
+            (BIG_MARKERS_X, BIG_MARKERS_Y),
+            BIG_MARKER_LENGTH_M,
+            BIG_MARKER_SEPARATION_M,
+            self._big_dict,
+        )
+        self._big_board_w = (
+            BIG_MARKERS_X * BIG_MARKER_LENGTH_M
+            + (BIG_MARKERS_X - 1) * BIG_MARKER_SEPARATION_M
+        )
+        self._big_board_h = (
+            BIG_MARKERS_Y * BIG_MARKER_LENGTH_M
+            + (BIG_MARKERS_Y - 1) * BIG_MARKER_SEPARATION_M
+        )
+        self._base_T_cam = np.loadtxt(self.calib_path).astype(np.float32)
+
+    def start(self) -> None:
+        if self._thread and self._thread.is_alive():
+            return
+        self._stop_event.clear()
+        self._thread = threading.Thread(
+            target=self._run, name="cabinet_marker_pose_provider", daemon=True
+        )
+        self._thread.start()
+
+    def stop(self) -> None:
+        self._stop_event.set()
+        if self._thread:
+            self._thread.join(timeout=2.0)
+            self._thread = None
+
+    def get_latest_outer_transform(self) -> Tuple[Optional[np.ndarray], Optional[int]]:
+        with self._lock:
+            if self._latest_outer_transform is None:
+                return None, None
+            return self._latest_outer_transform.copy(), self._latest_outer_marker_seq
+
+    def get_latest_inner_transform(self) -> Tuple[Optional[np.ndarray], Optional[int]]:
+        with self._lock:
+            if self._latest_inner_transform is None:
+                return None, None
+            return self._latest_inner_transform.copy(), self._latest_inner_marker_seq
+
+    def get_latest_front_rgb(self) -> Optional[np.ndarray]:
+        with self._lock:
+            if self._latest_front_rgb is None:
+                return None
+            return self._latest_front_rgb.copy()
+
+    def get_latest_outer_marker_seq(self) -> Optional[int]:
+        with self._lock:
+            return (
+                self._latest_outer_marker_seq
+                if self._latest_outer_marker_seq > 0
+                else None
+            )
+
+    def get_latest_inner_marker_seq(self) -> Optional[int]:
+        with self._lock:
+            return (
+                self._latest_inner_marker_seq
+                if self._latest_inner_marker_seq > 0
+                else None
+            )
+
+    def get_latest_image_seq(self) -> Optional[int]:
+        with self._lock:
+            return self._latest_image_seq if self._latest_image_seq > 0 else None
+
+    def _run(self) -> None:
+        pipeline = rs.pipeline()
+        config = rs.config()
+        config.enable_device(self.serial)
+        config.enable_stream(
+            rs.stream.color, self.res_w, self.res_h, rs.format.bgr8, self.fps
+        )
+
+        try:
+            profile = pipeline.start(config)
+        except Exception as exc:
+            print(
+                f"[CabinetMarkerPoseProvider] Failed to start RealSense pipeline: {exc}",
+                flush=True,
+            )
+            return
+
+        color_stream = profile.get_stream(rs.stream.color).as_video_stream_profile()
+        intr = color_stream.get_intrinsics()
+        K = np.array(
+            [[intr.fx, 0, intr.ppx], [0, intr.fy, intr.ppy], [0, 0, 1]],
+            dtype=np.float32,
+        )
+        dist_coeffs = np.array(intr.coeffs[:5], dtype=np.float32)
+
+        R_flip_x = np.array([[1, 0, 0], [0, -1, 0], [0, 0, -1]], dtype=np.float32)
+        R_big_z_offset = _rotation_z(BIG_BOARD_RZ_OFFSET_RAD)
+        big_center_offset = np.array(
+            [self._big_board_w * 0.5, self._big_board_h * 0.5, 0.0], dtype=np.float32
+        )
+        big_z_offset = np.array([0.0, 0.0, -BIG_PANEL_Z_OFFSET_M], dtype=np.float32)
+
+        try:
+            while not self._stop_event.is_set():
+                frames = pipeline.wait_for_frames()
+                cf = frames.get_color_frame()
+                if not cf:
+                    continue
+                img = np.asanyarray(cf.get_data())
+                rgb = cv2.cvtColor(_center_crop_4x3(img), cv2.COLOR_BGR2RGB)
+                rgb = cv2.resize(rgb, (640, 480), interpolation=cv2.INTER_AREA)
+                gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+                with self._lock:
+                    self._latest_front_rgb = rgb
+                    self._latest_image_seq += 1
+
+                small_corners, small_ids, _ = _detect_markers(
+                    gray, self._small_dict, self._aruco_params
+                )
+                small_rvec, small_tvec = _estimate_small_board_pose(
+                    small_corners,
+                    small_ids,
+                    self._small_board,
+                    K,
+                    dist_coeffs,
+                )
+                if small_rvec is not None and small_tvec is not None:
+                    R_small, _ = cv2.Rodrigues(small_rvec)
+                    cam_T_inner = np.eye(4, dtype=np.float32)
+                    cam_T_inner[:3, :3] = R_small.astype(np.float32)
+                    cam_T_inner[:3, 3] = small_tvec.flatten().astype(np.float32)
+                    base_T_inner = self._base_T_cam @ cam_T_inner
+                    with self._lock:
+                        self._latest_inner_transform = base_T_inner.copy()
+                        self._latest_inner_marker_seq += 1
+
+                corners, ids, _ = _detect_markers(
+                    gray, self._big_dict, self._aruco_params
+                )
+                if ids is None or len(ids) == 0:
+                    continue
+                retval, rvec, tvec = aruco.estimatePoseBoard(
+                    corners, ids, self._big_board, K, dist_coeffs, None, None
+                )
+                if retval <= 0:
+                    continue
+
+                R_big, _ = cv2.Rodrigues(rvec)
+                t_big_outer = big_center_offset + R_flip_x @ big_z_offset
+                R_cam_outer = R_big @ R_flip_x @ R_big_z_offset
+                t_cam_outer = R_big @ t_big_outer.reshape(3, 1) + tvec.reshape(3, 1)
+                cam_T_outer = np.eye(4, dtype=np.float32)
+                cam_T_outer[:3, :3] = R_cam_outer.astype(np.float32)
+                cam_T_outer[:3, 3] = t_cam_outer.flatten().astype(np.float32)
+                base_T_outer = self._base_T_cam @ cam_T_outer
+                with self._lock:
+                    self._latest_outer_transform = base_T_outer.copy()
+                    self._latest_outer_marker_seq += 1
+        except Exception as exc:
+            print(
+                f"[CabinetMarkerPoseProvider] Error during detection loop: {exc}",
+                flush=True,
+            )
+        finally:
+            pipeline.stop()
+
+
+@dataclass
+class SingleCardboardCabinetTask:
+    rollout: "RolloutRLPolicy"
+    params: Mapping[str, object] = field(default_factory=dict)
+    _provider: CabinetMarkerPoseProvider = field(init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        params = dict(self.params) if isinstance(self.params, Mapping) else {}
+        provider_kwargs = {}
+        for key in ("serial", "calib_path", "res_w", "res_h", "fps"):
+            if key in params:
+                provider_kwargs[key] = params[key]
+        self._provider = CabinetMarkerPoseProvider(**provider_kwargs)
+        self._provider.start()
+
+    def __del__(self) -> None:
+        try:
+            self._provider.stop()
+        except Exception:
+            pass
+
+    def _panel_state(
+        self, transform: np.ndarray, name: str
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        if transform.shape != (4, 4):
+            raise ValueError(f"{name} transform must be 4x4, got {transform.shape}.")
+        position = transform[:3, 3].astype(np.float32)
+        rotation_6d = _rotation_matrix_to_6d(transform[:3, :3])
+        return position, rotation_6d
+
+    def get_extra_state(self) -> Dict[str, np.ndarray]:
+        outer_T, _outer_seq = self._provider.get_latest_outer_transform()
+        inner_T, _inner_seq = self._provider.get_latest_inner_transform()
+        if outer_T is None:
+            raise RuntimeError(
+                "[SingleCardboardCabinetTask] Outer marker panel pose not available yet."
+            )
+        if inner_T is None:
+            raise RuntimeError(
+                "[SingleCardboardCabinetTask] Inner marker panel pose not available yet."
+            )
+
+        inner_pos, inner_rot6d = self._panel_state(inner_T, "inner marker panel")
+        outer_pos, outer_rot6d = self._panel_state(outer_T, "outer marker panel")
+        return {
+            "extra/inner_marker_panel_position": inner_pos,
+            "extra/inner_marker_panel_rotation_6d": inner_rot6d,
+            "extra/outer_marker_panel_position": outer_pos,
+            "extra/outer_marker_panel_rotation_6d": outer_rot6d,
+        }
+
+    def get_latest_front_rgb(self) -> Optional[np.ndarray]:
+        return self._provider.get_latest_front_rgb()
+
+    def get_latest_outer_marker_seq(self) -> Optional[int]:
+        return self._provider.get_latest_outer_marker_seq()
+
+    def get_latest_inner_marker_seq(self) -> Optional[int]:
+        return self._provider.get_latest_inner_marker_seq()
+
+    def get_latest_image_seq(self) -> Optional[int]:
+        return self._provider.get_latest_image_seq()
+
+
+def build_rl_task(
+    rollout: "RolloutRLPolicy", params: Optional[Mapping[str, object]] = None
+):
+    if params is None:
+        params = {}
+    return SingleCardboardCabinetTask(rollout=rollout, params=params)

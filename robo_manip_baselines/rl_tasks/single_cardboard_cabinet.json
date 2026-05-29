@@ -1,0 +1,67 @@
+{
+  "state": {
+    "keys": [
+      "agent/qpos",
+      "agent/qvel",
+      "extra/inner_marker_panel_position",
+      "extra/inner_marker_panel_rotation_6d",
+      "extra/outer_marker_panel_position",
+      "extra/outer_marker_panel_rotation_6d"
+    ],
+    "example": [
+      0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+      0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+      0.0, 0.0, 0.0,
+      0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+      0.0, 0.0, 0.0,
+      0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+    ],
+    "mean": [
+      0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+      0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+      0.0, 0.0, 0.0,
+      0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+      0.0, 0.0, 0.0,
+      0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+    ],
+    "std": [
+      1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+      1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+      1.0, 1.0, 1.0,
+      1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+      1.0, 1.0, 1.0,
+      1.0, 1.0, 1.0, 1.0, 1.0, 1.0
+    ]
+  },
+  "action": {
+    "keys": [
+      "command_joint_pos"
+    ],
+    "example": [
+      0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+    ],
+    "mean": [
+      0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+    ],
+    "std": [
+      1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0
+    ]
+  },
+  "image": {
+    "camera_names": []
+  },
+  "data": {
+    "skip": 1,
+    "n_obs_steps": 1,
+    "n_action_steps": 1
+  },
+  "policy": {
+    "algo": "ppo",
+    "source": "maniskill"
+  },
+  "rl_task": {
+    "name": "single_cardboard_cabinet",
+    "module": "robo_manip_baselines.policy.rl_policy.rl_tasks.single_cardboard_cabinet",
+    "params": {}
+  }
+}
