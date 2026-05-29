@@ -1,7 +1,11 @@
+import argparse
+from pathlib import Path
+
 import numpy as np
 
 
 LEFT_TO_CENTER_OFFSET_M = np.array([0.0, -0.3291, 0.0])
+DEFAULT_OUTPUT_PATH = Path("robo_manip_baselines/calib/base_center_T.calib")
 
 
 def load_calib(path):
@@ -31,13 +35,30 @@ def compute_center_transform_from_left(left_path):
     return T_center
 
 
-if __name__ == "__main__":
-    left_file = "robo_manip_baselines/calib/base_left_T.calib"
-    output_path = "robo_manip_baselines/calib/base_center_T.calib"
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Create base_center_T.calib from a user-provided left-base calib file."
+    )
+    parser.add_argument(
+        "left_calib_path",
+        type=Path,
+        help="Path to the left-base calib file to use as the only input.",
+    )
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=DEFAULT_OUTPUT_PATH,
+        help=f"Output path. Default: {DEFAULT_OUTPUT_PATH}",
+    )
+    return parser.parse_args()
 
-    T_center = compute_center_transform_from_left(left_file)
+
+if __name__ == "__main__":
+    args = parse_args()
+
+    T_center = compute_center_transform_from_left(args.left_calib_path)
     print("T_camera_to_center:")
     print(T_center)
 
-    np.savetxt(output_path, T_center, fmt="%.8f")
-    print(f"\nSaved center transform to: {output_path}")
+    np.savetxt(args.output, T_center, fmt="%.8f")
+    print(f"\nSaved center transform to: {args.output}")
