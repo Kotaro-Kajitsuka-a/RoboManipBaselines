@@ -13,6 +13,7 @@ class RolloutMain:
     policy_choices = [
         "Ppo",
         "PpoCus",
+        "RLPolicy",
         "Mlp",
         "Sarnn",
         "Act",
