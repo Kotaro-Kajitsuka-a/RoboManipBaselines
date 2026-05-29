@@ -74,7 +74,6 @@ class RealXarm7EnvBase(RealEnvBase):
                 ),
                 arm_root_pose=None,
                 ik_eef_joint_id=7,
-                ik_eef_frame_id=None,
                 arm_joint_idxes=np.arange(7),
                 gripper_joint_idxes=np.array([7]),
                 gripper_joint_idxes_in_gripper_joint_pos=np.array([0]),
@@ -95,7 +94,7 @@ class RealXarm7EnvBase(RealEnvBase):
         self.xarm_api.ft_sensor_set_zero()
         time.sleep(0.2)
         self.xarm_api.clean_error()
-        self.xarm_api.set_mode(1)
+        self.xarm_api.set_mode(6)
         self.xarm_api.set_state(0)
         self.xarm_api.set_collision_sensitivity(1)
         self.xarm_api.clean_gripper_error()
@@ -145,26 +144,14 @@ class RealXarm7EnvBase(RealEnvBase):
         print(
             f"[{self.__class__.__name__}] Start moving the robot to the reset position."
         )
-        
         self._set_action(
-            self.init_qpos, duration=None, joint_vel_limit_scale=0.1, wait=True, reset_bool=True
+            self.init_qpos, duration=None, joint_vel_limit_scale=0.1, wait=True
         )
-
-        msg1 = "gripper will move!!! in 100 seconds"
-        msg2 = "グリッパーが動きます!! 100秒後!!"
-        border = "★" * (len(msg1) + 8)
-        print("\033[1;35m" + border)
-        print(f"★  {msg1}  ★")
-        print(f"★  {msg2}  ★")
-        print(border + "\033[0m")
-        
-        time.sleep(100.0)
-
         print(
             f"[{self.__class__.__name__}] Finish moving the robot to the reset position."
         )
 
-    def _set_action(self, action, duration=None, joint_vel_limit_scale=0.5, wait=False, reset_bool = False):
+    def _set_action(self, action, duration=None, joint_vel_limit_scale=0.5, wait=False):
         start_time = time.time()
 
         # Overwrite duration or joint_pos for safety
@@ -172,50 +159,18 @@ class RealXarm7EnvBase(RealEnvBase):
             action, duration, joint_vel_limit_scale
         )
 
-
         # Send command to xArm7
         arm_joint_pos_command = action[self.body_config_list[0].arm_joint_idxes]
         scaled_joint_vel_limit = (
             np.clip(joint_vel_limit_scale, 0.01, 10.0) * self.joint_vel_limit
         )
-
-
-        if reset_bool:
-            result = self.xarm_api.set_mode(6)
-            self.xarm_api.set_state(0)
-            
-            for _ in range(10):
-                time.sleep(0.2)
-                if self.xarm_api.mode == 6:
-                    print(self.xarm_api.mode)
-                    break
-
-            xarm_code = self.xarm_api.set_servo_angle(
-                angle=arm_joint_pos_command,
-                speed=scaled_joint_vel_limit,
-                mvtime=duration,
-                is_radian=True,
-                wait=False,
-            )
-
-            time.sleep(5)
-            self.xarm_api.set_mode(1)
-            self.xarm_api.set_state(0)
-
-            time.sleep(0.2)
-        elif self.xarm_api.mode==1:
-
-            xarm_code = self.xarm_api.set_servo_angle_j(
-                arm_joint_pos_command,
-                speed=scaled_joint_vel_limit,  # set_servo_angle_j expects deg/s
-                is_radian=True,
-            )
-
-        else:
-            raise ValueError("Unexpectedly xarm_api.mode != 1 in _set_action function")
-
-
-
+        xarm_code = self.xarm_api.set_servo_angle(
+            angle=arm_joint_pos_command,
+            speed=scaled_joint_vel_limit,
+            mvtime=duration,
+            is_radian=True,
+            wait=False,
+        )
         if xarm_code != 0:
             raise RuntimeError(
                 f"[{self.__class__.__name__}] Invalid xArm API code: {xarm_code}"
