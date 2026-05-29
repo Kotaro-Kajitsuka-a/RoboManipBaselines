@@ -48,7 +48,10 @@ except ImportError:  # pragma: no cover - optional dependency
 
 
 _DEFAULT_T_BASE_TO_CAMERA_PATH = (
-    _REPO_ROOT / "robo_manip_baselines" / "calib" / "T_base_to_camera.csv"
+    _REPO_ROOT
+    / "robo_manip_baselines"
+    / "calib"
+    / "T_base_to_camera_for_single_april_tag.csv"
 )
 
 

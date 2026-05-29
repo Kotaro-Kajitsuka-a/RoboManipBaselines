@@ -37,7 +37,10 @@ from .single_AprilTag_detection import (
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _DEFAULT_T_BASE_TO_CAMERA_PATH = (
-    _REPO_ROOT / "robo_manip_baselines" / "calib" / "T_base_to_camera.csv"
+    _REPO_ROOT
+    / "robo_manip_baselines"
+    / "calib"
+    / "T_base_to_camera_for_single_april_tag.csv"
 )
 _GLOBAL_T_BASE_TO_CAMERA = load_base_to_camera_transform(_DEFAULT_T_BASE_TO_CAMERA_PATH)
 
