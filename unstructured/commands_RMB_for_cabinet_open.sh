@@ -1,5 +1,4 @@
-python ./robo_manip_baselines/policy/ppo_cus/ppo_tasks/dual_box_rotation_ablated.py
-python ./robo_manip_baselines/policy/ppo_cus/ppo_tasks/box_pose_viewer.py
+python ./robo_manip_baselines/policy/rl_policy/rl_tasks/single_cardboard_cabinet.py
 
 
 #Maniskillで学習したポリシーのロールアウト
@@ -15,7 +14,7 @@ python ./robo_manip_baselines/bin/Rollout.py RLPolicy RealXarm7Demo \
   --save_rollout \
   --wait_before_start \
   --skip_draw 50000 \
-  --config ./robo_manip_baselines/envs/configs/RealXarm7DemoEnv.yaml \
+  --config ./robo_manip_baselines/envs/configs/RealXarm7DemoEnvCabinetOpen.yaml \
   --world_idx_repeat_count 45
 
 ###########################################################################

@@ -1,16 +1,16 @@
 from __future__ import annotations
 
 import threading
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Dict, Mapping, Optional, Tuple
 
 import cv2
 import numpy as np
-import pyrealsense2 as rs
 from cv2 import aruco
 
-from robo_manip_baselines.policy.ppo_cus.ppo_tasks.dual_box_rotation_ablated import (
+from robo_manip_baselines.policy.rl_policy.rl_tasks.cabinet_marker_detection import (
     BASE_CENTER_T_PATH,
     BIG_ARUCO_DICT_ID,
     BIG_BOARD_RZ_OFFSET_RAD,
@@ -23,13 +23,14 @@ from robo_manip_baselines.policy.ppo_cus.ppo_tasks.dual_box_rotation_ablated imp
     RES_H,
     RES_W,
     SMALL_BOARD_DICT_ID,
+    SMALL_BOARD_MARKER_IDS,
     USE_SERIAL,
-    _build_small_board,
-    _detect_markers,
-    _estimate_small_board_pose,
-    _get_aruco_dictionary,
-    _get_aruco_parameters,
-    _rotation_z,
+    build_small_board,
+    detect_markers,
+    estimate_small_board_pose,
+    get_aruco_dictionary,
+    get_aruco_parameters,
+    rotation_z,
 )
 
 if TYPE_CHECKING:
@@ -52,6 +53,19 @@ def _rotation_matrix_to_6d(rotation: np.ndarray) -> np.ndarray:
     y_axis = y_axis - np.dot(x_axis, y_axis) * x_axis
     y_axis = y_axis / (np.linalg.norm(y_axis) + 1e-8)
     return np.concatenate([x_axis, y_axis]).astype(np.float32)
+
+
+def _rotmat_to_rpy_deg(rotation: np.ndarray) -> np.ndarray:
+    sy = -rotation[2, 0]
+    sy = np.clip(sy, -1.0, 1.0)
+    pitch = np.arcsin(sy)
+    if abs(sy) < 0.999999:
+        roll = np.arctan2(rotation[2, 1], rotation[2, 2])
+        yaw = np.arctan2(rotation[1, 0], rotation[0, 0])
+    else:
+        roll = np.arctan2(-rotation[1, 2], rotation[1, 1])
+        yaw = 0.0
+    return np.degrees([roll, pitch, yaw])
 
 
 class CabinetMarkerPoseProvider:
@@ -79,10 +93,10 @@ class CabinetMarkerPoseProvider:
         self._latest_image_seq = 0
         self._lock = threading.Lock()
 
-        self._big_dict = _get_aruco_dictionary(BIG_ARUCO_DICT_ID)
-        self._small_dict = _get_aruco_dictionary(SMALL_BOARD_DICT_ID)
-        self._aruco_params = _get_aruco_parameters()
-        self._small_board = _build_small_board(self._small_dict)
+        self._big_dict = get_aruco_dictionary(BIG_ARUCO_DICT_ID)
+        self._small_dict = get_aruco_dictionary(SMALL_BOARD_DICT_ID)
+        self._aruco_params = get_aruco_parameters()
+        self._small_board = build_small_board(self._small_dict)
         self._big_board = aruco.GridBoard(
             (BIG_MARKERS_X, BIG_MARKERS_Y),
             BIG_MARKER_LENGTH_M,
@@ -153,6 +167,8 @@ class CabinetMarkerPoseProvider:
             return self._latest_image_seq if self._latest_image_seq > 0 else None
 
     def _run(self) -> None:
+        import pyrealsense2 as rs
+
         pipeline = rs.pipeline()
         config = rs.config()
         config.enable_device(self.serial)
@@ -178,7 +194,7 @@ class CabinetMarkerPoseProvider:
         dist_coeffs = np.array(intr.coeffs[:5], dtype=np.float32)
 
         R_flip_x = np.array([[1, 0, 0], [0, -1, 0], [0, 0, -1]], dtype=np.float32)
-        R_big_z_offset = _rotation_z(BIG_BOARD_RZ_OFFSET_RAD)
+        R_big_z_offset = rotation_z(BIG_BOARD_RZ_OFFSET_RAD)
         big_center_offset = np.array(
             [self._big_board_w * 0.5, self._big_board_h * 0.5, 0.0], dtype=np.float32
         )
@@ -198,10 +214,10 @@ class CabinetMarkerPoseProvider:
                     self._latest_front_rgb = rgb
                     self._latest_image_seq += 1
 
-                small_corners, small_ids, _ = _detect_markers(
+                small_corners, small_ids, _ = detect_markers(
                     gray, self._small_dict, self._aruco_params
                 )
-                small_rvec, small_tvec = _estimate_small_board_pose(
+                small_rvec, small_tvec = estimate_small_board_pose(
                     small_corners,
                     small_ids,
                     self._small_board,
@@ -218,7 +234,7 @@ class CabinetMarkerPoseProvider:
                         self._latest_inner_transform = base_T_inner.copy()
                         self._latest_inner_marker_seq += 1
 
-                corners, ids, _ = _detect_markers(
+                corners, ids, _ = detect_markers(
                     gray, self._big_dict, self._aruco_params
                 )
                 if ids is None or len(ids) == 0:
@@ -319,3 +335,42 @@ def build_rl_task(
     if params is None:
         params = {}
     return SingleCardboardCabinetTask(rollout=rollout, params=params)
+
+
+def run():
+    provider = CabinetMarkerPoseProvider()
+    provider.start()
+    print("[SingleCardboardCabinetTask] CabinetMarkerPoseProvider started.")
+    frame_idx = 0
+    last_t = time.time()
+    try:
+        while True:
+            frame_idx += 1
+            outer_T, outer_seq = provider.get_latest_outer_transform()
+            inner_T, inner_seq = provider.get_latest_inner_transform()
+            if frame_idx % 20 == 0:
+                now = time.time()
+                fps = frame_idx / max(now - last_t, 1e-6)
+                print(f"[CabinetMarkerPoseProvider] fps~{fps:.1f}", flush=True)
+                if outer_T is not None:
+                    print(
+                        f"[OuterBoard] seq={outer_seq} center={outer_T[:3, 3]} "
+                        f"rpy(deg)={_rotmat_to_rpy_deg(outer_T[:3, :3])}",
+                        flush=True,
+                    )
+                if inner_T is not None:
+                    print(
+                        f"[InnerBoard] ids={SMALL_BOARD_MARKER_IDS} seq={inner_seq} "
+                        f"center={inner_T[:3, 3]} rpy(deg)={_rotmat_to_rpy_deg(inner_T[:3, :3])}",
+                        flush=True,
+                    )
+            time.sleep(0.05)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        provider.stop()
+        print("[SingleCardboardCabinetTask] CabinetMarkerPoseProvider stopped.")
+
+
+if __name__ == "__main__":
+    run()
