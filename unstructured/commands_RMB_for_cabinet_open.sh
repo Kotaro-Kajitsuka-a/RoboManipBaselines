@@ -1,4 +1,4 @@
-python ./robo_manip_baselines/policy/rl_policy/rl_tasks/single_cardboard_cabinet.py
+python ./robo_manip_baselines/policy/rl_policy/rl_tasks/box_pose_viewer.py
 
 
 #Maniskillで学習したポリシーのロールアウト
