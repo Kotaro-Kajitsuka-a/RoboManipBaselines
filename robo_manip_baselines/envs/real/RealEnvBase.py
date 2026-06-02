@@ -220,7 +220,7 @@ class RealEnvBase(EnvDataMixin, gym.Env, ABC):
 
     def step(self, action):
         self._set_action(
-            action, duration=self.dt, joint_vel_limit_scale=0.15, wait=True
+            action, duration=self.dt, joint_vel_limit_scale=0.35, wait=True
         )
 
         observation = self._get_obs()
