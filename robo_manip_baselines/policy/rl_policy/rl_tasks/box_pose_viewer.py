@@ -31,9 +31,6 @@ from robo_manip_baselines.policy.rl_policy.rl_tasks.cabinet_marker_detection imp
     rotation_z,
 )
 
-WORKSPACE_CENTER = np.array([-0.615, 0.0, 0.088], dtype=np.float32)
-
-
 def draw_axes(img, K, dist_coeffs, rvec, tvec, axis_len=0.05, thickness=2):
     origin = np.float32([[0, 0, 0]])
     axes = np.float32([[axis_len, 0, 0], [0, axis_len, 0], [0, 0, axis_len]])
@@ -135,7 +132,6 @@ def main():
     print(" fx, fy =", intr.fx, intr.fy)
     print(" cx, cy =", intr.ppx, intr.ppy)
     print(" dist   =", dist_coeffs)
-    print("workspace center =", WORKSPACE_CENTER)
 
     R_flip_x = np.array([[1, 0, 0], [0, -1, 0], [0, 0, -1]], dtype=np.float32)
     R_big_z_offset = rotation_z(BIG_BOARD_RZ_OFFSET_RAD)
@@ -164,10 +160,8 @@ def main():
             gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
             inner_base = None
-            inner_policy = None
             inner_rpy = None
             outer_base = None
-            outer_policy = None
             outer_rpy = None
             outer_marker_count = 0
 
@@ -206,7 +200,6 @@ def main():
                 cam_T_inner[:3, 3] = small_tvec.flatten().astype(np.float32)
                 base_T_inner = base_T_cam @ cam_T_inner
                 inner_base = base_T_inner[:3, 3]
-                inner_policy = inner_base - WORKSPACE_CENTER
                 inner_rpy = rotmat_to_rpy_deg(base_T_inner[:3, :3])
 
             corners, ids, _ = detect_markers(gray, big_dict, params)
@@ -246,7 +239,6 @@ def main():
                     cam_T_outer[:3, 3] = t_cam_outer.flatten().astype(np.float32)
                     base_T_outer = base_T_cam @ cam_T_outer
                     outer_base = base_T_outer[:3, 3]
-                    outer_policy = outer_base - WORKSPACE_CENTER
                     outer_rpy = rotmat_to_rpy_deg(base_T_outer[:3, :3])
 
             now = time.time()
@@ -260,7 +252,6 @@ def main():
             y = 30
             y = put_line(img, f"RLPolicy marker viewer  FPS: {fps_est:.1f}", y)
             y = put_line(img, f"Serial: {USE_SERIAL}", y, (220, 220, 220))
-            y = put_line(img, f"Workspace center: {WORKSPACE_CENTER.tolist()}", y)
             y += 8
             y = put_line(
                 img,
@@ -270,7 +261,6 @@ def main():
             )
             if outer_base is not None:
                 y = put_line(img, f"  base:   {np.round(outer_base, 4)}", y)
-                y = put_line(img, f"  policy: {np.round(outer_policy, 4)}", y)
                 y = put_line(img, f"  rpy:    {np.round(outer_rpy, 2)} deg", y)
             y += 8
             y = put_line(
@@ -282,18 +272,17 @@ def main():
             )
             if inner_base is not None:
                 y = put_line(img, f"  base:   {np.round(inner_base, 4)}", y)
-                y = put_line(img, f"  policy: {np.round(inner_policy, 4)}", y)
                 y = put_line(img, f"  rpy:    {np.round(inner_rpy, 2)} deg", y)
 
             if time.time() - last_print > 1.0:
                 if outer_base is not None:
                     print(
-                        f"[OuterBoard] base={outer_base} policy={outer_policy} rpy={outer_rpy}",
+                        f"[OuterBoard] base={outer_base} rpy={outer_rpy}",
                         flush=True,
                     )
                 if inner_base is not None:
                     print(
-                        f"[InnerBoard] base={inner_base} policy={inner_policy} rpy={inner_rpy}",
+                        f"[InnerBoard] base={inner_base} rpy={inner_rpy}",
                         flush=True,
                     )
                 last_print = time.time()
