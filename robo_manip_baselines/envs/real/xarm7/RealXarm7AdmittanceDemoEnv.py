@@ -10,14 +10,16 @@ class RealXarm7AdmittanceEnvBase(RealXarm7EnvBase):
         self, robot_ip, camera_ids, gelsight_ids=None, init_qpos=None, **kwargs
     ):
         super().__init__(
-            self,
-            robot_ip,
-            camera_ids,
-            gelsight_ids,
-            init_qpos,
+            robot_ip=robot_ip,
+            camera_ids=camera_ids,
+            gelsight_ids=gelsight_ids,
+            init_qpos=init_qpos,
             **kwargs,
         )
+        time.sleep(0.2)
+        self.setup_admittance_control()
 
+    def setup_admittance_control(self):
         # set tool admittance parameters:
         K_pos = 300  #  x/y/z linear stiffness coefficient, range: 0 ~ 2000 (N/m)
         K_ori = 4  #  Rx/Ry/Rz rotational stiffness coefficient, range: 0 ~ 20 (Nm/rad)
@@ -49,11 +51,12 @@ class RealXarm7AdmittanceEnvBase(RealXarm7EnvBase):
         self.xarm_api.set_ft_sensor_mode(1)
         # will start after set_state(0)
         self.xarm_api.set_state(0)
+        print(f"[{self.__class__.__name__}] Enabled xArm7 admittance control.")
 
-        time.sleep(100000)
+    def close(self):
         self.xarm_api.set_ft_sensor_mode(0)
         self.xarm_api.set_ft_sensor_enable(0)
-        self.xarm_api.disconnect()
+        super().close()
 
 
 class RealXarm7AdmittanceDemoEnv(RealXarm7AdmittanceEnvBase):
@@ -61,7 +64,7 @@ class RealXarm7AdmittanceDemoEnv(RealXarm7AdmittanceEnvBase):
         self,
         **kwargs,
     ):
-        RealXarm7EnvBase.__init__(
+        RealXarm7AdmittanceEnvBase.__init__(
             self,
             init_qpos=np.concatenate(
                 [np.deg2rad([0.0, -30.0, 0.0, 45.0, 0.0, 75.0, 0.0]), np.array([800.0])]
