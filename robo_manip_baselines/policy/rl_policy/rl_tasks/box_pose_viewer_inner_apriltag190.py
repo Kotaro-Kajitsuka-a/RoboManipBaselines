@@ -5,22 +5,28 @@ from pathlib import Path
 
 import cv2
 import numpy as np
+from cv2 import aruco
 
 from robo_manip_baselines.policy.rl_policy.rl_tasks.cabinet_marker_detection import (
     BASE_CENTER_T_PATH,
     FPS,
     RES_H,
     RES_W,
-    SMALL_BOARD_DICT_ID,
-    SMALL_BOARD_MARKER_LENGTH_M,
     USE_SERIAL,
     detect_markers,
-    get_aruco_dictionary,
     get_aruco_parameters,
 )
 
-MARKER_ID = 101
-MARKER_SIZE_M = SMALL_BOARD_MARKER_LENGTH_M
+MARKER_ID = 190
+MARKER_SIZE_M = 0.0309
+
+
+def get_apriltag36h11_dictionary():
+    dict_id = aruco.DICT_APRILTAG_36h11
+    try:
+        return aruco.getPredefinedDictionary(dict_id)
+    except AttributeError:
+        return aruco.Dictionary_get(dict_id)
 
 
 def put_line(img, text, y, color=(235, 235, 235), scale=0.54):
@@ -92,9 +98,9 @@ def estimate_marker_translation(corners, ids, K, dist_coeffs):
     if matched.size == 0:
         return None, None, None
 
-    marker_corners = [corners[int(matched[0])]]
+    marker_corners = corners[int(matched[0])]
     rvec, tvec = estimate_marker_pose_from_corners(
-        marker_corners[0], MARKER_SIZE_M, K, dist_coeffs
+        marker_corners, MARKER_SIZE_M, K, dist_coeffs
     )
     if rvec is None or tvec is None:
         return None, None, None
@@ -105,7 +111,7 @@ def main():
     import pyrealsense2 as rs
 
     base_T_cam = np.loadtxt(Path(BASE_CENTER_T_PATH)).astype(np.float32)
-    marker_dict = get_aruco_dictionary(SMALL_BOARD_DICT_ID)
+    marker_dict = get_apriltag36h11_dictionary()
     params = get_aruco_parameters()
 
     pipeline = rs.pipeline()
@@ -126,7 +132,7 @@ def main():
     print(" fx, fy =", intr.fx, intr.fy)
     print(" cx, cy =", intr.ppx, intr.ppy)
     print(" dist   =", dist_coeffs)
-    print(f"marker id={MARKER_ID}, size={MARKER_SIZE_M} m")
+    print(f"tag36h11 marker id={MARKER_ID}, size={MARKER_SIZE_M} m")
 
     t_prev = time.time()
     fps_est = 0.0
@@ -148,7 +154,7 @@ def main():
             corners, ids, _ = detect_markers(gray, marker_dict, params)
             if ids is not None and len(ids) > 0:
                 detected_ids = ids.reshape(-1).astype(int).tolist()
-                cv2.aruco.drawDetectedMarkers(img, corners, ids)
+                aruco.drawDetectedMarkers(img, corners, ids)
                 rvec, tvec, marker_cam = estimate_marker_translation(
                     corners, ids, K, dist_coeffs
                 )
@@ -163,7 +169,7 @@ def main():
                         rvec,
                         tvec,
                         (255, 0, 255),
-                        f"marker {MARKER_ID}",
+                        f"tag {MARKER_ID}",
                     )
 
             now = time.time()
@@ -175,14 +181,14 @@ def main():
             cv2.rectangle(overlay, (0, 0), (panel_w, RES_H), (0, 0, 0), -1)
             img = cv2.addWeighted(overlay, 0.35, img, 0.65, 0)
             y = 30
-            y = put_line(img, f"Marker {MARKER_ID} translation viewer  FPS: {fps_est:.1f}", y)
+            y = put_line(img, f"Tag36h11 id {MARKER_ID} translation  FPS: {fps_est:.1f}", y)
             y = put_line(img, f"Serial: {USE_SERIAL}", y, (220, 220, 220))
             y = put_line(img, f"Marker size: {MARKER_SIZE_M:.4f} m", y)
             y = put_line(img, f"Detected IDs: {detected_ids}", y)
             y += 8
             y = put_line(
                 img,
-                f"Marker {MARKER_ID}: {'OK' if marker_base is not None else '---'}",
+                f"Tag {MARKER_ID}: {'OK' if marker_base is not None else '---'}",
                 y,
                 (255, 160, 255) if marker_base is not None else (180, 180, 180),
             )
@@ -192,17 +198,17 @@ def main():
             if time.time() - last_print > 1.0:
                 if marker_base is not None:
                     print(
-                        f"[Marker{MARKER_ID}] base_translation={marker_base}",
+                        f"[AprilTag{MARKER_ID}] base_translation={marker_base}",
                         flush=True,
                     )
                 else:
                     print(
-                        f"[Marker{MARKER_ID}] not detected. detected_ids={detected_ids}",
+                        f"[AprilTag{MARKER_ID}] not detected. detected_ids={detected_ids}",
                         flush=True,
                     )
                 last_print = time.time()
 
-            cv2.imshow(f"Marker {MARKER_ID} Translation Viewer", img)
+            cv2.imshow(f"Tag36h11 {MARKER_ID} Translation Viewer", img)
             key = cv2.waitKey(1) & 0xFF
             if key in (27, ord("q")):
                 break
