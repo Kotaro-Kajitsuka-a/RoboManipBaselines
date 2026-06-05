@@ -10,7 +10,7 @@ python ./robo_manip_baselines/bin/CreatePpoCusMetaInfo.py \
   --force
 
 python ./robo_manip_baselines/bin/Rollout.py RLPolicy RealXarm7Demo \
-  --checkpoint "robo_manip_baselines/checkpoint/PpoCus/OpenDrawer/ckpt_41.pt" \
+  --checkpoint robo_manip_baselines/checkpoint/PpoCus/OpenDrawer/ckpt_41.pt \
   --save_rollout \
   --wait_before_start \
   --skip_draw 50000 \

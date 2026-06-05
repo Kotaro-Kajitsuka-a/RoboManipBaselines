@@ -103,7 +103,7 @@ def estimate_small_board_pose(corners, ids, board, K, dist_coeffs):
     )
     t_center = R_board @ center_offset.reshape(3, 1) + tvec.reshape(3, 1)
     target_offset = np.array(
-        [0.0, SMALL_BOARD_TARGET_Y_OFFSET_M, 0.0], dtype=np.float32
+        [-0.00, SMALL_BOARD_TARGET_Y_OFFSET_M, 0.0], dtype=np.float32
     )
     R_target = R_board @ rotation_y(SMALL_BOARD_TARGET_RY_OFFSET_RAD)
     t_target = R_board @ target_offset.reshape(3, 1) + t_center.reshape(3, 1)
