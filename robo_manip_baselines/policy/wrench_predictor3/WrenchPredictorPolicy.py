@@ -68,33 +68,48 @@ class WrenchPredictorPolicy(nn.Module):
             return self.model(state, image, material_property)
 
     def configure_optimizers(self):
-        param_dicts = [
-            {
-                "params": [
-                    p
-                    for n, p in self.named_parameters()
-                    if n.startswith("material_property_embedding") and p.requires_grad
-                ],
-                "lr": self.policy_args["lr_material_property"],
-            },
-            {
-                "params": [
-                    p
-                    for n, p in self.named_parameters()
-                    if not n.startswith("material_property_embedding")
-                    and not n.startswith("model.cnn")
-                    and p.requires_grad
-                ]
-            },
-            {
-                "params": [
-                    p
-                    for n, p in self.named_parameters()
-                    if n.startswith("model.cnn") and p.requires_grad
-                ],
-                "lr": self.policy_args["lr_backbone"],
-            },
+        param_dicts = []
+        material_property_params = [
+            p
+            for n, p in self.named_parameters()
+            if n.startswith("material_property_embedding") and p.requires_grad
         ]
+        if len(material_property_params) > 0:
+            param_dicts.append(
+                {
+                    "params": material_property_params,
+                    "lr": self.policy_args["lr_material_property"],
+                }
+            )
+
+        model_params = [
+            p
+            for n, p in self.named_parameters()
+            if not n.startswith("material_property_embedding")
+            and not n.startswith("model.cnn")
+            and p.requires_grad
+        ]
+        if len(model_params) > 0:
+            param_dicts.append(
+                {
+                    "params": model_params,
+                    "lr": self.policy_args["lr"],
+                }
+            )
+
+        backbone_params = [
+            p
+            for n, p in self.named_parameters()
+            if n.startswith("model.cnn") and p.requires_grad
+        ]
+        if len(backbone_params) > 0:
+            param_dicts.append(
+                {
+                    "params": backbone_params,
+                    "lr": self.policy_args["lr_backbone"],
+                }
+            )
+        assert len(param_dicts) > 0, "No trainable WrenchPredictor3 parameters."
         return torch.optim.AdamW(
             param_dicts,
             lr=self.policy_args["lr"],

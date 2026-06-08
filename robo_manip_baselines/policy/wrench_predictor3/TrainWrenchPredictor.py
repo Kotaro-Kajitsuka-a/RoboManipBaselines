@@ -34,6 +34,18 @@ class TrainWrenchPredictor(TrainBase):
         parser.add_argument(
             "--dim_feedforward", type=int, default=2048, help="feedforward dimension"
         )
+        parser.add_argument(
+            "--lr_material_property",
+            type=float,
+            default=1e-3,
+            help="learning rate for material property embedding; set 0 to freeze it",
+        )
+        parser.add_argument(
+            "--lr_backbone",
+            type=float,
+            default=1e-5,
+            help="learning rate for image CNN backbone; set 0 to freeze it",
+        )
 
     def setup_model_meta_info(self):
         super().setup_model_meta_info()
@@ -160,12 +172,12 @@ class TrainWrenchPredictor(TrainBase):
         # Set policy args
         self.model_meta_info["policy"]["args"] = {
             "lr": self.args.lr,
-            "lr_material_property": 1e-3,
+            "lr_material_property": self.args.lr_material_property,
             "weight_decay": 1e-4,
             "horizon": self.model_meta_info["data"]["horizon"],
             "hidden_dim": self.args.hidden_dim,
             "dim_feedforward": self.args.dim_feedforward,
-            "lr_backbone": 1e-5,
+            "lr_backbone": self.args.lr_backbone,
             "enc_layers": 4,
             "nheads": 8,
             "camera_names": self.args.camera_names,
@@ -184,6 +196,8 @@ class TrainWrenchPredictor(TrainBase):
         )
         self.policy.cuda()
 
+        self.freeze_zero_lr_parameter_groups()
+
         # Construct optimizer
         self.optimizer = self.policy.configure_optimizers()
 
@@ -194,6 +208,42 @@ class TrainWrenchPredictor(TrainBase):
         print(
             f"  - material objects: {self.model_meta_info['material_property']['object_key_to_id']}"
         )
+        print(
+            "  - lr material/model/backbone: "
+            f"{self.args.lr_material_property}, {self.args.lr}, {self.args.lr_backbone}"
+        )
+
+    def freeze_zero_lr_parameter_groups(self):
+        lr_by_group = {
+            "material_property": self.args.lr_material_property,
+            "backbone": self.args.lr_backbone,
+            "model": self.args.lr,
+        }
+        frozen_param_count = {group: 0 for group in lr_by_group}
+
+        for name, param in self.policy.named_parameters():
+            group = self.get_parameter_group(name)
+            if lr_by_group[group] <= 0.0:
+                param.requires_grad = False
+                frozen_param_count[group] += param.numel()
+
+        trainable_param_count = sum(
+            param.numel() for param in self.policy.parameters() if param.requires_grad
+        )
+        assert trainable_param_count > 0, "All WrenchPredictor3 parameters are frozen."
+        print(
+            f"[{self.__class__.__name__}] Frozen parameters: "
+            f"material_property={frozen_param_count['material_property']}, "
+            f"model={frozen_param_count['model']}, "
+            f"backbone={frozen_param_count['backbone']}"
+        )
+
+    def get_parameter_group(self, name):
+        if name.startswith("material_property_embedding"):
+            return "material_property"
+        if name.startswith("model.cnn"):
+            return "backbone"
+        return "model"
 
     def print_material_property_embedding(self, epoch):
         object_key_to_id = self.model_meta_info["material_property"]["object_key_to_id"]
