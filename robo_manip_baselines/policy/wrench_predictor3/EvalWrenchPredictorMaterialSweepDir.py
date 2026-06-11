@@ -140,13 +140,22 @@ class EvalWrenchPredictorMaterialSweepDir:
         rmb_paths,
     ):
         abs_error_seq_list = []
+        plot_dir = os.path.join(
+            self.output_dir,
+            f"actual_{actual_object_key}",
+            f"material_{material_object_key}",
+        )
+        os.makedirs(plot_dir, exist_ok=True)
+
         for rmb_path in rmb_paths:
+            evaluator.output_dir = plot_dir
             evaluator.set_rmb_filename(rmb_path)
             evaluator.material_object_key = material_object_key
             evaluator.setup_material_property()
-            _time_seq, _gt_wrench_seq, _pred_wrench_seq, abs_error_seq, _mae = (
+            time_seq, gt_wrench_seq, pred_wrench_seq, abs_error_seq, mae = (
                 evaluator.evaluate()
             )
+            evaluator.save_plot(time_seq, gt_wrench_seq, pred_wrench_seq, mae)
             abs_error_seq_list.append(abs_error_seq)
 
         all_abs_error_seq = np.concatenate(abs_error_seq_list, axis=0)
@@ -164,6 +173,7 @@ class EvalWrenchPredictorMaterialSweepDir:
             "Fx/Fy mean": mae[:2].mean(),
             "Fz only": mae[2],
             "torque mean": mae[3:].mean(),
+            "plot_dir": plot_dir,
         }
 
     def print_row(self, row):
@@ -176,7 +186,8 @@ class EvalWrenchPredictorMaterialSweepDir:
             f"Fx={row['Fx']:.6f}, "
             f"Fy={row['Fy']:.6f}, "
             f"Fz={row['Fz']:.6f}, "
-            f"torque mean={row['torque mean']:.6f}"
+            f"torque mean={row['torque mean']:.6f}, "
+            f"plot_dir={row['plot_dir']}"
         )
 
     def save_csv(self, rows):
@@ -193,6 +204,7 @@ class EvalWrenchPredictorMaterialSweepDir:
             "Nz",
             "Fz only",
             "torque mean",
+            "plot_dir",
         ]
         with open(self.output_csv, "w", newline="") as f:
             writer = csv.DictWriter(f, fieldnames=fieldnames)
