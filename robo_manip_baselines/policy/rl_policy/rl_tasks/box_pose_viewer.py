@@ -31,6 +31,7 @@ from robo_manip_baselines.policy.rl_policy.rl_tasks.cabinet_marker_detection imp
     transform_from_rvec_tvec,
 )
 
+
 def draw_axes(img, K, dist_coeffs, rvec, tvec, axis_len=0.05, thickness=2):
     origin = np.float32([[0, 0, 0]])
     axes = np.float32([[axis_len, 0, 0], [0, axis_len, 0], [0, 0, axis_len]])
@@ -95,6 +96,14 @@ def main():
     import pyrealsense2 as rs
 
     base_T_cam = np.loadtxt(Path(BASE_CENTER_T_PATH)).astype(np.float32)
+    cam_T_base = np.linalg.inv(base_T_cam)
+
+    R_cam_base = cam_T_base[:3, :3]
+    t_cam_base = cam_T_base[:3, 3]
+
+    base_rvec, _ = cv2.Rodrigues(R_cam_base)
+    base_tvec = t_cam_base.reshape(3, 1)
+
     big_dict = get_aruco_dictionary(BIG_ARUCO_DICT_ID)
     small_dict = get_aruco_dictionary(SMALL_BOARD_DICT_ID)
     params = get_aruco_parameters()
@@ -175,7 +184,29 @@ def main():
                     "inner",
                 )
 
+                draw_axes(
+                    img,
+                    K,
+                    dist_coeffs,
+                    base_rvec,
+                    base_tvec,
+                    axis_len=0.10,
+                    thickness=4,
+                )
+
+                project_center(
+                    img,
+                    K,
+                    dist_coeffs,
+                    base_rvec,
+                    base_tvec,
+                    (0, 255, 255),
+                    "base",
+                )
+
                 cam_T_inner = transform_from_rvec_tvec(small_rvec, small_tvec)
+
+                base_T_inner = base_T_cam @ cam_T_inner
                 base_T_inner = base_T_cam @ cam_T_inner
                 inner_base = base_T_inner[:3, 3]
                 inner_rpy = rotmat_to_rpy_deg(base_T_inner[:3, :3])
