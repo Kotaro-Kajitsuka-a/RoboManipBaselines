@@ -38,7 +38,7 @@ python robo_manip_baselines/bin/Train.py WrenchPredictor3 \
     --state_keys measured_eef_pose measured_eef_pose_rel \
     --action_keys command_eef_pose \
     --lr 0 \
-    --lr_material_property 1e-3 \
+    --lr_material_property 1e-4 \
     --lr_backbone 0 \
     --num_epochs 100 \
     --batch_size 64 \
