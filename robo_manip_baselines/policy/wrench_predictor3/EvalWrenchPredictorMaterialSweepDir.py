@@ -7,6 +7,9 @@ import sys
 import numpy as np
 
 from robo_manip_baselines.common import find_rmb_files
+from robo_manip_baselines.misc.SummarizeWrenchPredictorMaterialSweepCsv import (
+    summarize_material_sweep_csv,
+)
 from robo_manip_baselines.policy.wrench_predictor3.EvalWrenchPredictor import (
     EvalWrenchPredictor,
 )
@@ -120,6 +123,7 @@ class EvalWrenchPredictorMaterialSweepDir:
                 self.print_row(row)
 
         self.save_csv(rows)
+        summarize_material_sweep_csv(self.output_csv)
 
     def group_rmb_paths_by_object_key(self, rmb_path_list):
         object_key_to_rmb_paths = {}

@@ -13,7 +13,7 @@ source ~/projects/ForceImagination/RoboManipBaselines/.venv/bin/activate
 
 cd ~/projects/ForceImagination/RoboManipBaselines/
 
-CHECKPOINT=${CHECKPOINT:-robo_manip_baselines/checkpoint/WrenchPredictor3/DatasetColl_640x480_h256/policy_last.ckpt}
+CHECKPOINT=${CHECKPOINT:-robo_manip_baselines/checkpoint/WrenchPredictor3/DatasetColl_320x240_512/policy_last.ckpt}
 EVAL_DIR=${EVAL_DIR:-robo_manip_baselines/dataset/DatasetColl/validation/normal_0123}
 
 python robo_manip_baselines/policy/wrench_predictor3/EvalWrenchPredictorMaterialSweepDir.py \
