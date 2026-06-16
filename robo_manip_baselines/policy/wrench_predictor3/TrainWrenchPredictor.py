@@ -17,6 +17,7 @@ from .WrenchPredictorSequenceUtils import build_condition, build_wrench_target
 
 class TrainWrenchPredictor(TrainBase):
     DatasetClass = WrenchPredictorDataset
+    IMAGE_SIZE = (320, 240)  # (width, height)
 
     def set_additional_args(self, parser):
         parser.set_defaults(enable_rmb_cache=True)
@@ -34,12 +35,6 @@ class TrainWrenchPredictor(TrainBase):
             "--dim_feedforward", type=int, default=2048, help="feedforward dimension"
         )
         parser.add_argument(
-            "--image_width", type=int, default=320, help="input image width"
-        )
-        parser.add_argument(
-            "--image_height", type=int, default=240, help="input image height"
-        )
-        parser.add_argument(
             "--lr_material_property",
             type=float,
             default=1e-3,
@@ -55,10 +50,7 @@ class TrainWrenchPredictor(TrainBase):
     def setup_model_meta_info(self):
         super().setup_model_meta_info()
 
-        self.model_meta_info["data"]["image_size"] = (
-            self.args.image_width,
-            self.args.image_height,
-        )
+        self.model_meta_info["data"]["image_size"] = self.IMAGE_SIZE
         self.model_meta_info["data"]["horizon"] = self.args.skip
         self.model_meta_info["material_property"] = {
             "dim": 9,
@@ -80,9 +72,7 @@ class TrainWrenchPredictor(TrainBase):
         clip_min = None
         clip_max = None
         for filename in self.all_filenames:
-            with RmbData(
-                filename, image_size=self.model_meta_info["data"]["image_size"]
-            ) as rmb_data:
+            with RmbData(filename, image_size=self.IMAGE_SIZE) as rmb_data:
                 episode_len = rmb_data[DataKey.TIME].shape[0]
                 episode_len_list.append(episode_len)
                 try:
@@ -214,7 +204,7 @@ class TrainWrenchPredictor(TrainBase):
         # Print policy information
         self.print_policy_info()
         print(f"  - horizon: {self.model_meta_info['data']['horizon']}")
-        print(f"  - image size: {self.model_meta_info['data']['image_size']}")
+        print(f"  - image size: {self.IMAGE_SIZE}")
         print(
             f"  - material objects: {self.model_meta_info['material_property']['object_key_to_id']}"
         )
