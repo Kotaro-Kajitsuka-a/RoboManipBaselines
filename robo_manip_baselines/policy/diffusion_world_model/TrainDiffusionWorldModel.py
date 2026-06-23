@@ -3,6 +3,7 @@ import copy
 import os
 import sys
 
+import numpy as np
 import torch
 from tqdm import tqdm
 
@@ -12,13 +13,14 @@ sys.path.append(
 from diffusion_policy.common.pytorch_util import dict_apply, optimizer_to
 from diffusion_policy.model.common.lr_scheduler import get_scheduler
 from diffusion_policy.model.diffusion.ema_model import EMAModel
-from robo_manip_baselines.common import DataKey, TrainBase
+from robo_manip_baselines.common import RmbData, TrainBase, get_skipped_data_seq
 
-from .DiffusionPolicyDataset import DiffusionPolicyDataset
+from .DiffusionWorldModel import DiffusionWorldModel
+from .DiffusionWorldModelDataset import DiffusionWorldModelDataset
 
 
-class TrainDiffusionPolicy(TrainBase):
-    DatasetClass = DiffusionPolicyDataset
+class TrainDiffusionWorldModel(TrainBase):
+    DatasetClass = DiffusionWorldModelDataset
 
     def setup_args(self):
         super().setup_args()
@@ -85,40 +87,32 @@ class TrainDiffusionPolicy(TrainBase):
             "--n_obs_steps",
             type=int,
             default=2,
-            help="number of steps in the observation sequence to input in the policy",
+            help="number of image_feature/state steps used as condition",
         )
         parser.add_argument(
-            "--n_action_steps",
+            "--pb_dim",
             type=int,
-            default=8,
-            help="number of steps in the action sequence to output from the policy",
-        )
-
-        parser.add_argument(
-            "--image_size",
-            type=int,
-            nargs=2,
-            default=[320, 240],
-            help="Image size (width, height) to be resized before crop. In the case of multiple image inputs, it is assumed that all images share the same size.",
-        )
-        parser.add_argument(
-            "--image_crop_size",
-            type=int,
-            nargs=2,
-            default=[288, 216],
-            help="Image size (width, height) to be cropped after resize. In the case of multiple image inputs, it is assumed that all images share the same size.",
+            default=9,
+            help="dimension of object-wise material property vector",
         )
 
     def setup_model_meta_info(self):
         super().setup_model_meta_info()
 
-        self.model_meta_info["data"]["image_size"] = self.args.image_size
-        self.model_meta_info["data"]["image_crop_size"] = self.args.image_crop_size
-
         self.model_meta_info["data"]["horizon"] = self.args.horizon
         self.model_meta_info["data"]["n_obs_steps"] = self.args.n_obs_steps
-        self.model_meta_info["data"]["n_action_steps"] = self.args.n_action_steps
+        self.model_meta_info["data"]["n_action_steps"] = 1
+        self.model_meta_info["data"]["image_feature_key"] = (
+            DiffusionWorldModelDataset.IMAGE_FEATURE_KEY
+        )
 
+        self.model_meta_info["wrench"] = {
+            "key": DiffusionWorldModelDataset.WRENCH_KEY,
+        }
+        self.model_meta_info["material_property"] = {
+            "pb_dim": self.args.pb_dim,
+            "object_key_to_id": DiffusionWorldModelDataset.OBJECT_KEY_TO_ID,
+        }
         self.model_meta_info["policy"]["use_ema"] = self.args.use_ema
         self.model_meta_info["policy"]["backbone"] = self.args.backbone
         self.model_meta_info["policy"]["scheduler"] = self.args.scheduler
@@ -132,37 +126,50 @@ class TrainDiffusionPolicy(TrainBase):
         else:
             return super().get_extra_norm_config()
 
+    def set_data_stats(self):
+        super().set_data_stats()
+
+        all_image_feature = []
+        all_wrench = []
+        for filename in self.all_filenames:
+            with RmbData(filename) as rmb_data:
+                image_feature = get_skipped_data_seq(
+                    rmb_data[DiffusionWorldModelDataset.IMAGE_FEATURE_KEY][:],
+                    DiffusionWorldModelDataset.IMAGE_FEATURE_KEY,
+                    self.args.skip,
+                )
+                wrench = get_skipped_data_seq(
+                    rmb_data[DiffusionWorldModelDataset.WRENCH_KEY][:],
+                    DiffusionWorldModelDataset.WRENCH_KEY,
+                    self.args.skip,
+                )
+            all_image_feature.append(image_feature)
+            all_wrench.append(wrench)
+
+        all_image_feature = np.concatenate(all_image_feature, dtype=np.float64)
+        all_wrench = np.concatenate(all_wrench, dtype=np.float64)
+        self.model_meta_info["image_feature"] = self.calc_stats_from_seq(
+            all_image_feature
+        )
+        self.model_meta_info["wrench"].update(self.calc_stats_from_seq(all_wrench))
+
     def setup_policy(self):
         # Set policy args
-        shape_meta = {
-            "obs": {},
-            "action": {"shape": [len(self.model_meta_info["action"]["example"])]},
-        }
-        if len(self.args.state_keys) > 0:
-            shape_meta["obs"]["state"] = {
-                "shape": [len(self.model_meta_info["state"]["example"])],
-                "type": "low_dim",
-            }
-        for camera_name in self.args.camera_names:
-            shape_meta["obs"][DataKey.get_rgb_image_key(camera_name)] = {
-                "shape": [3, self.args.image_size[1], self.args.image_size[0]],
-                "type": "rgb",
-            }
         self.model_meta_info["policy"]["args"] = {
-            "shape_meta": shape_meta,
+            "image_feature_dim": len(self.model_meta_info["image_feature"]["example"]),
+            "state_dim": len(self.model_meta_info["state"]["example"]),
+            "action_dim": len(self.model_meta_info["action"]["example"]),
+            "wrench_dim": len(self.model_meta_info["wrench"]["example"]),
+            "num_objects": len(DiffusionWorldModelDataset.OBJECT_KEY_TO_ID),
+            "pb_dim": self.args.pb_dim,
             "horizon": self.args.horizon,
-            "n_action_steps": self.args.n_action_steps,
             "n_obs_steps": self.args.n_obs_steps,
-            "crop_shape": self.args.image_crop_size[::-1],  # (height, width)
-            "obs_encoder_group_norm": True,
-            "eval_fixed_crop": True,
         }
         if self.args.backbone == "cnn":
             self.model_meta_info["policy"]["args"].update(
                 {
                     "num_inference_steps": 100,
                     "down_dims": [512, 1024, 2048],
-                    "obs_as_global_cond": True,
                     "diffusion_step_embed_dim": 128,
                     "kernel_size": 5,
                     "n_groups": 8,
@@ -225,17 +232,11 @@ class TrainDiffusionPolicy(TrainBase):
 
         # Construct policy
         if self.args.backbone == "cnn":
-            from diffusion_policy.policy.diffusion_unet_hybrid_image_policy import (
-                DiffusionUnetHybridImagePolicy,
-            )
-
-            PolicyClass = DiffusionUnetHybridImagePolicy
+            PolicyClass = DiffusionWorldModel
         else:  # if self.args.backbone == "transformer"
-            from diffusion_policy.policy.diffusion_transformer_hybrid_image_policy import (
-                DiffusionTransformerHybridImagePolicy,
+            raise NotImplementedError(
+                f"[{self.__class__.__name__}] Transformer backbone is not implemented yet."
             )
-
-            PolicyClass = DiffusionTransformerHybridImagePolicy
         self.policy = PolicyClass(
             noise_scheduler=noise_scheduler,
             **self.model_meta_info["policy"]["args"],
@@ -263,11 +264,8 @@ class TrainDiffusionPolicy(TrainBase):
                 eps=1e-8,
             )
         else:  # if self.args.backbone == "transformer"
-            self.optimizer = self.policy.get_optimizer(
-                transformer_weight_decay=1e-3,
-                obs_encoder_weight_decay=1e-6,
-                learning_rate=self.args.lr,
-                betas=(0.9, 0.95),
+            raise NotImplementedError(
+                f"[{self.__class__.__name__}] Transformer backbone is not implemented yet."
             )
 
         if self.args.backbone == "cnn":
@@ -290,13 +288,13 @@ class TrainDiffusionPolicy(TrainBase):
         # Print policy information
         self.print_policy_info()
         print(
-            f"  - use ema: {self.args.use_ema}, backbone: {self.args.backbone}, scheduler: {self.args.scheduler}"
+            f"  - use ema: {self.args.use_ema}, backbone: {self.args.backbone}, scheduler: {self.args.scheduler}, pb dim: {self.args.pb_dim}"
         )
         print(
-            f"  - horizon: {self.args.horizon}, obs steps: {self.args.n_obs_steps}, action steps: {self.args.n_action_steps}"
+            f"  - horizon: {self.args.horizon}, obs steps: {self.args.n_obs_steps}"
         )
         print(
-            f"  - image size: {self.args.image_size}, image crop size: {self.args.image_crop_size}"
+            f"  - trajectory dim: {self.policy.trajectory_dim}, image feature dim: {self.policy.image_feature_dim}, wrench dim: {self.policy.wrench_dim}"
         )
 
     def load_ckpt(self):
