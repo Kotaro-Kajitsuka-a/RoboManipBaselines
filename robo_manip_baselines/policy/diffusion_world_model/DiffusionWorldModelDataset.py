@@ -7,6 +7,7 @@ from robo_manip_baselines.common import (
     DpStyleDatasetMixin,
     RmbData,
     get_skipped_data_seq,
+    normalize_data,
 )
 
 
@@ -41,7 +42,7 @@ class DiffusionWorldModelDataset(DatasetBase, DpStyleDatasetMixin):
                 np.arange(start_time_idx, start_time_idx + horizon), 0, episode_len - 1
             )
 
-            # Load state
+            # Load image feature
             image_feature = get_skipped_data_seq(
                 rmb_data[self.IMAGE_FEATURE_KEY][:], self.IMAGE_FEATURE_KEY, skip
             )[time_idxes]
@@ -70,7 +71,9 @@ class DiffusionWorldModelDataset(DatasetBase, DpStyleDatasetMixin):
                 rmb_data[self.WRENCH_KEY][:], self.WRENCH_KEY, skip
             )[time_idxes]
 
-        state, action, _images = self.pre_convert_data(state, action, None)
+        state, action, image_feature, wrench = self.pre_convert_data(
+            state, action, image_feature, wrench
+        )
 
         return {
             "image_feature": torch.tensor(image_feature, dtype=torch.float32),
@@ -79,6 +82,14 @@ class DiffusionWorldModelDataset(DatasetBase, DpStyleDatasetMixin):
             "wrench": torch.tensor(wrench, dtype=torch.float32),
             "object_id": torch.tensor(object_id, dtype=torch.long),
         }
+
+    def pre_convert_data(self, state, action, image_feature, wrench):
+        state, action, _images = super().pre_convert_data(state, action, None)
+        image_feature = normalize_data(
+            image_feature, self.model_meta_info["image_feature"]
+        )
+        wrench = normalize_data(wrench, self.model_meta_info["wrench"])
+        return state, action, image_feature, wrench
 
     def get_object_id(self, filename):
         matched_object_ids = [
