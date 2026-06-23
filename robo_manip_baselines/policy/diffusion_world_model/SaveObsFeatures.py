@@ -32,7 +32,7 @@ def parse_argument():
         help="path to data (*.hdf5 or *.rmb) or directory containing them",
     )
     parser.add_argument(
-        "--dst_key",
+        "--image_feature_key",
         type=str,
         default="diffusion_policy_obs_visual_feature",
         help="key to save frozen visual features",
@@ -56,13 +56,13 @@ class SaveObsFeatures:
         self,
         checkpoint,
         path,
-        dst_key="diffusion_policy_obs_visual_feature",
+        image_feature_key="diffusion_policy_obs_visual_feature",
         batch_size=128,
         overwrite=False,
     ):
         self.checkpoint = checkpoint
         self.path = path
-        self.dst_key = dst_key
+        self.image_feature_key = image_feature_key
         self.batch_size = batch_size
         self.device = torch.device("cuda")
         self.overwrite = overwrite
@@ -73,7 +73,9 @@ class SaveObsFeatures:
 
     def run(self):
         print(f"[{self.__class__.__name__}] Load checkpoint: {self.checkpoint}")
-        print(f"[{self.__class__.__name__}] Save visual feature to '{self.dst_key}'.")
+        print(
+            f"[{self.__class__.__name__}] Save visual feature to '{self.image_feature_key}'."
+        )
         print(f"  - obs feature shape: {self.encoder.output_shape()}")
         print(f"  - visual feature shape: {self.encoder.visual_output_shape()}")
         print(f"  - feature slices: {self.encoder.feature_slices}")
@@ -86,24 +88,28 @@ class SaveObsFeatures:
                 mode="r+",
                 image_size=self.model_meta_info["data"]["image_size"],
             ) as rmb_data:
-                if self.dst_key in rmb_data.keys():
+                if self.image_feature_key in rmb_data.keys():
                     if self.overwrite:
-                        del rmb_data.h5file[self.dst_key]
+                        del rmb_data.h5file[self.image_feature_key]
                     else:
                         raise ValueError(
-                            f"[{self.__class__.__name__}] '{self.dst_key}' already exists: "
+                            f"[{self.__class__.__name__}] '{self.image_feature_key}' already exists: "
                             f"{rmb_path} (use --overwrite to replace)"
                         )
 
                 feature = self.extract_feature(rmb_data)
-                rmb_data.h5file.create_dataset(self.dst_key, data=feature)
-                rmb_data.attrs[self.dst_key + "_checkpoint"] = self.checkpoint
-                rmb_data.attrs[self.dst_key + "_feature_type"] = "visual"
-                rmb_data.attrs[self.dst_key + "_output_shape"] = feature.shape[1:]
-                rmb_data.attrs[self.dst_key + "_camera_names"] = np.array(
+                rmb_data.h5file.create_dataset(self.image_feature_key, data=feature)
+                rmb_data.attrs[self.image_feature_key + "_checkpoint"] = (
+                    self.checkpoint
+                )
+                rmb_data.attrs[self.image_feature_key + "_feature_type"] = "visual"
+                rmb_data.attrs[self.image_feature_key + "_output_shape"] = (
+                    feature.shape[1:]
+                )
+                rmb_data.attrs[self.image_feature_key + "_camera_names"] = np.array(
                     self.model_meta_info["image"]["camera_names"], dtype="S"
                 )
-                rmb_data.attrs[self.dst_key + "_state_keys"] = np.array(
+                rmb_data.attrs[self.image_feature_key + "_state_keys"] = np.array(
                     self.model_meta_info["state"]["keys"], dtype="S"
                 )
 
