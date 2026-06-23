@@ -29,8 +29,9 @@ python robo_manip_baselines/policy/wrench_predictor2/EvalWrenchPredictor.py \
 
 python ./bin/Train.py DiffusionPolicy \
   --camera_names front \
-  --action_keys command_eef_pose command_gripper_joint_pos \
-  --dataset_dir ./dataset/MujocoPusht_012 \
+  --state_keys measured_eef_pose \
+  --action_keys command_eef_pose \
+  --dataset_dir ./dataset/DatasetColl/training_50 \
   --scheduler ddim --num_epochs 1000 \
   --train_ratio 1.0 --val_ratio 0.01
 
