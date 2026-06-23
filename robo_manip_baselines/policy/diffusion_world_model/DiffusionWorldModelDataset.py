@@ -21,6 +21,9 @@ class DiffusionWorldModelDataset(DatasetBase, DpStyleDatasetMixin):
         "WrenchPredObject1": 1,
         "WrenchPredObject2": 2,
         "WrenchPredObject3": 3,
+        "WrenchPredObject4": 4,
+        "WrenchPredObject5": 5,
+        "WrenchPredObject6": 6,
     }
 
     def setup_variables(self):

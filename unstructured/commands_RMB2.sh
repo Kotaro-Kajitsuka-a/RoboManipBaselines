@@ -47,3 +47,18 @@ uv run python robo_manip_baselines/policy/diffusion_world_model/SaveObsFeatures.
   robo_manip_baselines/checkpoint/DiffusionPolicy/Stage0_DatasetAdmittancePushtRandom_cnn_ddim_seed62_eef_pose/policy_epoch0000.ckpt \
   robo_manip_baselines/dataset/DatasetAdmittancePushtRandom \
   --overwrite
+
+# Train DiffusionWorldModel with frozen Diffusion Policy visual features
+uv run python robo_manip_baselines/bin/Train.py DiffusionWorldModel \
+  --dataset_dir robo_manip_baselines/dataset/DatasetAdmittancePushtRandom \
+  --state_keys measured_eef_pose \
+  --action_keys command_eef_pose \
+  --scheduler ddim \
+  --horizon 16 \
+  --n_obs_steps 2 \
+  --pb_dim 9 \
+  --num_epochs 500 \
+  --batch_size 64 \
+  --train_ratio 0.96 \
+  --val_ratio 0.04 \
+  --checkpoint_dir robo_manip_baselines/checkpoint/DiffusionWorldModel/DatasetAdmittancePushtRandom_cnn_ddim_pb9
