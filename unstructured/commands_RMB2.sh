@@ -5,6 +5,7 @@ python ./robo_manip_baselines/bin/Teleop.py MujocoXarm7DualAdmittanceBox --input
 #ただのteleopration
 python robo_manip_baselines/bin/Teleop.py MujocoXarm7AdmittancePusht
 
+python robo_manip_baselines/bin/Teleop.py MujocoXarm7AdmittancePushi_I0 --input_device keyboard --world_idx_list 0 1 2 3
 
 #replay_log
 python robo_manip_baselines/bin/Teleop.py MujocoXarm7AdmittancePusht \
@@ -39,3 +40,9 @@ python ./robo_manip_baselines/bin/Rollout.py DiffusionPolicy MujocoXarm7Admittan
 
 # Run WrenchPredictor3 Coll training/evaluation locally without submitting a PBS job
 bash scripts/train_WrenchPred_Coll.sh
+
+# Add frozen Diffusion Policy visual features to all RMB HDF5 files
+uv run python robo_manip_baselines/policy/diffusion_world_model/SaveObsFeatures.py \
+  robo_manip_baselines/checkpoint/DiffusionPolicy/Stage0_DatasetAdmittancePushtRandom_cnn_ddim_seed62_eef_pose/policy_epoch0000.ckpt \
+  robo_manip_baselines/dataset/DatasetAdmittancePushtRandom \
+  --overwrite
