@@ -61,3 +61,8 @@ uv run python robo_manip_baselines/bin/Train.py DiffusionWorldModel \
   --batch_size 64 \
   --train_ratio 0.99 \
   --val_ratio 0.01 
+
+# Evaluate all DiffusionWorldModel checkpoints with material-property sweep
+uv run python robo_manip_baselines/policy/diffusion_world_model/EvalDiffusionWorldModelMaterialSweepDir.py \
+  robo_manip_baselines/checkpoint/DiffusionWorldModel/DatasetAdmittancePushtRandom_cnn_ddim_pb9 \
+  robo_manip_baselines/dataset/DatasetAdmittancePushtRandom/validation
