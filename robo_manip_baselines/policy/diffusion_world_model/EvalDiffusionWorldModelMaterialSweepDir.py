@@ -181,6 +181,7 @@ class EvalDiffusionWorldModelMaterialSweepDir:
 
         self.save_csv(rows)
         self.save_summary_csv(rows)
+        self.save_diagonal_accuracy_csv(rows)
         self.save_heatmaps(rows)
         print(f"[{self.__class__.__name__}] Save csv: {self.output_csv}")
 
@@ -230,6 +231,10 @@ class EvalDiffusionWorldModelMaterialSweepDir:
         self.summary_csv = os.path.join(
             self.summary_dir,
             "material_sweep_matrix_summary.csv",
+        )
+        self.diagonal_accuracy_csv = os.path.join(
+            self.summary_dir,
+            "material_sweep_diagonal_accuracy.csv",
         )
 
         print(f"[{self.__class__.__name__}] Device: {self.device}")
@@ -692,6 +697,47 @@ class EvalDiffusionWorldModelMaterialSweepDir:
             writer.writeheader()
             writer.writerows(summary_rows)
         print(f"[{self.__class__.__name__}] Save summary csv: {self.summary_csv}")
+
+    def save_diagonal_accuracy_csv(self, rows):
+        fieldnames = [
+            "checkpoint",
+            "metric",
+            "diagonal_accuracy",
+            "num_correct",
+            "num_objects",
+        ]
+        accuracy_rows = []
+        for checkpoint in sorted({row["checkpoint"] for row in rows}):
+            checkpoint_rows = [
+                row for row in rows if row["checkpoint"] == checkpoint
+            ]
+            for metric_name, row_metric_key in self.get_heatmap_metrics():
+                matrix = self.build_error_matrix(checkpoint_rows, row_metric_key)
+                num_correct = 0
+                for actual_idx, actual_object_key in enumerate(self.target_object_keys):
+                    correct_material_idx = MATERIAL_OBJECT_KEYS.index(actual_object_key)
+                    best_material_idx = int(np.argmin(matrix[actual_idx]))
+                    if best_material_idx == correct_material_idx:
+                        num_correct += 1
+                accuracy_rows.append(
+                    {
+                        "checkpoint": checkpoint,
+                        "metric": metric_name,
+                        "diagonal_accuracy": num_correct
+                        / len(self.target_object_keys),
+                        "num_correct": num_correct,
+                        "num_objects": len(self.target_object_keys),
+                    }
+                )
+
+        with open(self.diagonal_accuracy_csv, "w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(accuracy_rows)
+        print(
+            f"[{self.__class__.__name__}] Save diagonal accuracy csv: "
+            f"{self.diagonal_accuracy_csv}"
+        )
 
     def save_heatmaps(self, rows):
         for checkpoint in sorted({row["checkpoint"] for row in rows}):
