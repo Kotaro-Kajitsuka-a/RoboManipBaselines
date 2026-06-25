@@ -180,6 +180,8 @@ class EvalDiffusionWorldModelMaterialSweepDir:
                     )
 
         self.save_csv(rows)
+        self.save_summary_csv(rows)
+        self.save_heatmaps(rows)
         print(f"[{self.__class__.__name__}] Save csv: {self.output_csv}")
 
     def setup_model_meta_info(self):
@@ -216,8 +218,19 @@ class EvalDiffusionWorldModelMaterialSweepDir:
         rmb_dir_name = os.path.basename(os.path.normpath(self.rmb_dir))
         output_name = f"{rmb_dir_name}_world_model_material_sweep"
         self.output_dir = os.path.join(self.checkpoint_dir, "eval", output_name)
-        os.makedirs(self.output_dir, exist_ok=True)
-        self.output_csv = os.path.join(self.output_dir, f"{output_name}.csv")
+        self.raw_dir = os.path.join(self.output_dir, "raw")
+        self.summary_dir = os.path.join(self.output_dir, "summary")
+        self.heatmap_dir = os.path.join(self.output_dir, "heatmaps")
+        self.episode_dir = os.path.join(self.output_dir, "episodes")
+        os.makedirs(self.raw_dir, exist_ok=True)
+        os.makedirs(self.summary_dir, exist_ok=True)
+        os.makedirs(self.heatmap_dir, exist_ok=True)
+        os.makedirs(self.episode_dir, exist_ok=True)
+        self.output_csv = os.path.join(self.raw_dir, "material_sweep_eval.csv")
+        self.summary_csv = os.path.join(
+            self.summary_dir,
+            "material_sweep_matrix_summary.csv",
+        )
 
         print(f"[{self.__class__.__name__}] Device: {self.device}")
         print(f"[{self.__class__.__name__}] Checkpoints: {len(self.checkpoints)}")
@@ -302,6 +315,7 @@ class EvalDiffusionWorldModelMaterialSweepDir:
         material_object_id = self.object_key_to_id[material_object_key]
         wrench_abs_error_list = []
         image_feature_abs_error_list = []
+        total_abs_error_list = []
         torch.manual_seed(self.seed)
         if self.device.type == "cuda":
             torch.cuda.manual_seed_all(self.seed)
@@ -320,16 +334,19 @@ class EvalDiffusionWorldModelMaterialSweepDir:
             )
             with torch.inference_mode():
                 pred = self.policy.predict(batch)
-            wrench_abs_error, image_feature_abs_error = self.compute_abs_error(
-                batch, pred
+            wrench_abs_error, image_feature_abs_error, total_abs_error = (
+                self.compute_abs_error(batch, pred)
             )
             wrench_abs_error_list.append(wrench_abs_error)
             image_feature_abs_error_list.append(image_feature_abs_error)
+            total_abs_error_list.append(total_abs_error)
 
         wrench_abs_error = np.concatenate(wrench_abs_error_list, axis=0)
         image_feature_abs_error = np.concatenate(image_feature_abs_error_list, axis=0)
+        total_abs_error = np.concatenate(total_abs_error_list, axis=0)
         wrench_mae = wrench_abs_error.mean(axis=0)
         image_feature_mae = image_feature_abs_error.mean()
+        total_mae = total_abs_error.mean()
 
         return {
             "checkpoint": os.path.basename(checkpoint),
@@ -347,13 +364,13 @@ class EvalDiffusionWorldModelMaterialSweepDir:
             "Nz": wrench_mae[5],
             "wrench mean": wrench_mae.mean(),
             "image_feature mean": image_feature_mae,
+            "total mean": total_mae,
         }
 
     def save_episode_plots(self, checkpoint, actual_object_key, filenames):
         checkpoint_stem = os.path.splitext(os.path.basename(checkpoint))[0]
         plot_dir = os.path.join(
-            self.output_dir,
-            "plots",
+            self.episode_dir,
             checkpoint_stem,
             f"actual_{actual_object_key}",
         )
@@ -537,19 +554,45 @@ class EvalDiffusionWorldModelMaterialSweepDir:
 
     def compute_abs_error(self, batch, pred):
         start = self.model_meta_info["data"]["n_obs_steps"]
-        gt_wrench = batch["wrench"][:, start:].detach().cpu().numpy()
-        pred_wrench = pred["wrench"][:, start:].detach().cpu().numpy()
-        gt_image_feature = batch["image_feature"][:, start:].detach().cpu().numpy()
-        pred_image_feature = pred["image_feature"][:, start:].detach().cpu().numpy()
+        gt_wrench_normalized = batch["wrench"][:, start:].detach().cpu().numpy()
+        pred_wrench_normalized = pred["wrench"][:, start:].detach().cpu().numpy()
+        gt_image_feature_normalized = (
+            batch["image_feature"][:, start:].detach().cpu().numpy()
+        )
+        pred_image_feature_normalized = (
+            pred["image_feature"][:, start:].detach().cpu().numpy()
+        )
 
-        gt_wrench = denormalize_data(gt_wrench, self.model_meta_info["wrench"])
-        pred_wrench = denormalize_data(pred_wrench, self.model_meta_info["wrench"])
+        total_abs_error = np.concatenate(
+            [
+                np.abs(pred_wrench_normalized - gt_wrench_normalized).reshape(
+                    -1,
+                    self.model_meta_info["policy"]["args"]["wrench_dim"],
+                ),
+                np.abs(
+                    pred_image_feature_normalized - gt_image_feature_normalized
+                ).reshape(
+                    -1,
+                    self.model_meta_info["policy"]["args"]["image_feature_dim"],
+                ),
+            ],
+            axis=1,
+        )
+
+        gt_wrench = denormalize_data(
+            gt_wrench_normalized,
+            self.model_meta_info["wrench"],
+        )
+        pred_wrench = denormalize_data(
+            pred_wrench_normalized,
+            self.model_meta_info["wrench"],
+        )
         gt_image_feature = denormalize_data(
-            gt_image_feature,
+            gt_image_feature_normalized,
             self.model_meta_info["image_feature"],
         )
         pred_image_feature = denormalize_data(
-            pred_image_feature,
+            pred_image_feature_normalized,
             self.model_meta_info["image_feature"],
         )
 
@@ -559,7 +602,7 @@ class EvalDiffusionWorldModelMaterialSweepDir:
         image_feature_abs_error = np.abs(
             pred_image_feature - gt_image_feature
         ).reshape(-1, self.model_meta_info["policy"]["args"]["image_feature_dim"])
-        return wrench_abs_error, image_feature_abs_error
+        return wrench_abs_error, image_feature_abs_error, total_abs_error
 
     def print_row(self, row):
         print(
@@ -589,11 +632,184 @@ class EvalDiffusionWorldModelMaterialSweepDir:
             "Nz",
             "wrench mean",
             "image_feature mean",
+            "total mean",
         ]
         with open(self.output_csv, "w", newline="") as f:
             writer = csv.DictWriter(f, fieldnames=fieldnames)
             writer.writeheader()
             writer.writerows(rows)
+
+    def save_summary_csv(self, rows):
+        fieldnames = [
+            "checkpoint",
+            "metric",
+            "actual_object_key",
+            *MATERIAL_OBJECT_KEYS,
+            "best_material_object_key",
+            "correct_error",
+            "best_error",
+            "correct_is_best",
+        ]
+        summary_rows = []
+        for checkpoint in sorted({row["checkpoint"] for row in rows}):
+            checkpoint_rows = [
+                row for row in rows if row["checkpoint"] == checkpoint
+            ]
+            for metric_name, row_metric_key in self.get_heatmap_metrics():
+                matrix = self.build_error_matrix(checkpoint_rows, row_metric_key)
+                for actual_idx, actual_object_key in enumerate(self.target_object_keys):
+                    correct_material_idx = MATERIAL_OBJECT_KEYS.index(actual_object_key)
+                    best_material_idx = int(np.argmin(matrix[actual_idx]))
+                    summary_rows.append(
+                        {
+                            "checkpoint": checkpoint,
+                            "metric": metric_name,
+                            "actual_object_key": actual_object_key,
+                            **{
+                                material_object_key: matrix[
+                                    actual_idx,
+                                    material_idx,
+                                ]
+                                for material_idx, material_object_key in enumerate(
+                                    MATERIAL_OBJECT_KEYS
+                                )
+                            },
+                            "best_material_object_key": MATERIAL_OBJECT_KEYS[
+                                best_material_idx
+                            ],
+                            "correct_error": matrix[
+                                actual_idx,
+                                correct_material_idx,
+                            ],
+                            "best_error": matrix[actual_idx, best_material_idx],
+                            "correct_is_best": best_material_idx
+                            == correct_material_idx,
+                        }
+                    )
+
+        with open(self.summary_csv, "w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(summary_rows)
+        print(f"[{self.__class__.__name__}] Save summary csv: {self.summary_csv}")
+
+    def save_heatmaps(self, rows):
+        for checkpoint in sorted({row["checkpoint"] for row in rows}):
+            checkpoint_rows = [
+                row for row in rows if row["checkpoint"] == checkpoint
+            ]
+            checkpoint_stem = os.path.splitext(checkpoint)[0]
+            output_png = os.path.join(
+                self.heatmap_dir,
+                f"{checkpoint_stem}_material_sweep_heatmap.png",
+            )
+            self.save_checkpoint_heatmap(output_png, checkpoint_stem, checkpoint_rows)
+            print(f"[{self.__class__.__name__}] Save heatmap: {output_png}")
+
+    def save_checkpoint_heatmap(self, output_png, checkpoint_stem, rows):
+        metrics = self.get_heatmap_metrics()
+        fig, axes = plt.subplots(len(metrics), 2, figsize=(12, 12))
+        for row_idx, (metric_name, row_metric_key) in enumerate(metrics):
+            error_matrix = self.build_error_matrix(rows, row_metric_key)
+            delta_matrix = self.compute_delta_from_correct(error_matrix)
+            self.draw_heatmap(
+                axes[row_idx, 0],
+                error_matrix,
+                f"{metric_name} absolute",
+                "viridis",
+            )
+            self.draw_heatmap(
+                axes[row_idx, 1],
+                delta_matrix,
+                f"{metric_name} delta from correct",
+                "coolwarm",
+                center_zero=True,
+            )
+
+        fig.suptitle(f"{checkpoint_stem} material sweep", fontsize=13)
+        fig.tight_layout()
+        fig.savefig(output_png)
+        plt.close(fig)
+
+    def get_heatmap_metrics(self):
+        return [
+            ("wrench", "wrench mean"),
+            ("image feature", "image_feature mean"),
+            ("total", "total mean"),
+        ]
+
+    def build_error_matrix(self, rows, metric_key):
+        row_by_object_pair = {
+            (row["actual_object_key"], row["material_object_key"]): row
+            for row in rows
+        }
+        matrix = np.full(
+            (len(self.target_object_keys), len(MATERIAL_OBJECT_KEYS)),
+            np.nan,
+            dtype=np.float64,
+        )
+        for actual_idx, actual_object_key in enumerate(self.target_object_keys):
+            for material_idx, material_object_key in enumerate(MATERIAL_OBJECT_KEYS):
+                matrix[actual_idx, material_idx] = row_by_object_pair[
+                    (actual_object_key, material_object_key)
+                ][metric_key]
+        return matrix
+
+    def compute_delta_from_correct(self, error_matrix):
+        delta_matrix = np.zeros_like(error_matrix)
+        for actual_idx, actual_object_key in enumerate(self.target_object_keys):
+            correct_material_idx = MATERIAL_OBJECT_KEYS.index(actual_object_key)
+            delta_matrix[actual_idx] = (
+                error_matrix[actual_idx]
+                - error_matrix[actual_idx, correct_material_idx]
+            )
+        return delta_matrix
+
+    def draw_heatmap(
+        self,
+        ax,
+        matrix,
+        title,
+        cmap,
+        center_zero=False,
+    ):
+        vmin = None
+        vmax = None
+        if center_zero:
+            abs_max = np.nanmax(np.abs(matrix))
+            if abs_max == 0:
+                abs_max = 1.0
+            vmin = -abs_max
+            vmax = abs_max
+        im = ax.imshow(matrix, cmap=cmap, vmin=vmin, vmax=vmax)
+        ax.set_title(title)
+        ax.set_xticks(range(len(MATERIAL_OBJECT_KEYS)))
+        ax.set_xticklabels(
+            [object_key.replace("WrenchPredObject", "PB") for object_key in MATERIAL_OBJECT_KEYS],
+            rotation=45,
+            ha="right",
+        )
+        ax.set_yticks(range(len(self.target_object_keys)))
+        ax.set_yticklabels(
+            [
+                object_key.replace("WrenchPredObject", "Object")
+                for object_key in self.target_object_keys
+            ]
+        )
+        ax.set_xlabel("used material PB")
+        ax.set_ylabel("actual object")
+        for row_idx in range(matrix.shape[0]):
+            for col_idx in range(matrix.shape[1]):
+                ax.text(
+                    col_idx,
+                    row_idx,
+                    f"{matrix[row_idx, col_idx]:.3g}",
+                    ha="center",
+                    va="center",
+                    color="white",
+                    fontsize=8,
+                )
+        plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
 
 
 if __name__ == "__main__":
