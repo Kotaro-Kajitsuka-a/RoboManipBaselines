@@ -18,7 +18,13 @@ import matplotlib.pyplot as plt
 sys.path.append(
     os.path.join(os.path.dirname(__file__), "../../../third_party/diffusion_policy")
 )
-from robo_manip_baselines.common import DataKey, RmbData, denormalize_data, find_rmb_files
+from robo_manip_baselines.common import (
+    DataKey,
+    RmbData,
+    denormalize_data,
+    find_rmb_files,
+    get_skipped_data_seq,
+)
 from robo_manip_baselines.policy.diffusion_world_model.DiffusionWorldModel import (
     DiffusionWorldModel,
 )
@@ -35,6 +41,68 @@ MATERIAL_OBJECT_KEYS = [
     "WrenchPredObject4",
 ]
 WRENCH_LABELS = ["Fx", "Fy", "Fz", "Nx", "Ny", "Nz"]
+
+
+class EvalDiffusionWorldModelDataset(DiffusionWorldModelDataset):
+    def __getitem__(self, chunk_idx):
+        skip = self.model_meta_info["data"]["skip"]
+        horizon = self.model_meta_info["data"]["horizon"]
+        episode_idx, start_time_idx = self.chunk_info_list[chunk_idx]
+        filename = self.filenames[episode_idx]
+        object_id = self.get_object_id(filename)
+        clip_info = self.model_meta_info["wrench"]["percentile_clip"]
+        source_key = clip_info["source_key"]
+        if isinstance(source_key, bytes):
+            source_key = source_key.decode()
+
+        with RmbData(filename, self.enable_rmb_cache) as rmb_data:
+            episode_len = rmb_data[DataKey.TIME][::skip].shape[0]
+            time_idxes = np.clip(
+                np.arange(start_time_idx, start_time_idx + horizon), 0, episode_len - 1
+            )
+
+            image_feature = get_skipped_data_seq(
+                rmb_data[self.IMAGE_FEATURE_KEY][:], self.IMAGE_FEATURE_KEY, skip
+            )[time_idxes]
+
+            if len(self.model_meta_info["state"]["keys"]) == 0:
+                state = np.zeros((horizon, 0), dtype=np.float64)
+            else:
+                state = np.concatenate(
+                    [
+                        get_skipped_data_seq(rmb_data[key][:], key, skip)[time_idxes]
+                        for key in self.model_meta_info["state"]["keys"]
+                    ],
+                    axis=1,
+                )
+
+            action = np.concatenate(
+                [
+                    get_skipped_data_seq(rmb_data[key][:], key, skip)[time_idxes]
+                    for key in self.model_meta_info["action"]["keys"]
+                ],
+                axis=1,
+            )
+
+            source_wrench = np.asarray(rmb_data[source_key][:])
+            clipped_wrench = np.clip(source_wrench, clip_info["min"], clip_info["max"])
+            wrench = get_skipped_data_seq(
+                clipped_wrench,
+                self.model_meta_info["wrench"]["percentile_clip"]["key"],
+                skip,
+            )[time_idxes]
+
+        state, action, image_feature, wrench = self.pre_convert_data(
+            state, action, image_feature, wrench
+        )
+
+        return {
+            "image_feature": torch.tensor(image_feature, dtype=torch.float32),
+            "state": torch.tensor(state, dtype=torch.float32),
+            "action": torch.tensor(action, dtype=torch.float32),
+            "wrench": torch.tensor(wrench, dtype=torch.float32),
+            "object_id": torch.tensor(object_id, dtype=torch.long),
+        }
 
 
 def parse_argument():
@@ -118,6 +186,12 @@ class EvalDiffusionWorldModelMaterialSweepDir:
         model_meta_info_path = os.path.join(self.checkpoint_dir, "model_meta_info.pkl")
         with open(model_meta_info_path, "rb") as f:
             self.model_meta_info = pickle.load(f)
+        if "percentile_clip" not in self.model_meta_info["wrench"]:
+            raise KeyError(
+                "[EvalDiffusionWorldModelMaterialSweepDir] "
+                "model_meta_info['wrench']['percentile_clip'] is missing. "
+                "Please train DiffusionWorldModel with a checkpoint that stores the training clip range."
+            )
         print(
             f"[{self.__class__.__name__}] Load model meta info: {model_meta_info_path}"
         )
@@ -213,7 +287,7 @@ class EvalDiffusionWorldModelMaterialSweepDir:
         material_object_key,
         filenames,
     ):
-        dataset = DiffusionWorldModelDataset(
+        dataset = EvalDiffusionWorldModelDataset(
             filenames,
             self.model_meta_info,
             enable_rmb_cache=False,
@@ -301,7 +375,7 @@ class EvalDiffusionWorldModelMaterialSweepDir:
             )
 
     def evaluate_episode_for_plot(self, filename):
-        dataset = DiffusionWorldModelDataset(
+        dataset = EvalDiffusionWorldModelDataset(
             [filename],
             self.model_meta_info,
             enable_rmb_cache=False,

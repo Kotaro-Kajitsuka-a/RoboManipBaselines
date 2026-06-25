@@ -50,7 +50,7 @@ uv run python robo_manip_baselines/policy/diffusion_world_model/SaveObsFeatures.
 
 # Train DiffusionWorldModel with frozen Diffusion Policy visual features
 uv run python robo_manip_baselines/bin/Train.py DiffusionWorldModel \
-  --dataset_dir robo_manip_baselines/dataset/DatasetAdmittancePushtRandom \
+  --dataset_dir robo_manip_baselines/dataset/DatasetColl \
   --state_keys measured_eef_pose \
   --action_keys command_eef_pose \
   --scheduler ddim \
@@ -64,5 +64,5 @@ uv run python robo_manip_baselines/bin/Train.py DiffusionWorldModel \
 
 # Evaluate all DiffusionWorldModel checkpoints with material-property sweep
 uv run python robo_manip_baselines/policy/diffusion_world_model/EvalDiffusionWorldModelMaterialSweepDir.py \
-  robo_manip_baselines/checkpoint/DiffusionWorldModel/DatasetAdmittancePushtRandom_cnn_ddim_pb9 \
-  robo_manip_baselines/dataset/DatasetAdmittancePushtRandom/validation
+  robo_manip_baselines/checkpoint/DiffusionWorldModel/hogehoge \
+  robo_manip_baselines/dataset/DatasetColl/validation
