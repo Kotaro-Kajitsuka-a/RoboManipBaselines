@@ -203,9 +203,14 @@ class AddAprilTagPoseToRmbData:
         tag_ids = np.full(len(rgb_image_seq), -1, dtype=np.int32)
         rvecs = np.full((len(rgb_image_seq), 3), np.nan, dtype=np.float64)
         tvecs = np.full((len(rgb_image_seq), 3), np.nan, dtype=np.float64)
+        previous_rotation_matrix = None
 
         for frame_idx, rgb_image in enumerate(rgb_image_seq):
-            detection = self.detect_single(rgb_image, camera_matrix)
+            detection = self.detect_single(
+                rgb_image,
+                camera_matrix,
+                previous_rotation_matrix,
+            )
             if detection is None:
                 continue
             poses[frame_idx] = detection["pose"]
@@ -214,6 +219,7 @@ class AddAprilTagPoseToRmbData:
             tag_ids[frame_idx] = detection["tag_id"]
             rvecs[frame_idx] = detection["rvec"]
             tvecs[frame_idx] = detection["tvec"]
+            previous_rotation_matrix = detection["rotation_matrix"]
 
         if not np.any(detected):
             raise ValueError(
@@ -232,7 +238,7 @@ class AddAprilTagPoseToRmbData:
         )
         return poses, corners, detected, tag_ids, rvecs, tvecs
 
-    def detect_single(self, rgb_image, camera_matrix):
+    def detect_single(self, rgb_image, camera_matrix, previous_rotation_matrix=None):
         gray_image = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2GRAY)
         corners_list, ids = self.detect_markers_with_fallback(gray_image)
         if ids is None:
@@ -244,13 +250,18 @@ class AddAprilTagPoseToRmbData:
 
         image_points = corners_list[selected_idx].reshape(4, 2).astype(np.float64)
         tag_id = int(ids[selected_idx, 0])
-        pose_xy_axis, rvec, tvec = self.estimate_pose(image_points, camera_matrix)
+        pose_xy_axis, rvec, tvec, rotation_matrix = self.estimate_pose(
+            image_points,
+            camera_matrix,
+            previous_rotation_matrix,
+        )
         return {
             "pose": pose_xy_axis,
             "corners": image_points,
             "tag_id": tag_id,
             "rvec": rvec,
             "tvec": tvec,
+            "rotation_matrix": rotation_matrix,
         }
 
     def detect_markers_with_fallback(self, gray_image):
@@ -282,7 +293,7 @@ class AddAprilTagPoseToRmbData:
         ]
         return int(np.argmax(areas))
 
-    def estimate_pose(self, image_points, camera_matrix):
+    def estimate_pose(self, image_points, camera_matrix, previous_rotation_matrix):
         half_size = self.tag_size / 2.0
         object_points = np.array(
             [
@@ -293,7 +304,7 @@ class AddAprilTagPoseToRmbData:
             ],
             dtype=np.float64,
         )
-        success, rvec, tvec = cv2.solvePnP(
+        success, rvecs, tvecs, reprojection_errors = cv2.solvePnPGeneric(
             object_points,
             image_points,
             camera_matrix,
@@ -301,12 +312,41 @@ class AddAprilTagPoseToRmbData:
             flags=cv2.SOLVEPNP_IPPE_SQUARE,
         )
         assert success
-        rotation_matrix, _jacobian = cv2.Rodrigues(rvec)
-        return (
-            self.get_pose_xy_axis(rotation_matrix, tvec.reshape(3)),
-            rvec.reshape(3),
-            tvec.reshape(3),
+        rvec, tvec, rotation_matrix = self.select_pose_solution(
+            rvecs,
+            tvecs,
+            reprojection_errors,
+            previous_rotation_matrix,
         )
+        return (
+            self.get_pose_xy_axis(rotation_matrix, tvec),
+            rvec,
+            tvec,
+            rotation_matrix,
+        )
+
+    def select_pose_solution(
+        self,
+        rvecs,
+        tvecs,
+        reprojection_errors,
+        previous_rotation_matrix,
+    ):
+        if previous_rotation_matrix is None:
+            selected_idx = int(np.argmin(np.asarray(reprojection_errors).reshape(-1)))
+        else:
+            rotation_scores = []
+            for rvec in rvecs:
+                rotation_matrix, _jacobian = cv2.Rodrigues(rvec)
+                rotation_scores.append(
+                    np.trace(previous_rotation_matrix.T @ rotation_matrix)
+                )
+            selected_idx = int(np.argmax(rotation_scores))
+
+        rvec = rvecs[selected_idx].reshape(3)
+        tvec = tvecs[selected_idx].reshape(3)
+        rotation_matrix, _jacobian = cv2.Rodrigues(rvec)
+        return rvec, tvec, rotation_matrix
 
     def get_pose_xy_axis(self, rotation_matrix, position):
         return np.concatenate(
