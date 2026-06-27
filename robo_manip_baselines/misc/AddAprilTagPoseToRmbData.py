@@ -9,7 +9,6 @@ from robo_manip_baselines.common import (
     DataKey,
     RmbData,
     find_rmb_files,
-    get_pose_from_rot_pos,
 )
 
 
@@ -83,7 +82,7 @@ class AddAprilTagPoseToRmbData:
         self.video_fps = video_fps
 
         self.rgb_key = DataKey.get_rgb_image_key(camera_name)
-        self.pose_key = f"{camera_name}_apriltag_pose"
+        self.pose_key = f"{camera_name}_apriltag_pose_xy_axis"
         self.corners_key = f"{camera_name}_apriltag_corners"
         self.detected_key = f"{camera_name}_apriltag_detected"
         self.id_key = f"{camera_name}_apriltag_id"
@@ -110,6 +109,7 @@ class AddAprilTagPoseToRmbData:
                 rgb_image_seq = np.asarray(rmb_data[self.rgb_key][:])
                 camera_matrix = self.build_camera_matrix(rmb_data, rgb_image_seq)
                 poses, corners, detected, tag_ids, rvecs, tvecs = self.detect_sequence(
+                    rmb_path,
                     rgb_image_seq,
                     camera_matrix,
                 )
@@ -133,6 +133,18 @@ class AddAprilTagPoseToRmbData:
         )
         parameters = cv2.aruco.DetectorParameters()
         parameters.cornerRefinementMethod = cv2.aruco.CORNER_REFINE_APRILTAG
+        parameters.adaptiveThreshWinSizeMax = 53
+        parameters.adaptiveThreshWinSizeStep = 4
+        parameters.minMarkerPerimeterRate = 0.01
+        parameters.maxMarkerPerimeterRate = 6.0
+        parameters.minCornerDistanceRate = 0.02
+        parameters.minDistanceToBorder = 1
+        parameters.errorCorrectionRate = 0.8
+        parameters.maxErroneousBitsInBorderRate = 0.5
+        parameters.aprilTagMinClusterPixels = 3
+        parameters.aprilTagMinWhiteBlackDiff = 3
+        parameters.aprilTagMaxLineFitMse = 20.0
+        parameters.detectInvertedMarker = True
         self.detector = cv2.aruco.ArucoDetector(dictionary, parameters)
 
     def assert_output_keys(self, rmb_data, rmb_path):
@@ -181,8 +193,8 @@ class AddAprilTagPoseToRmbData:
             f"'{rgb_fovy_key}' or '{depth_fovy_key}'"
         )
 
-    def detect_sequence(self, rgb_image_seq, camera_matrix):
-        poses = np.full((len(rgb_image_seq), 7), np.nan, dtype=np.float64)
+    def detect_sequence(self, rmb_path, rgb_image_seq, camera_matrix):
+        poses = np.full((len(rgb_image_seq), 9), np.nan, dtype=np.float64)
         corners = np.full((len(rgb_image_seq), 4, 2), np.nan, dtype=np.float64)
         detected = np.zeros(len(rgb_image_seq), dtype=np.bool_)
         tag_ids = np.full(len(rgb_image_seq), -1, dtype=np.int32)
@@ -202,15 +214,29 @@ class AddAprilTagPoseToRmbData:
 
         if not np.any(detected):
             raise ValueError(
-                f"[{self.__class__.__name__}] No AprilTag was detected from '{self.rgb_key}'."
+                f"[{self.__class__.__name__}] No AprilTag was detected from "
+                f"'{self.rgb_key}': {rmb_path}"
             )
 
-        self.fill_missing_with_previous(poses, corners, tag_ids, rvecs, tvecs, detected)
+        self.fill_missing_with_previous(
+            rmb_path,
+            poses,
+            corners,
+            tag_ids,
+            rvecs,
+            tvecs,
+            detected,
+        )
         return poses, corners, detected, tag_ids, rvecs, tvecs
 
     def detect_single(self, rgb_image, camera_matrix):
         gray_image = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2GRAY)
         corners_list, ids, _rejected = self.detector.detectMarkers(gray_image)
+        if ids is None:
+            gray_image_equalized = cv2.equalizeHist(gray_image)
+            corners_list, ids, _rejected = self.detector.detectMarkers(
+                gray_image_equalized
+            )
         if ids is None:
             return None
 
@@ -220,9 +246,9 @@ class AddAprilTagPoseToRmbData:
 
         image_points = corners_list[selected_idx].reshape(4, 2).astype(np.float64)
         tag_id = int(ids[selected_idx, 0])
-        pose, rvec, tvec = self.estimate_pose(image_points, camera_matrix)
+        pose_xy_axis, rvec, tvec = self.estimate_pose(image_points, camera_matrix)
         return {
-            "pose": pose,
+            "pose": pose_xy_axis,
             "corners": image_points,
             "tag_id": tag_id,
             "rvec": rvec,
@@ -264,17 +290,35 @@ class AddAprilTagPoseToRmbData:
         assert success
         rotation_matrix, _jacobian = cv2.Rodrigues(rvec)
         return (
-            get_pose_from_rot_pos(rotation_matrix, tvec.reshape(3)),
+            self.get_pose_xy_axis(rotation_matrix, tvec.reshape(3)),
             rvec.reshape(3),
             tvec.reshape(3),
         )
 
-    def fill_missing_with_previous(self, poses, corners, tag_ids, rvecs, tvecs, detected):
+    def get_pose_xy_axis(self, rotation_matrix, position):
+        return np.concatenate(
+            [
+                position,
+                rotation_matrix[:, 0],
+                rotation_matrix[:, 1],
+            ]
+        )
+
+    def fill_missing_with_previous(
+        self,
+        rmb_path,
+        poses,
+        corners,
+        tag_ids,
+        rvecs,
+        tvecs,
+        detected,
+    ):
         if not detected[0]:
             raise ValueError(
                 f"[{self.__class__.__name__}] AprilTag was not detected at frame 0 "
                 f"from '{self.rgb_key}'. Frame 0 detection is required because missing "
-                "frames are filled with the previous frame."
+                f"frames are filled with the previous frame: {rmb_path}"
             )
 
         for frame_idx in range(1, len(detected)):
@@ -412,7 +456,9 @@ class AddAprilTagPoseToRmbData:
         rmb_data.attrs[self.pose_key + "_fill_missing"] = (
             "previous_frame; frame0_detection_required"
         )
-        rmb_data.attrs[self.pose_key + "_format"] = "tx ty tz qw qx qy qz"
+        rmb_data.attrs[self.pose_key + "_format"] = (
+            "tx ty tz x_axis_x x_axis_y x_axis_z y_axis_x y_axis_y y_axis_z"
+        )
 
 
 if __name__ == "__main__":
