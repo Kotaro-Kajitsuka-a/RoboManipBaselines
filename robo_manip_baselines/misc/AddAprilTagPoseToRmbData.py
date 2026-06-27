@@ -133,17 +133,20 @@ class AddAprilTagPoseToRmbData:
         )
         parameters = cv2.aruco.DetectorParameters()
         parameters.cornerRefinementMethod = cv2.aruco.CORNER_REFINE_APRILTAG
-        parameters.adaptiveThreshWinSizeMax = 53
-        parameters.adaptiveThreshWinSizeStep = 4
-        parameters.minMarkerPerimeterRate = 0.01
-        parameters.maxMarkerPerimeterRate = 6.0
-        parameters.minCornerDistanceRate = 0.02
-        parameters.minDistanceToBorder = 1
-        parameters.errorCorrectionRate = 0.8
-        parameters.maxErroneousBitsInBorderRate = 0.5
-        parameters.aprilTagMinClusterPixels = 3
-        parameters.aprilTagMinWhiteBlackDiff = 3
-        parameters.aprilTagMaxLineFitMse = 20.0
+        parameters.adaptiveThreshWinSizeMax = 101
+        parameters.adaptiveThreshWinSizeStep = 2
+        parameters.adaptiveThreshConstant = 3
+        parameters.minMarkerPerimeterRate = 0.005
+        parameters.maxMarkerPerimeterRate = 10.0
+        parameters.minCornerDistanceRate = 0.01
+        parameters.minDistanceToBorder = 0
+        parameters.errorCorrectionRate = 1.0
+        parameters.maxErroneousBitsInBorderRate = 0.8
+        parameters.aprilTagMinClusterPixels = 1
+        parameters.aprilTagMinWhiteBlackDiff = 1
+        parameters.aprilTagMaxLineFitMse = 50.0
+        parameters.aprilTagCriticalRad = 0.05
+        parameters.polygonalApproxAccuracyRate = 0.08
         parameters.detectInvertedMarker = True
         self.detector = cv2.aruco.ArucoDetector(dictionary, parameters)
 
