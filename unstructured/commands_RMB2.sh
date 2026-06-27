@@ -66,3 +66,12 @@ uv run python robo_manip_baselines/bin/Train.py DiffusionWorldModel \
 uv run python robo_manip_baselines/policy/diffusion_world_model/EvalDiffusionWorldModelMaterialSweepDir.py \
   robo_manip_baselines/checkpoint/DiffusionWorldModel/hogehoge \
   robo_manip_baselines/dataset/DatasetColl/validation
+
+# Add AprilTag tag25h9 pose to all RMB HDF5 files
+uv run python robo_manip_baselines/misc/AddAprilTagPoseToRmbData.py \
+  robo_manip_baselines/dataset/ピンチテスト_marker/training \
+  --camera_name front \
+  --tag_size 0.03385 \
+  --tag_id 0 \
+  --save_video \
+  --overwrite

@@ -1,4 +1,5 @@
 import argparse
+import os
 
 import cv2
 import numpy as np
@@ -45,6 +46,17 @@ def parse_argument():
         action="store_true",
         help="whether to overwrite existing values if they exist",
     )
+    parser.add_argument(
+        "--save_video",
+        action="store_true",
+        help="whether to save an mp4 video with AprilTag detection overlays",
+    )
+    parser.add_argument(
+        "--video_fps",
+        type=float,
+        default=None,
+        help="fps of the output mp4 video; if omitted, it is inferred from the RMB time data",
+    )
 
     return parser.parse_args()
 
@@ -59,12 +71,16 @@ class AddAprilTagPoseToRmbData:
         tag_size=0.03385,
         tag_id=None,
         overwrite=False,
+        save_video=False,
+        video_fps=None,
     ):
         self.path = path
         self.camera_name = camera_name
         self.tag_size = tag_size
         self.tag_id = tag_id
         self.overwrite = overwrite
+        self.save_video = save_video
+        self.video_fps = video_fps
 
         self.rgb_key = DataKey.get_rgb_image_key(camera_name)
         self.pose_key = f"{camera_name}_apriltag_pose"
@@ -93,11 +109,23 @@ class AddAprilTagPoseToRmbData:
 
                 rgb_image_seq = np.asarray(rmb_data[self.rgb_key][:])
                 camera_matrix = self.build_camera_matrix(rmb_data, rgb_image_seq)
-                poses, corners, detected, tag_ids = self.detect_sequence(
+                poses, corners, detected, tag_ids, rvecs, tvecs = self.detect_sequence(
                     rgb_image_seq,
                     camera_matrix,
                 )
                 self.save(rmb_data, poses, corners, detected, tag_ids)
+                if self.save_video:
+                    self.save_detection_video(
+                        rmb_path,
+                        rmb_data,
+                        rgb_image_seq,
+                        corners,
+                        detected,
+                        tag_ids,
+                        camera_matrix,
+                        rvecs,
+                        tvecs,
+                    )
 
     def setup_detector(self):
         dictionary = cv2.aruco.getPredefinedDictionary(
@@ -158,6 +186,8 @@ class AddAprilTagPoseToRmbData:
         corners = np.full((len(rgb_image_seq), 4, 2), np.nan, dtype=np.float64)
         detected = np.zeros(len(rgb_image_seq), dtype=np.bool_)
         tag_ids = np.full(len(rgb_image_seq), -1, dtype=np.int32)
+        rvecs = np.full((len(rgb_image_seq), 3), np.nan, dtype=np.float64)
+        tvecs = np.full((len(rgb_image_seq), 3), np.nan, dtype=np.float64)
 
         for frame_idx, rgb_image in enumerate(rgb_image_seq):
             detection = self.detect_single(rgb_image, camera_matrix)
@@ -167,14 +197,16 @@ class AddAprilTagPoseToRmbData:
             corners[frame_idx] = detection["corners"]
             detected[frame_idx] = True
             tag_ids[frame_idx] = detection["tag_id"]
+            rvecs[frame_idx] = detection["rvec"]
+            tvecs[frame_idx] = detection["tvec"]
 
         if not np.any(detected):
             raise ValueError(
                 f"[{self.__class__.__name__}] No AprilTag was detected from '{self.rgb_key}'."
             )
 
-        self.fill_missing_with_previous(poses, corners, tag_ids, detected)
-        return poses, corners, detected, tag_ids
+        self.fill_missing_with_previous(poses, corners, tag_ids, rvecs, tvecs, detected)
+        return poses, corners, detected, tag_ids, rvecs, tvecs
 
     def detect_single(self, rgb_image, camera_matrix):
         gray_image = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2GRAY)
@@ -188,11 +220,13 @@ class AddAprilTagPoseToRmbData:
 
         image_points = corners_list[selected_idx].reshape(4, 2).astype(np.float64)
         tag_id = int(ids[selected_idx, 0])
-        pose = self.estimate_pose(image_points, camera_matrix)
+        pose, rvec, tvec = self.estimate_pose(image_points, camera_matrix)
         return {
             "pose": pose,
             "corners": image_points,
             "tag_id": tag_id,
+            "rvec": rvec,
+            "tvec": tvec,
         }
 
     def select_detection(self, corners_list, ids):
@@ -229,20 +263,139 @@ class AddAprilTagPoseToRmbData:
         )
         assert success
         rotation_matrix, _jacobian = cv2.Rodrigues(rvec)
-        return get_pose_from_rot_pos(rotation_matrix, tvec.reshape(3))
+        return (
+            get_pose_from_rot_pos(rotation_matrix, tvec.reshape(3)),
+            rvec.reshape(3),
+            tvec.reshape(3),
+        )
 
-    def fill_missing_with_previous(self, poses, corners, tag_ids, detected):
-        first_detected_idx = int(np.where(detected)[0][0])
-        poses[:first_detected_idx] = poses[first_detected_idx]
-        corners[:first_detected_idx] = corners[first_detected_idx]
-        tag_ids[:first_detected_idx] = tag_ids[first_detected_idx]
+    def fill_missing_with_previous(self, poses, corners, tag_ids, rvecs, tvecs, detected):
+        if not detected[0]:
+            raise ValueError(
+                f"[{self.__class__.__name__}] AprilTag was not detected at frame 0 "
+                f"from '{self.rgb_key}'. Frame 0 detection is required because missing "
+                "frames are filled with the previous frame."
+            )
 
-        for frame_idx in range(first_detected_idx + 1, len(detected)):
+        for frame_idx in range(1, len(detected)):
             if detected[frame_idx]:
                 continue
             poses[frame_idx] = poses[frame_idx - 1]
             corners[frame_idx] = corners[frame_idx - 1]
             tag_ids[frame_idx] = tag_ids[frame_idx - 1]
+            rvecs[frame_idx] = rvecs[frame_idx - 1]
+            tvecs[frame_idx] = tvecs[frame_idx - 1]
+
+    def save_detection_video(
+        self,
+        rmb_path,
+        rmb_data,
+        rgb_image_seq,
+        corners,
+        detected,
+        tag_ids,
+        camera_matrix,
+        rvecs,
+        tvecs,
+    ):
+        output_path = self.get_video_output_path(rmb_path)
+        fps = self.get_video_fps(rmb_data)
+        height, width = rgb_image_seq.shape[1:3]
+        writer = cv2.VideoWriter(
+            output_path,
+            cv2.VideoWriter_fourcc(*"mp4v"),
+            fps,
+            (width, height),
+        )
+        if not writer.isOpened():
+            raise RuntimeError(
+                f"[{self.__class__.__name__}] Failed to open video writer: {output_path}"
+            )
+
+        for frame_idx, rgb_image in enumerate(rgb_image_seq):
+            frame = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2BGR)
+            self.draw_detection_overlay(
+                frame,
+                frame_idx,
+                corners[frame_idx],
+                detected[frame_idx],
+                tag_ids[frame_idx],
+                camera_matrix,
+                rvecs[frame_idx],
+                tvecs[frame_idx],
+            )
+            writer.write(frame)
+        writer.release()
+        tqdm.write(f"[{self.__class__.__name__}] Save video {output_path}")
+
+    def get_video_output_path(self, rmb_path):
+        output_filename = f"{self.pose_key}_detection.mp4"
+        if rmb_path.rstrip("/").endswith(".rmb"):
+            return os.path.join(rmb_path, output_filename)
+
+        base_path, _ext = os.path.splitext(rmb_path)
+        return base_path + "_" + output_filename
+
+    def get_video_fps(self, rmb_data):
+        if self.video_fps is not None:
+            return self.video_fps
+        if DataKey.TIME not in rmb_data.keys():
+            return 30.0
+
+        time = np.asarray(rmb_data[DataKey.TIME][:], dtype=np.float64)
+        if len(time) < 2:
+            return 30.0
+        dt = np.median(np.diff(time))
+        if dt <= 0:
+            return 30.0
+        return float(1.0 / dt)
+
+    def draw_detection_overlay(
+        self,
+        frame,
+        frame_idx,
+        corners,
+        detected,
+        tag_id,
+        camera_matrix,
+        rvec,
+        tvec,
+    ):
+        color = (0, 255, 0) if detected else (0, 255, 255)
+        points = np.round(corners).astype(np.int32)
+        cv2.polylines(frame, [points], isClosed=True, color=color, thickness=2)
+        for point_idx, point in enumerate(points):
+            cv2.circle(frame, tuple(point), 4, color, -1)
+            cv2.putText(
+                frame,
+                str(point_idx),
+                tuple(point + np.array([4, -4])),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.45,
+                color,
+                1,
+                cv2.LINE_AA,
+            )
+
+        cv2.drawFrameAxes(
+            frame,
+            camera_matrix,
+            np.zeros(5),
+            rvec,
+            tvec,
+            self.tag_size * 0.5,
+        )
+        status = "detected" if detected else "filled_previous"
+        cv2.putText(
+            frame,
+            f"frame={frame_idx} tag_id={tag_id} {status}",
+            (12, 24),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.65,
+            color,
+            2,
+            cv2.LINE_AA,
+        )
 
     def save(self, rmb_data, poses, corners, detected, tag_ids):
         rmb_data.h5file[self.pose_key] = poses
@@ -257,7 +410,7 @@ class AddAprilTagPoseToRmbData:
             -1 if self.tag_id is None else self.tag_id
         )
         rmb_data.attrs[self.pose_key + "_fill_missing"] = (
-            "previous_frame; leading_missing_frames_use_first_detection"
+            "previous_frame; frame0_detection_required"
         )
         rmb_data.attrs[self.pose_key + "_format"] = "tx ty tz qw qx qy qz"
 
