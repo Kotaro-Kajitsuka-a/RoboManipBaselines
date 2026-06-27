@@ -93,6 +93,12 @@ class TrainDiffusionWorldModel(TrainBase):
             help="number of image_feature/state steps used as condition",
         )
         parser.add_argument(
+            "--image_feature_key",
+            type=str,
+            default=DiffusionWorldModelDataset.IMAGE_FEATURE_KEY,
+            help="RMB key used as image feature target and condition",
+        )
+        parser.add_argument(
             "--pb_dim",
             type=int,
             default=9,
@@ -105,9 +111,7 @@ class TrainDiffusionWorldModel(TrainBase):
         self.model_meta_info["data"]["horizon"] = self.args.horizon
         self.model_meta_info["data"]["n_obs_steps"] = self.args.n_obs_steps
         self.model_meta_info["data"]["n_action_steps"] = 1
-        self.model_meta_info["data"]["image_feature_key"] = (
-            DiffusionWorldModelDataset.IMAGE_FEATURE_KEY
-        )
+        self.model_meta_info["data"]["image_feature_key"] = self.args.image_feature_key
 
         self.model_meta_info["wrench"] = {
             "key": DiffusionWorldModelDataset.WRENCH_KEY,
@@ -141,11 +145,12 @@ class TrainDiffusionWorldModel(TrainBase):
         all_wrench = []
         clip_min = None
         clip_max = None
+        image_feature_key = self.model_meta_info["data"]["image_feature_key"]
         for filename in self.all_filenames:
             with RmbData(filename) as rmb_data:
                 image_feature = get_skipped_data_seq(
-                    rmb_data[DiffusionWorldModelDataset.IMAGE_FEATURE_KEY][:],
-                    DiffusionWorldModelDataset.IMAGE_FEATURE_KEY,
+                    rmb_data[image_feature_key][:],
+                    image_feature_key,
                     self.args.skip,
                 )
                 wrench = get_skipped_data_seq(

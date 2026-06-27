@@ -62,6 +62,21 @@ uv run python robo_manip_baselines/bin/Train.py DiffusionWorldModel \
   --train_ratio 0.99 \
   --val_ratio 0.01 
 
+# Train DiffusionWorldModel with AprilTag pose instead of frozen visual features
+uv run python robo_manip_baselines/bin/Train.py DiffusionWorldModel \
+  --dataset_dir robo_manip_baselines/dataset/ピンチテスト_marker/training \
+  --state_keys measured_eef_pose \
+  --action_keys command_eef_pose \
+  --image_feature_key front_apriltag_pose_xy_axis \
+  --scheduler ddim \
+  --horizon 16 \
+  --n_obs_steps 2 \
+  --pb_dim 9 \
+  --num_epochs 1000 \
+  --batch_size 64 \
+  --train_ratio 0.99 \
+  --val_ratio 0.01
+
 # Evaluate all DiffusionWorldModel checkpoints with material-property sweep
 uv run python robo_manip_baselines/policy/diffusion_world_model/EvalDiffusionWorldModelMaterialSweepDir.py \
   robo_manip_baselines/checkpoint/DiffusionWorldModel/hogehoge \

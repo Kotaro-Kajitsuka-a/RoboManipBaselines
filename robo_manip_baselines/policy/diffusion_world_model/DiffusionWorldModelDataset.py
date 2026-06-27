@@ -46,8 +46,9 @@ class DiffusionWorldModelDataset(DatasetBase, DpStyleDatasetMixin):
             )
 
             # Load image feature
+            image_feature_key = self.model_meta_info["data"]["image_feature_key"]
             image_feature = get_skipped_data_seq(
-                rmb_data[self.IMAGE_FEATURE_KEY][:], self.IMAGE_FEATURE_KEY, skip
+                rmb_data[image_feature_key][:], image_feature_key, skip
             )[time_idxes]
 
             if len(self.model_meta_info["state"]["keys"]) == 0:
