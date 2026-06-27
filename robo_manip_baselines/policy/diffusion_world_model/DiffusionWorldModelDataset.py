@@ -15,7 +15,6 @@ class DiffusionWorldModelDataset(DatasetBase, DpStyleDatasetMixin):
     """Dataset to train diffusion world model."""
 
     IMAGE_FEATURE_KEY = "diffusion_policy_obs_visual_feature"
-    WRENCH_KEY = DataKey.MEASURED_EEF_WRENCH_MOVING_AVERAGE_PERCENTILE_CLIP
     OBJECT_KEY_TO_ID = {
         "WrenchPredObject0": 0,
         "WrenchPredObject1": 1,
