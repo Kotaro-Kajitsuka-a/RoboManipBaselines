@@ -56,6 +56,7 @@ uv run python robo_manip_baselines/bin/Train.py DiffusionWorldModel \
   --scheduler ddim \
   --horizon 16 \
   --n_obs_steps 2 \
+  --wrench_source_key measured_eef_wrench_moving_average \
   --pb_dim 9 \
   --num_epochs 1000 \
   --batch_size 64 \
@@ -68,6 +69,7 @@ uv run python robo_manip_baselines/bin/Train.py DiffusionWorldModel \
   --state_keys measured_eef_pose \
   --action_keys command_eef_pose \
   --image_feature_key front_apriltag_pose_xy_axis \
+  --wrench_source_key measured_eef_wrench \
   --scheduler ddim \
   --horizon 16 \
   --n_obs_steps 2 \

@@ -50,10 +50,6 @@ class EvalDiffusionWorldModelDataset(DiffusionWorldModelDataset):
         episode_idx, start_time_idx = self.chunk_info_list[chunk_idx]
         filename = self.filenames[episode_idx]
         object_id = self.get_object_id(filename)
-        clip_info = self.model_meta_info["wrench"]["percentile_clip"]
-        source_key = clip_info["source_key"]
-        if isinstance(source_key, bytes):
-            source_key = source_key.decode()
 
         with RmbData(filename, self.enable_rmb_cache) as rmb_data:
             episode_len = rmb_data[DataKey.TIME][::skip].shape[0]
@@ -85,13 +81,7 @@ class EvalDiffusionWorldModelDataset(DiffusionWorldModelDataset):
                 axis=1,
             )
 
-            source_wrench = np.asarray(rmb_data[source_key][:])
-            clipped_wrench = np.clip(source_wrench, clip_info["min"], clip_info["max"])
-            wrench = get_skipped_data_seq(
-                clipped_wrench,
-                self.model_meta_info["wrench"]["percentile_clip"]["key"],
-                skip,
-            )[time_idxes]
+            wrench = self.load_wrench(rmb_data, skip)[time_idxes]
 
         state, action, image_feature, wrench = self.pre_convert_data(
             state, action, image_feature, wrench
@@ -104,6 +94,19 @@ class EvalDiffusionWorldModelDataset(DiffusionWorldModelDataset):
             "wrench": torch.tensor(wrench, dtype=torch.float32),
             "object_id": torch.tensor(object_id, dtype=torch.long),
         }
+
+    def load_wrench(self, rmb_data, skip):
+        clip_info = self.model_meta_info["wrench"]["percentile_clip"]
+        source_key = clip_info["source_key"]
+        if isinstance(source_key, bytes):
+            source_key = source_key.decode()
+        source_wrench = np.asarray(rmb_data[source_key][:])
+        clipped_wrench = np.clip(
+            source_wrench,
+            clip_info["min"],
+            clip_info["max"],
+        )
+        return get_skipped_data_seq(clipped_wrench, clip_info["key"], skip)
 
 
 def parse_argument():
@@ -194,7 +197,7 @@ class EvalDiffusionWorldModelMaterialSweepDir:
             raise KeyError(
                 "[EvalDiffusionWorldModelMaterialSweepDir] "
                 "model_meta_info['wrench']['percentile_clip'] is missing. "
-                "Please train DiffusionWorldModel with a checkpoint that stores the training clip range."
+                "Please train DiffusionWorldModel with --wrench_source_key."
             )
         print(
             f"[{self.__class__.__name__}] Load model meta info: {model_meta_info_path}"

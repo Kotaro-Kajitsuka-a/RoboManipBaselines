@@ -6,6 +6,17 @@ from tqdm import tqdm
 from robo_manip_baselines.common import DataKey, RmbData, find_rmb_files
 
 
+def get_percentile_clip_wrench_key(src_key):
+    if src_key == DataKey.MEASURED_EEF_WRENCH:
+        return "measured_eef_wrench_percentile_clip"
+    elif src_key == DataKey.MEASURED_EEF_WRENCH_MOVING_AVERAGE:
+        return DataKey.MEASURED_EEF_WRENCH_MOVING_AVERAGE_PERCENTILE_CLIP
+    else:
+        raise ValueError(
+            f"[get_percentile_clip_wrench_key] Invalid source key: {src_key}"
+        )
+
+
 def parse_argument():
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
@@ -33,6 +44,22 @@ def parse_argument():
         action="store_true",
         help="whether to overwrite existing value if it exists",
     )
+    parser.add_argument(
+        "--src_key",
+        type=str,
+        default=DataKey.MEASURED_EEF_WRENCH_MOVING_AVERAGE,
+        choices=[
+            DataKey.MEASURED_EEF_WRENCH,
+            DataKey.MEASURED_EEF_WRENCH_MOVING_AVERAGE,
+        ],
+        help="source wrench key to percentile-clip",
+    )
+    parser.add_argument(
+        "--dst_key",
+        type=str,
+        default=None,
+        help="destination key for percentile-clipped wrench",
+    )
 
     return parser.parse_args()
 
@@ -44,13 +71,15 @@ class AddPercentileClippedWrenchToRmbData:
         low_percentile=1.0,
         high_percentile=99.0,
         overwrite=False,
+        src_key=DataKey.MEASURED_EEF_WRENCH_MOVING_AVERAGE,
+        dst_key=None,
     ):
         self.path = path
         self.low_percentile = low_percentile
         self.high_percentile = high_percentile
         self.overwrite = overwrite
-        self.src_key = DataKey.MEASURED_EEF_WRENCH_MOVING_AVERAGE
-        self.dst_key = DataKey.MEASURED_EEF_WRENCH_MOVING_AVERAGE_PERCENTILE_CLIP
+        self.src_key = src_key
+        self.dst_key = dst_key or get_percentile_clip_wrench_key(src_key)
 
     def run(self):
         if not self.low_percentile < self.high_percentile:

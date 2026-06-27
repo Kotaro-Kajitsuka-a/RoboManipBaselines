@@ -71,9 +71,10 @@ class DiffusionWorldModelDataset(DatasetBase, DpStyleDatasetMixin):
                 axis=1,
             )
 
-            wrench = get_skipped_data_seq(
-                rmb_data[self.WRENCH_KEY][:], self.WRENCH_KEY, skip
-            )[time_idxes]
+            wrench_key = self.model_meta_info["wrench"]["key"]
+            wrench = get_skipped_data_seq(rmb_data[wrench_key][:], wrench_key, skip)[
+                time_idxes
+            ]
 
         state, action, image_feature, wrench = self.pre_convert_data(
             state, action, image_feature, wrench

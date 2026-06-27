@@ -13,9 +13,15 @@ sys.path.append(
 from diffusion_policy.common.pytorch_util import dict_apply, optimizer_to
 from diffusion_policy.model.common.lr_scheduler import get_scheduler
 from diffusion_policy.model.diffusion.ema_model import EMAModel
-from robo_manip_baselines.common import RmbData, TrainBase, get_skipped_data_seq
+from robo_manip_baselines.common import (
+    DataKey,
+    RmbData,
+    TrainBase,
+    get_skipped_data_seq,
+)
 from robo_manip_baselines.misc.AddPercentileClippedWrenchToRmbData import (
     AddPercentileClippedWrenchToRmbData,
+    get_percentile_clip_wrench_key,
 )
 
 from .DiffusionWorldModel import DiffusionWorldModel
@@ -99,6 +105,16 @@ class TrainDiffusionWorldModel(TrainBase):
             help="RMB key used as image feature target and condition",
         )
         parser.add_argument(
+            "--wrench_source_key",
+            type=str,
+            required=True,
+            choices=[
+                DataKey.MEASURED_EEF_WRENCH,
+                DataKey.MEASURED_EEF_WRENCH_MOVING_AVERAGE,
+            ],
+            help="RMB source wrench key to percentile-clip and use as prediction target",
+        )
+        parser.add_argument(
             "--pb_dim",
             type=int,
             default=9,
@@ -114,7 +130,8 @@ class TrainDiffusionWorldModel(TrainBase):
         self.model_meta_info["data"]["image_feature_key"] = self.args.image_feature_key
 
         self.model_meta_info["wrench"] = {
-            "key": DiffusionWorldModelDataset.WRENCH_KEY,
+            "key": get_percentile_clip_wrench_key(self.args.wrench_source_key),
+            "source_key": self.args.wrench_source_key,
         }
         self.model_meta_info["material_property"] = {
             "pb_dim": self.args.pb_dim,
@@ -137,6 +154,8 @@ class TrainDiffusionWorldModel(TrainBase):
         AddPercentileClippedWrenchToRmbData(
             self.args.dataset_dir,
             overwrite=True,
+            src_key=self.args.wrench_source_key,
+            dst_key=self.model_meta_info["wrench"]["key"],
         ).run()
 
         super().set_data_stats()
@@ -146,6 +165,8 @@ class TrainDiffusionWorldModel(TrainBase):
         clip_min = None
         clip_max = None
         image_feature_key = self.model_meta_info["data"]["image_feature_key"]
+        wrench_key = self.model_meta_info["wrench"]["key"]
+        source_key = self.model_meta_info["wrench"]["source_key"]
         for filename in self.all_filenames:
             with RmbData(filename) as rmb_data:
                 image_feature = get_skipped_data_seq(
@@ -154,28 +175,25 @@ class TrainDiffusionWorldModel(TrainBase):
                     self.args.skip,
                 )
                 wrench = get_skipped_data_seq(
-                    rmb_data[DiffusionWorldModelDataset.WRENCH_KEY][:],
-                    DiffusionWorldModelDataset.WRENCH_KEY,
+                    rmb_data[wrench_key][:],
+                    wrench_key,
                     self.args.skip,
                 )
                 try:
                     file_clip_min = np.asarray(
-                        rmb_data.attrs[
-                            DiffusionWorldModelDataset.WRENCH_KEY + "_clip_min"
-                        ],
+                        rmb_data.attrs[wrench_key + "_clip_min"],
                         dtype=np.float64,
                     )
                     file_clip_max = np.asarray(
-                        rmb_data.attrs[
-                            DiffusionWorldModelDataset.WRENCH_KEY + "_clip_max"
-                        ],
+                        rmb_data.attrs[wrench_key + "_clip_max"],
                         dtype=np.float64,
                     )
-                    source_key = rmb_data.attrs[
-                        DiffusionWorldModelDataset.WRENCH_KEY + "_source_key"
-                    ]
+                    file_source_key = rmb_data.attrs[wrench_key + "_source_key"]
                 except KeyError as e:
                     raise KeyError(f"{e}: {filename}") from e
+                if isinstance(file_source_key, bytes):
+                    file_source_key = file_source_key.decode()
+                assert file_source_key == source_key, filename
                 if clip_min is None:
                     clip_min = file_clip_min
                     clip_max = file_clip_max
@@ -192,7 +210,7 @@ class TrainDiffusionWorldModel(TrainBase):
         )
         self.model_meta_info["wrench"].update(self.calc_stats_from_seq(all_wrench))
         self.model_meta_info["wrench"]["percentile_clip"] = {
-            "key": DiffusionWorldModelDataset.WRENCH_KEY,
+            "key": wrench_key,
             "source_key": source_key,
             "min": clip_min,
             "max": clip_max,
