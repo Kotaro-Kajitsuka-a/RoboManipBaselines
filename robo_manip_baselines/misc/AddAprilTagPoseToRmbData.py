@@ -234,12 +234,7 @@ class AddAprilTagPoseToRmbData:
 
     def detect_single(self, rgb_image, camera_matrix):
         gray_image = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2GRAY)
-        corners_list, ids, _rejected = self.detector.detectMarkers(gray_image)
-        if ids is None:
-            gray_image_equalized = cv2.equalizeHist(gray_image)
-            corners_list, ids, _rejected = self.detector.detectMarkers(
-                gray_image_equalized
-            )
+        corners_list, ids = self.detect_markers_with_fallback(gray_image)
         if ids is None:
             return None
 
@@ -257,6 +252,21 @@ class AddAprilTagPoseToRmbData:
             "rvec": rvec,
             "tvec": tvec,
         }
+
+    def detect_markers_with_fallback(self, gray_image):
+        gray_images = [
+            gray_image,
+            cv2.equalizeHist(gray_image),
+            cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8)).apply(gray_image),
+            cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8)).apply(gray_image),
+        ]
+        for target_gray_image in gray_images:
+            corners_list, ids, _rejected = self.detector.detectMarkers(
+                target_gray_image
+            )
+            if ids is not None:
+                return corners_list, ids
+        return None, None
 
     def select_detection(self, corners_list, ids):
         if self.tag_id is not None:
