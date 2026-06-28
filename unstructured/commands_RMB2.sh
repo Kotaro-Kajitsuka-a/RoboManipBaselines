@@ -85,6 +85,7 @@ uv run python robo_manip_baselines/policy/diffusion_world_model/EvalDiffusionWor
   robo_manip_baselines/dataset/DatasetColl/validation
 
 # Evaluate all DiffusionWorldModel checkpoints trained with AprilTag marker pose
+# This also saves marker prediction plots and overlay videos unless --no_plot is added.
 uv run python robo_manip_baselines/policy/diffusion_world_model/EvalDiffusionWorldModelMarkerSweepDir.py \
   robo_manip_baselines/checkpoint/DiffusionWorldModel/hogehoge \
   robo_manip_baselines/dataset/ピンチテスト_marker/validation \

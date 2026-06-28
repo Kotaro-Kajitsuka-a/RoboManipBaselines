@@ -378,10 +378,7 @@ class EvalDiffusionWorldModelMarkerSweepDir(EvalDiffusionWorldModelSweepBase):
         rmb_stem,
         plot_data,
     ):
-        rgb_image_seq, camera_matrix, fps = self.load_video_rgb_frames(
-            filename,
-            plot_data["time_idx"],
-        )
+        rgb_image_seq, camera_matrix, fps = self.load_video_rgb_frames(filename)
         height, width = rgb_image_seq.shape[1:3]
         writer = cv2.VideoWriter(
             output_mp4,
@@ -398,29 +395,43 @@ class EvalDiffusionWorldModelMarkerSweepDir(EvalDiffusionWorldModelSweepBase):
         material_key_to_pred_marker = plot_data["material_key_to_pred_marker"]
         material_colors = self.get_material_colors()
         axis_length = self.get_marker_axis_length(filename)
+        time_idx_to_plot_idx = self.get_time_idx_to_plot_idx(plot_data["time_idx"])
 
-        for frame_idx, rgb_image in enumerate(rgb_image_seq):
+        for skipped_time_idx, rgb_image in enumerate(rgb_image_seq):
             frame = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2BGR)
-            self.draw_marker_pose(
-                frame,
-                camera_matrix,
-                gt_marker[frame_idx],
-                "GT",
-                (0, 255, 0),
-                axis_length,
-                3,
-            )
-            for material_idx, (material_object_key, pred_marker) in enumerate(
-                material_key_to_pred_marker.items()
-            ):
+            plot_idx = time_idx_to_plot_idx.get(skipped_time_idx)
+            if plot_idx is not None:
                 self.draw_marker_pose(
                     frame,
                     camera_matrix,
-                    pred_marker[frame_idx],
-                    material_object_key.replace("WrenchPredObject", "PB"),
-                    material_colors[material_idx % len(material_colors)],
+                    gt_marker[plot_idx],
+                    "GT",
+                    (0, 255, 0),
                     axis_length,
+                    3,
+                )
+                for material_idx, (material_object_key, pred_marker) in enumerate(
+                    material_key_to_pred_marker.items()
+                ):
+                    self.draw_marker_pose(
+                        frame,
+                        camera_matrix,
+                        pred_marker[plot_idx],
+                        material_object_key.replace("WrenchPredObject", "PB"),
+                        material_colors[material_idx % len(material_colors)],
+                        axis_length,
+                        2,
+                    )
+            else:
+                cv2.putText(
+                    frame,
+                    "prediction unavailable",
+                    (12, 72),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.55,
+                    (255, 255, 255),
                     2,
+                    cv2.LINE_AA,
                 )
             cv2.putText(
                 frame,
@@ -434,7 +445,7 @@ class EvalDiffusionWorldModelMarkerSweepDir(EvalDiffusionWorldModelSweepBase):
             )
             cv2.putText(
                 frame,
-                f"target skipped time={plot_data['time_idx'][frame_idx]}",
+                f"skipped time={skipped_time_idx}",
                 (12, 48),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.55,
@@ -446,7 +457,16 @@ class EvalDiffusionWorldModelMarkerSweepDir(EvalDiffusionWorldModelSweepBase):
         writer.release()
         print(f"[{self.__class__.__name__}] Save marker overlay video: {output_mp4}")
 
-    def load_video_rgb_frames(self, filename, skipped_time_idx):
+    def get_time_idx_to_plot_idx(self, time_idx):
+        horizon = self.model_meta_info["data"]["horizon"]
+        time_idx_to_plot_idx = {}
+        for plot_idx, skipped_time_idx in enumerate(time_idx):
+            if skipped_time_idx < horizon - 1:
+                continue
+            time_idx_to_plot_idx[int(skipped_time_idx)] = plot_idx
+        return time_idx_to_plot_idx
+
+    def load_video_rgb_frames(self, filename):
         skip = self.model_meta_info["data"]["skip"]
         rgb_key = self.get_marker_rgb_key()
         with RmbData(filename) as rmb_data:
@@ -454,12 +474,7 @@ class EvalDiffusionWorldModelMarkerSweepDir(EvalDiffusionWorldModelSweepBase):
             camera_matrix = self.build_camera_matrix(rmb_data, rgb_image_seq)
             fps = self.get_video_fps(rmb_data)
 
-        raw_time_idx = np.clip(
-            np.asarray(skipped_time_idx, dtype=np.int64) * skip,
-            0,
-            len(rgb_image_seq) - 1,
-        )
-        return rgb_image_seq[raw_time_idx], camera_matrix, fps
+        return rgb_image_seq[::skip], camera_matrix, fps
 
     def get_marker_rgb_key(self):
         pose_key = self.model_meta_info["data"]["image_feature_key"]
