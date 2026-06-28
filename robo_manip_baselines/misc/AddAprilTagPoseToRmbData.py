@@ -131,8 +131,14 @@ class AddAprilTagPoseToRmbData:
         dictionary = cv2.aruco.getPredefinedDictionary(
             cv2.aruco.DICT_APRILTAG_25h9
         )
+        self.detector = cv2.aruco.ArucoDetector(
+            dictionary,
+            self.build_detector_parameters(cv2.aruco.CORNER_REFINE_APRILTAG),
+        )
+
+    def build_detector_parameters(self, corner_refinement_method):
         parameters = cv2.aruco.DetectorParameters()
-        parameters.cornerRefinementMethod = cv2.aruco.CORNER_REFINE_APRILTAG
+        parameters.cornerRefinementMethod = corner_refinement_method
         parameters.adaptiveThreshWinSizeMax = 101
         parameters.adaptiveThreshWinSizeStep = 2
         parameters.adaptiveThreshConstant = 3
@@ -148,7 +154,7 @@ class AddAprilTagPoseToRmbData:
         parameters.aprilTagCriticalRad = 0.05
         parameters.polygonalApproxAccuracyRate = 0.08
         parameters.detectInvertedMarker = True
-        self.detector = cv2.aruco.ArucoDetector(dictionary, parameters)
+        return parameters
 
     def assert_output_keys(self, rmb_data, rmb_path):
         output_keys = [
@@ -204,12 +210,14 @@ class AddAprilTagPoseToRmbData:
         rvecs = np.full((len(rgb_image_seq), 3), np.nan, dtype=np.float64)
         tvecs = np.full((len(rgb_image_seq), 3), np.nan, dtype=np.float64)
         previous_rotation_matrix = None
+        previous_corners = None
 
         for frame_idx, rgb_image in enumerate(rgb_image_seq):
             detection = self.detect_single(
                 rgb_image,
                 camera_matrix,
                 previous_rotation_matrix,
+                previous_corners,
             )
             if detection is None:
                 continue
@@ -220,6 +228,7 @@ class AddAprilTagPoseToRmbData:
             rvecs[frame_idx] = detection["rvec"]
             tvecs[frame_idx] = detection["tvec"]
             previous_rotation_matrix = detection["rotation_matrix"]
+            previous_corners = detection["corners"]
 
         if not np.any(detected):
             raise ValueError(
@@ -238,9 +247,18 @@ class AddAprilTagPoseToRmbData:
         )
         return poses, corners, detected, tag_ids, rvecs, tvecs
 
-    def detect_single(self, rgb_image, camera_matrix, previous_rotation_matrix=None):
+    def detect_single(
+        self,
+        rgb_image,
+        camera_matrix,
+        previous_rotation_matrix=None,
+        previous_corners=None,
+    ):
         gray_image = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2GRAY)
-        corners_list, ids = self.detect_markers_with_fallback(gray_image)
+        corners_list, ids = self.detect_markers_with_fallback(
+            gray_image,
+            previous_corners,
+        )
         if ids is None:
             return None
 
@@ -264,20 +282,108 @@ class AddAprilTagPoseToRmbData:
             "rotation_matrix": rotation_matrix,
         }
 
-    def detect_markers_with_fallback(self, gray_image):
-        gray_images = [
-            gray_image,
-            cv2.equalizeHist(gray_image),
-            cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8)).apply(gray_image),
-            cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8)).apply(gray_image),
-        ]
-        for target_gray_image in gray_images:
+    def detect_markers_with_fallback(self, gray_image, previous_corners=None):
+        for target_gray_image, scale in self.get_gray_image_fallbacks(gray_image):
             corners_list, ids, _rejected = self.detector.detectMarkers(
                 target_gray_image
             )
-            if ids is not None:
-                return corners_list, ids
+            if not self.has_target_tag_id(ids):
+                continue
+            if scale != 1:
+                corners_list = [corners / scale for corners in corners_list]
+            return corners_list, ids
+        if previous_corners is None:
+            return None, None
+
+        crop_info = self.crop_around_previous_corners(gray_image, previous_corners)
+        if crop_info is None:
+            return None, None
+        crop_gray_image, offset = crop_info
+        for target_gray_image, scale in self.get_crop_gray_image_fallbacks(
+            crop_gray_image
+        ):
+            corners_list, ids, _rejected = self.detector.detectMarkers(
+                target_gray_image
+            )
+            if not self.has_target_tag_id(ids):
+                continue
+            corners_list = [corners / scale + offset for corners in corners_list]
+            return corners_list, ids
         return None, None
+
+    def has_target_tag_id(self, ids):
+        if ids is None:
+            return False
+        if self.tag_id is None:
+            return True
+        return self.tag_id in ids[:, 0]
+
+    def get_gray_image_fallbacks(self, gray_image):
+        clahe2 = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+        clahe3 = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
+        sharp_gray_image = self.sharpen_gray_image(gray_image)
+        gray_images = [
+            gray_image,
+            cv2.equalizeHist(gray_image),
+            clahe2.apply(gray_image),
+            clahe3.apply(gray_image),
+            sharp_gray_image,
+        ]
+
+        for target_gray_image in gray_images:
+            yield target_gray_image, 1
+        for target_gray_image in [
+            gray_image,
+            sharp_gray_image,
+            clahe2.apply(gray_image),
+        ]:
+            scale = 2
+            yield (
+                cv2.resize(
+                    target_gray_image,
+                    None,
+                    fx=scale,
+                    fy=scale,
+                    interpolation=cv2.INTER_CUBIC,
+                ),
+                scale,
+            )
+
+    def crop_around_previous_corners(self, gray_image, previous_corners):
+        points = previous_corners.reshape(4, 2)
+        min_xy = points.min(axis=0)
+        max_xy = points.max(axis=0)
+        tag_size_px = float(np.max(max_xy - min_xy))
+        margin = max(80.0, 3.0 * tag_size_px)
+        image_height, image_width = gray_image.shape[:2]
+        x0 = max(int(np.floor(min_xy[0] - margin)), 0)
+        y0 = max(int(np.floor(min_xy[1] - margin)), 0)
+        x1 = min(int(np.ceil(max_xy[0] + margin)), image_width)
+        y1 = min(int(np.ceil(max_xy[1] + margin)), image_height)
+        if x1 <= x0 or y1 <= y0:
+            return None
+        return gray_image[y0:y1, x0:x1], np.array([x0, y0], dtype=np.float32)
+
+    def get_crop_gray_image_fallbacks(self, gray_image):
+        for target_gray_image in [
+            gray_image,
+            self.sharpen_gray_image(gray_image),
+        ]:
+            for scale in (2, 3):
+                yield (
+                    cv2.resize(
+                        target_gray_image,
+                        None,
+                        fx=scale,
+                        fy=scale,
+                        interpolation=cv2.INTER_CUBIC,
+                    ),
+                    scale,
+                )
+
+    def sharpen_gray_image(self, gray_image):
+        blurred_gray_image = cv2.GaussianBlur(gray_image, (0, 0), 1.0)
+        return cv2.addWeighted(gray_image, 1.8, blurred_gray_image, -0.8, 0)
 
     def select_detection(self, corners_list, ids):
         if self.tag_id is not None:
