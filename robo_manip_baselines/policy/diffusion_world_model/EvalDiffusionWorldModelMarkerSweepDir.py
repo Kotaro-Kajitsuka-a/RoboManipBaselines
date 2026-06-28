@@ -7,7 +7,6 @@ from tqdm import tqdm
 
 from robo_manip_baselines.common import denormalize_data
 from robo_manip_baselines.policy.diffusion_world_model.EvalDiffusionWorldModelSweepCommon import (
-    MATERIAL_OBJECT_KEYS,
     EvalDiffusionWorldModelSweepBase,
     parse_sweep_argument,
     plt,
@@ -257,7 +256,7 @@ class EvalDiffusionWorldModelMarkerSweepDir(EvalDiffusionWorldModelSweepBase):
         gt_marker = None
         material_key_to_pred_marker = {}
 
-        for material_object_key in MATERIAL_OBJECT_KEYS:
+        for material_object_key in self.material_object_keys:
             material_object_id = self.object_key_to_id[material_object_key]
             pred_marker_list = []
             gt_marker_list = []

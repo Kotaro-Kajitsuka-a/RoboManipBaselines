@@ -31,13 +31,7 @@ from robo_manip_baselines.policy.diffusion_world_model.DiffusionWorldModelDatase
 )
 
 
-MATERIAL_OBJECT_KEYS = [
-    "WrenchPredObject0",
-    "WrenchPredObject1",
-    "WrenchPredObject2",
-    "WrenchPredObject3",
-    "WrenchPredObject4",
-]
+DEFAULT_MAX_MATERIAL_OBJECT_ID = 4
 WRENCH_LABELS = ["Fx", "Fy", "Fz", "Nx", "Ny", "Nz"]
 
 
@@ -68,6 +62,12 @@ def parse_sweep_argument():
         help="disable episode-wise PNG plots",
     )
     parser.add_argument("--seed", type=int, default=42, help="random seed")
+    parser.add_argument(
+        "--max_material_object_id",
+        type=int,
+        default=DEFAULT_MAX_MATERIAL_OBJECT_ID,
+        help="maximum WrenchPredObject id used as material PB sweep targets",
+    )
     return parser.parse_args()
 
 
@@ -146,6 +146,7 @@ class EvalDiffusionWorldModelSweepBase:
         num_files=None,
         no_plot=False,
         seed=42,
+        max_material_object_id=DEFAULT_MAX_MATERIAL_OBJECT_ID,
     ):
         self.checkpoint_dir = checkpoint_dir
         self.rmb_dir = rmb_dir
@@ -153,6 +154,11 @@ class EvalDiffusionWorldModelSweepBase:
         self.num_files = num_files
         self.no_plot = no_plot
         self.seed = seed
+        assert max_material_object_id >= 0, max_material_object_id
+        self.material_object_keys = [
+            f"WrenchPredObject{object_id}"
+            for object_id in range(max_material_object_id + 1)
+        ]
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     def run(self):
@@ -165,7 +171,7 @@ class EvalDiffusionWorldModelSweepBase:
             self.setup_policy(checkpoint)
             for actual_object_key in self.target_object_keys:
                 actual_filenames = self.object_key_to_filenames[actual_object_key]
-                for material_object_key in MATERIAL_OBJECT_KEYS:
+                for material_object_key in self.material_object_keys:
                     row = self.evaluate_object_pair(
                         checkpoint,
                         actual_object_key,
@@ -246,11 +252,16 @@ class EvalDiffusionWorldModelSweepBase:
         print(f"[{self.__class__.__name__}] Checkpoints: {len(self.checkpoints)}")
         print(f"[{self.__class__.__name__}] RMB files: {len(rmb_path_list)}")
         print(f"[{self.__class__.__name__}] Objects: {self.target_object_keys}")
-        print(f"[{self.__class__.__name__}] Material PBs: {MATERIAL_OBJECT_KEYS}")
+        print(f"[{self.__class__.__name__}] Material PBs: {self.material_object_keys}")
         print(f"[{self.__class__.__name__}] Output directory: {self.output_dir}")
 
-        for object_key in MATERIAL_OBJECT_KEYS:
+        for object_key in self.material_object_keys:
             assert object_key in self.object_key_to_id, object_key
+        for object_key in self.target_object_keys:
+            assert object_key in self.material_object_keys, (
+                object_key,
+                self.material_object_keys,
+            )
 
     @property
     def object_key_to_id(self):
@@ -349,7 +360,7 @@ class EvalDiffusionWorldModelSweepBase:
             "checkpoint",
             "metric",
             "actual_object_key",
-            *MATERIAL_OBJECT_KEYS,
+            *self.material_object_keys,
             "best_material_object_key",
             "correct_error",
             "best_error",
@@ -363,7 +374,9 @@ class EvalDiffusionWorldModelSweepBase:
             for metric_name, row_metric_key in self.get_heatmap_metrics():
                 matrix = self.build_error_matrix(checkpoint_rows, row_metric_key)
                 for actual_idx, actual_object_key in enumerate(self.target_object_keys):
-                    correct_material_idx = MATERIAL_OBJECT_KEYS.index(actual_object_key)
+                    correct_material_idx = self.material_object_keys.index(
+                        actual_object_key
+                    )
                     best_material_idx = int(np.argmin(matrix[actual_idx]))
                     summary_rows.append(
                         {
@@ -376,10 +389,10 @@ class EvalDiffusionWorldModelSweepBase:
                                     material_idx,
                                 ]
                                 for material_idx, material_object_key in enumerate(
-                                    MATERIAL_OBJECT_KEYS
+                                    self.material_object_keys
                                 )
                             },
-                            "best_material_object_key": MATERIAL_OBJECT_KEYS[
+                            "best_material_object_key": self.material_object_keys[
                                 best_material_idx
                             ],
                             "correct_error": matrix[
@@ -415,7 +428,9 @@ class EvalDiffusionWorldModelSweepBase:
                 matrix = self.build_error_matrix(checkpoint_rows, row_metric_key)
                 num_correct = 0
                 for actual_idx, actual_object_key in enumerate(self.target_object_keys):
-                    correct_material_idx = MATERIAL_OBJECT_KEYS.index(actual_object_key)
+                    correct_material_idx = self.material_object_keys.index(
+                        actual_object_key
+                    )
                     best_material_idx = int(np.argmin(matrix[actual_idx]))
                     if best_material_idx == correct_material_idx:
                         num_correct += 1
@@ -483,12 +498,14 @@ class EvalDiffusionWorldModelSweepBase:
             for row in rows
         }
         matrix = np.full(
-            (len(self.target_object_keys), len(MATERIAL_OBJECT_KEYS)),
+            (len(self.target_object_keys), len(self.material_object_keys)),
             np.nan,
             dtype=np.float64,
         )
         for actual_idx, actual_object_key in enumerate(self.target_object_keys):
-            for material_idx, material_object_key in enumerate(MATERIAL_OBJECT_KEYS):
+            for material_idx, material_object_key in enumerate(
+                self.material_object_keys
+            ):
                 matrix[actual_idx, material_idx] = row_by_object_pair[
                     (actual_object_key, material_object_key)
                 ][metric_key]
@@ -497,7 +514,7 @@ class EvalDiffusionWorldModelSweepBase:
     def compute_delta_from_correct(self, error_matrix):
         delta_matrix = np.zeros_like(error_matrix)
         for actual_idx, actual_object_key in enumerate(self.target_object_keys):
-            correct_material_idx = MATERIAL_OBJECT_KEYS.index(actual_object_key)
+            correct_material_idx = self.material_object_keys.index(actual_object_key)
             delta_matrix[actual_idx] = (
                 error_matrix[actual_idx]
                 - error_matrix[actual_idx, correct_material_idx]
@@ -522,9 +539,12 @@ class EvalDiffusionWorldModelSweepBase:
             vmax = abs_max
         im = ax.imshow(matrix, cmap=cmap, vmin=vmin, vmax=vmax)
         ax.set_title(title)
-        ax.set_xticks(range(len(MATERIAL_OBJECT_KEYS)))
+        ax.set_xticks(range(len(self.material_object_keys)))
         ax.set_xticklabels(
-            [object_key.replace("WrenchPredObject", "PB") for object_key in MATERIAL_OBJECT_KEYS],
+            [
+                object_key.replace("WrenchPredObject", "PB")
+                for object_key in self.material_object_keys
+            ],
             rotation=45,
             ha="right",
         )

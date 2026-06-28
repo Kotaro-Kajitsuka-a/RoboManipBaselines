@@ -87,7 +87,8 @@ uv run python robo_manip_baselines/policy/diffusion_world_model/EvalDiffusionWor
 # Evaluate all DiffusionWorldModel checkpoints trained with AprilTag marker pose
 uv run python robo_manip_baselines/policy/diffusion_world_model/EvalDiffusionWorldModelMarkerSweepDir.py \
   robo_manip_baselines/checkpoint/DiffusionWorldModel/hogehoge \
-  robo_manip_baselines/dataset/ピンチテスト_marker/validation
+  robo_manip_baselines/dataset/ピンチテスト_marker/validation \
+  --max_material_object_id 2
 
 # Add AprilTag tag25h9 pose to all RMB HDF5 files
 uv run python robo_manip_baselines/misc/AddAprilTagPoseToRmbData.py \

@@ -7,7 +7,6 @@ from tqdm import tqdm
 
 from robo_manip_baselines.common import denormalize_data
 from robo_manip_baselines.policy.diffusion_world_model.EvalDiffusionWorldModelSweepCommon import (
-    MATERIAL_OBJECT_KEYS,
     WRENCH_LABELS,
     EvalDiffusionWorldModelSweepBase,
     parse_sweep_argument,
@@ -213,7 +212,7 @@ class EvalDiffusionWorldModelMaterialSweepDir(EvalDiffusionWorldModelSweepBase):
         material_key_to_pred_wrench = {}
         material_key_to_image_feature_loss = {}
 
-        for material_object_key in MATERIAL_OBJECT_KEYS:
+        for material_object_key in self.material_object_keys:
             material_object_id = self.object_key_to_id[material_object_key]
             pred_wrench_list = []
             gt_wrench_list = []
