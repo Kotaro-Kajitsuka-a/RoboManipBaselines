@@ -105,6 +105,13 @@ class TrainDiffusionWorldModel(TrainBase):
             help="RMB key used as image feature target and condition",
         )
         parser.add_argument(
+            "--image_feature_target_mode",
+            type=str,
+            default="absolute",
+            choices=["absolute", "delta_from_last_obs"],
+            help="image feature prediction target representation",
+        )
+        parser.add_argument(
             "--wrench_source_key",
             type=str,
             required=True,
@@ -227,6 +234,7 @@ class TrainDiffusionWorldModel(TrainBase):
             "pb_dim": self.args.pb_dim,
             "horizon": self.args.horizon,
             "n_obs_steps": self.args.n_obs_steps,
+            "image_feature_target_mode": self.args.image_feature_target_mode,
         }
         if self.args.backbone == "cnn":
             self.model_meta_info["policy"]["args"].update(

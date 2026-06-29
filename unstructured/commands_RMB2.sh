@@ -63,12 +63,14 @@ uv run python robo_manip_baselines/bin/Train.py DiffusionWorldModel \
   --train_ratio 0.99 \
   --val_ratio 0.01 
 
-# Train DiffusionWorldModel with AprilTag pose instead of frozen visual features
+# Train DiffusionWorldModel with AprilTag pose delta target instead of frozen visual features
 uv run python robo_manip_baselines/bin/Train.py DiffusionWorldModel \
   --dataset_dir robo_manip_baselines/dataset/ピンチテスト_marker/training \
-  --state_keys measured_eef_pose \
-  --action_keys command_eef_pose \
+  --checkpoint_dir robo_manip_baselines/checkpoint/DiffusionWorldModel/pinch_marker_delta_dwm_h16 \
+  --state_keys measured_eef_pose measured_gripper_joint_pos \
+  --action_keys command_eef_pose command_gripper_joint_pos \
   --image_feature_key front_apriltag_pose_xy_axis \
+  --image_feature_target_mode delta_from_last_obs \
   --wrench_source_key measured_eef_wrench \
   --scheduler ddim \
   --horizon 16 \
