@@ -10,12 +10,10 @@ from cv2 import aruco
 from robo_manip_baselines.policy.rl_policy.rl_tasks.cabinet_marker_detection import (
     BASE_CENTER_T_PATH,
     BIG_ARUCO_DICT_ID,
-    BIG_BOARD_RZ_OFFSET_RAD,
     BIG_MARKER_LENGTH_M,
     BIG_MARKER_SEPARATION_M,
     BIG_MARKERS_X,
     BIG_MARKERS_Y,
-    BIG_PANEL_Z_OFFSET_M,
     FPS,
     RES_H,
     RES_W,
@@ -23,12 +21,14 @@ from robo_manip_baselines.policy.rl_policy.rl_tasks.cabinet_marker_detection imp
     SMALL_BOARD_MARKER_IDS,
     SMALL_BOARD_MARKER_LENGTH_M,
     USE_SERIAL,
+    build_big_board,
     build_small_board,
     detect_markers,
+    estimate_big_board_outer_pose,
     estimate_small_board_pose,
     get_aruco_dictionary,
     get_aruco_parameters,
-    rotation_z,
+    transform_from_rvec_tvec,
 )
 
 def draw_axes(img, K, dist_coeffs, rvec, tvec, axis_len=0.05, thickness=2):
@@ -99,20 +99,7 @@ def main():
     small_dict = get_aruco_dictionary(SMALL_BOARD_DICT_ID)
     params = get_aruco_parameters()
     small_board = build_small_board(small_dict)
-    big_board = aruco.GridBoard(
-        (BIG_MARKERS_X, BIG_MARKERS_Y),
-        BIG_MARKER_LENGTH_M,
-        BIG_MARKER_SEPARATION_M,
-        big_dict,
-    )
-    big_board_w = (
-        BIG_MARKERS_X * BIG_MARKER_LENGTH_M
-        + (BIG_MARKERS_X - 1) * BIG_MARKER_SEPARATION_M
-    )
-    big_board_h = (
-        BIG_MARKERS_Y * BIG_MARKER_LENGTH_M
-        + (BIG_MARKERS_Y - 1) * BIG_MARKER_SEPARATION_M
-    )
+    big_board = build_big_board(big_dict)
 
     pipeline = rs.pipeline()
     config = rs.config()
@@ -133,12 +120,6 @@ def main():
     print(" cx, cy =", intr.ppx, intr.ppy)
     print(" dist   =", dist_coeffs)
 
-    R_flip_x = np.array([[1, 0, 0], [0, -1, 0], [0, 0, -1]], dtype=np.float32)
-    R_big_z_offset = rotation_z(BIG_BOARD_RZ_OFFSET_RAD)
-    big_center_offset = np.array(
-        [big_board_w * 0.5, big_board_h * 0.5, 0.0], dtype=np.float32
-    )
-    big_z_offset = np.array([0.0, 0.0, -BIG_PANEL_Z_OFFSET_M], dtype=np.float32)
     big_axis_len = (
         max(BIG_MARKERS_X, BIG_MARKERS_Y)
         * (BIG_MARKER_LENGTH_M + BIG_MARKER_SEPARATION_M)
@@ -194,10 +175,7 @@ def main():
                     "inner",
                 )
 
-                R_small, _ = cv2.Rodrigues(small_rvec)
-                cam_T_inner = np.eye(4, dtype=np.float32)
-                cam_T_inner[:3, :3] = R_small.astype(np.float32)
-                cam_T_inner[:3, 3] = small_tvec.flatten().astype(np.float32)
+                cam_T_inner = transform_from_rvec_tvec(small_rvec, small_tvec)
                 base_T_inner = base_T_cam @ cam_T_inner
                 inner_base = base_T_inner[:3, 3]
                 inner_rpy = rotmat_to_rpy_deg(base_T_inner[:3, :3])
@@ -206,21 +184,20 @@ def main():
             if ids is not None and len(ids) > 0:
                 outer_marker_count = len(ids)
                 aruco.drawDetectedMarkers(img, corners, ids)
-                retval, rvec, tvec = aruco.estimatePoseBoard(
-                    corners, ids, big_board, K, dist_coeffs, None, None
+                outer_rvec, outer_tvec = estimate_big_board_outer_pose(
+                    corners,
+                    ids,
+                    big_board,
+                    K,
+                    dist_coeffs,
                 )
-                if retval > 0:
-                    R_big, _ = cv2.Rodrigues(rvec)
-                    t_big_outer = big_center_offset + R_flip_x @ big_z_offset
-                    R_cam_outer = R_big @ R_flip_x @ R_big_z_offset
-                    t_cam_outer = R_big @ t_big_outer.reshape(3, 1) + tvec.reshape(3, 1)
-                    outer_rvec, _ = cv2.Rodrigues(R_cam_outer)
+                if outer_rvec is not None and outer_tvec is not None:
                     draw_axes(
                         img,
                         K,
                         dist_coeffs,
                         outer_rvec,
-                        t_cam_outer,
+                        outer_tvec,
                         axis_len=big_axis_len,
                         thickness=3,
                     )
@@ -229,14 +206,12 @@ def main():
                         K,
                         dist_coeffs,
                         outer_rvec,
-                        t_cam_outer,
+                        outer_tvec,
                         (0, 200, 255),
                         "outer",
                     )
 
-                    cam_T_outer = np.eye(4, dtype=np.float32)
-                    cam_T_outer[:3, :3] = R_cam_outer.astype(np.float32)
-                    cam_T_outer[:3, 3] = t_cam_outer.flatten().astype(np.float32)
+                    cam_T_outer = transform_from_rvec_tvec(outer_rvec, outer_tvec)
                     base_T_outer = base_T_cam @ cam_T_outer
                     outer_base = base_T_outer[:3, 3]
                     outer_rpy = rotmat_to_rpy_deg(base_T_outer[:3, :3])

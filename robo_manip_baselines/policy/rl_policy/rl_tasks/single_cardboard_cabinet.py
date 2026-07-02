@@ -8,29 +8,24 @@ from typing import TYPE_CHECKING, Dict, Mapping, Optional, Tuple
 
 import cv2
 import numpy as np
-from cv2 import aruco
 
 from robo_manip_baselines.policy.rl_policy.rl_tasks.cabinet_marker_detection import (
     BASE_CENTER_T_PATH,
     BIG_ARUCO_DICT_ID,
-    BIG_BOARD_RZ_OFFSET_RAD,
-    BIG_MARKER_LENGTH_M,
-    BIG_MARKER_SEPARATION_M,
-    BIG_MARKERS_X,
-    BIG_MARKERS_Y,
-    BIG_PANEL_Z_OFFSET_M,
     FPS,
     RES_H,
     RES_W,
     SMALL_BOARD_DICT_ID,
     SMALL_BOARD_MARKER_IDS,
     USE_SERIAL,
+    build_big_board,
     build_small_board,
     detect_markers,
+    estimate_big_board_outer_pose,
     estimate_small_board_pose,
     get_aruco_dictionary,
     get_aruco_parameters,
-    rotation_z,
+    transform_from_rvec_tvec,
 )
 
 if TYPE_CHECKING:
@@ -97,20 +92,7 @@ class CabinetMarkerPoseProvider:
         self._small_dict = get_aruco_dictionary(SMALL_BOARD_DICT_ID)
         self._aruco_params = get_aruco_parameters()
         self._small_board = build_small_board(self._small_dict)
-        self._big_board = aruco.GridBoard(
-            (BIG_MARKERS_X, BIG_MARKERS_Y),
-            BIG_MARKER_LENGTH_M,
-            BIG_MARKER_SEPARATION_M,
-            self._big_dict,
-        )
-        self._big_board_w = (
-            BIG_MARKERS_X * BIG_MARKER_LENGTH_M
-            + (BIG_MARKERS_X - 1) * BIG_MARKER_SEPARATION_M
-        )
-        self._big_board_h = (
-            BIG_MARKERS_Y * BIG_MARKER_LENGTH_M
-            + (BIG_MARKERS_Y - 1) * BIG_MARKER_SEPARATION_M
-        )
+        self._big_board = build_big_board(self._big_dict)
         self._base_T_cam = np.loadtxt(self.calib_path).astype(np.float32)
 
     def start(self) -> None:
@@ -193,13 +175,6 @@ class CabinetMarkerPoseProvider:
         )
         dist_coeffs = np.array(intr.coeffs[:5], dtype=np.float32)
 
-        R_flip_x = np.array([[1, 0, 0], [0, -1, 0], [0, 0, -1]], dtype=np.float32)
-        R_big_z_offset = rotation_z(BIG_BOARD_RZ_OFFSET_RAD)
-        big_center_offset = np.array(
-            [self._big_board_w * 0.5, self._big_board_h * 0.5, 0.0], dtype=np.float32
-        )
-        big_z_offset = np.array([0.0, 0.0, -BIG_PANEL_Z_OFFSET_M], dtype=np.float32)
-
         try:
             while not self._stop_event.is_set():
                 frames = pipeline.wait_for_frames()
@@ -225,10 +200,7 @@ class CabinetMarkerPoseProvider:
                     dist_coeffs,
                 )
                 if small_rvec is not None and small_tvec is not None:
-                    R_small, _ = cv2.Rodrigues(small_rvec)
-                    cam_T_inner = np.eye(4, dtype=np.float32)
-                    cam_T_inner[:3, :3] = R_small.astype(np.float32)
-                    cam_T_inner[:3, 3] = small_tvec.flatten().astype(np.float32)
+                    cam_T_inner = transform_from_rvec_tvec(small_rvec, small_tvec)
                     base_T_inner = self._base_T_cam @ cam_T_inner
                     with self._lock:
                         self._latest_inner_transform = base_T_inner.copy()
@@ -237,21 +209,17 @@ class CabinetMarkerPoseProvider:
                 corners, ids, _ = detect_markers(
                     gray, self._big_dict, self._aruco_params
                 )
-                if ids is None or len(ids) == 0:
-                    continue
-                retval, rvec, tvec = aruco.estimatePoseBoard(
-                    corners, ids, self._big_board, K, dist_coeffs, None, None
+                outer_rvec, outer_tvec = estimate_big_board_outer_pose(
+                    corners,
+                    ids,
+                    self._big_board,
+                    K,
+                    dist_coeffs,
                 )
-                if retval <= 0:
+                if outer_rvec is None or outer_tvec is None:
                     continue
 
-                R_big, _ = cv2.Rodrigues(rvec)
-                t_big_outer = big_center_offset + R_flip_x @ big_z_offset
-                R_cam_outer = R_big @ R_flip_x @ R_big_z_offset
-                t_cam_outer = R_big @ t_big_outer.reshape(3, 1) + tvec.reshape(3, 1)
-                cam_T_outer = np.eye(4, dtype=np.float32)
-                cam_T_outer[:3, :3] = R_cam_outer.astype(np.float32)
-                cam_T_outer[:3, 3] = t_cam_outer.flatten().astype(np.float32)
+                cam_T_outer = transform_from_rvec_tvec(outer_rvec, outer_tvec)
                 base_T_outer = self._base_T_cam @ cam_T_outer
                 with self._lock:
                     self._latest_outer_transform = base_T_outer.copy()

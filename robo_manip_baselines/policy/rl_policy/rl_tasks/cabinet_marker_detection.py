@@ -87,6 +87,23 @@ def build_small_board(small_board_dict):
     )
 
 
+def build_big_board(big_board_dict):
+    return aruco.GridBoard(
+        (BIG_MARKERS_X, BIG_MARKERS_Y),
+        BIG_MARKER_LENGTH_M,
+        BIG_MARKER_SEPARATION_M,
+        big_board_dict,
+    )
+
+
+def transform_from_rvec_tvec(rvec, tvec) -> np.ndarray:
+    rotation, _ = cv2.Rodrigues(rvec)
+    transform = np.eye(4, dtype=np.float32)
+    transform[:3, :3] = rotation.astype(np.float32)
+    transform[:3, 3] = tvec.reshape(3).astype(np.float32)
+    return transform
+
+
 def estimate_small_board_pose(corners, ids, board, K, dist_coeffs):
     if ids is None or len(ids) == 0:
         return None, None
@@ -109,3 +126,33 @@ def estimate_small_board_pose(corners, ids, board, K, dist_coeffs):
     t_target = R_board @ target_offset.reshape(3, 1) + t_center.reshape(3, 1)
     rvec_target, _ = cv2.Rodrigues(R_target)
     return rvec_target.reshape(3, 1), t_target.reshape(3, 1)
+
+
+def estimate_big_board_outer_pose(corners, ids, board, K, dist_coeffs):
+    if ids is None or len(ids) == 0:
+        return None, None
+
+    retval, rvec, tvec = aruco.estimatePoseBoard(
+        corners, ids, board, K, dist_coeffs, None, None
+    )
+    if retval <= 0:
+        return None, None
+
+    board_w = (
+        BIG_MARKERS_X * BIG_MARKER_LENGTH_M
+        + (BIG_MARKERS_X - 1) * BIG_MARKER_SEPARATION_M
+    )
+    board_h = (
+        BIG_MARKERS_Y * BIG_MARKER_LENGTH_M
+        + (BIG_MARKERS_Y - 1) * BIG_MARKER_SEPARATION_M
+    )
+    center_offset = np.array([board_w * 0.5, board_h * 0.5, 0.0], dtype=np.float32)
+    z_offset = np.array([0.0, 0.0, -BIG_PANEL_Z_OFFSET_M], dtype=np.float32)
+    flip_x = np.array([[1, 0, 0], [0, -1, 0], [0, 0, -1]], dtype=np.float32)
+
+    R_board, _ = cv2.Rodrigues(rvec)
+    R_outer = R_board @ flip_x @ rotation_z(BIG_BOARD_RZ_OFFSET_RAD)
+    t_outer = R_board @ (center_offset + flip_x @ z_offset).reshape(3, 1)
+    t_outer = t_outer + tvec.reshape(3, 1)
+    rvec_outer, _ = cv2.Rodrigues(R_outer)
+    return rvec_outer.reshape(3, 1), t_outer.reshape(3, 1)
