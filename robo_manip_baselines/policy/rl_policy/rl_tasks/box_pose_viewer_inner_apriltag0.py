@@ -13,20 +13,10 @@ from robo_manip_baselines.policy.rl_policy.rl_tasks.cabinet_marker_detection imp
     RES_H,
     RES_W,
     USE_SERIAL,
-    detect_markers,
-    get_aruco_parameters,
 )
 
 MARKER_ID = 0
 MARKER_SIZE_M = 0.09265
-
-
-def get_apriltag36h11_dictionary():
-    dict_id = aruco.DICT_APRILTAG_36h11
-    try:
-        return aruco.getPredefinedDictionary(dict_id)
-    except AttributeError:
-        return aruco.Dictionary_get(dict_id)
 
 
 def put_line(img, text, y, color=(235, 235, 235), scale=0.54):
@@ -111,8 +101,9 @@ def main():
     import pyrealsense2 as rs
 
     base_T_cam = np.loadtxt(Path(BASE_CENTER_T_PATH)).astype(np.float32)
-    marker_dict = get_apriltag36h11_dictionary()
-    params = get_aruco_parameters()
+    marker_dict = aruco.getPredefinedDictionary(aruco.DICT_APRILTAG_36h11)
+    params = aruco.DetectorParameters()
+    detector = aruco.ArucoDetector(marker_dict, params)
 
     pipeline = rs.pipeline()
     config = rs.config()
@@ -151,7 +142,7 @@ def main():
             marker_base = None
             detected_ids = []
 
-            corners, ids, _ = detect_markers(gray, marker_dict, params)
+            corners, ids, _ = detector.detectMarkers(gray)
             if ids is not None and len(ids) > 0:
                 detected_ids = ids.reshape(-1).astype(int).tolist()
                 aruco.drawDetectedMarkers(img, corners, ids)

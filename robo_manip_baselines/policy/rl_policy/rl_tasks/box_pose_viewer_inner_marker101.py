@@ -5,6 +5,7 @@ from pathlib import Path
 
 import cv2
 import numpy as np
+from cv2 import aruco
 
 from robo_manip_baselines.policy.rl_policy.rl_tasks.cabinet_marker_detection import (
     BASE_CENTER_T_PATH,
@@ -14,9 +15,6 @@ from robo_manip_baselines.policy.rl_policy.rl_tasks.cabinet_marker_detection imp
     SMALL_BOARD_DICT_ID,
     SMALL_BOARD_MARKER_LENGTH_M,
     USE_SERIAL,
-    detect_markers,
-    get_aruco_dictionary,
-    get_aruco_parameters,
 )
 
 MARKER_ID = 101
@@ -105,8 +103,9 @@ def main():
     import pyrealsense2 as rs
 
     base_T_cam = np.loadtxt(Path(BASE_CENTER_T_PATH)).astype(np.float32)
-    marker_dict = get_aruco_dictionary(SMALL_BOARD_DICT_ID)
-    params = get_aruco_parameters()
+    marker_dict = aruco.getPredefinedDictionary(SMALL_BOARD_DICT_ID)
+    params = aruco.DetectorParameters()
+    detector = aruco.ArucoDetector(marker_dict, params)
 
     pipeline = rs.pipeline()
     config = rs.config()
@@ -145,10 +144,10 @@ def main():
             marker_base = None
             detected_ids = []
 
-            corners, ids, _ = detect_markers(gray, marker_dict, params)
+            corners, ids, _ = detector.detectMarkers(gray)
             if ids is not None and len(ids) > 0:
                 detected_ids = ids.reshape(-1).astype(int).tolist()
-                cv2.aruco.drawDetectedMarkers(img, corners, ids)
+                aruco.drawDetectedMarkers(img, corners, ids)
                 rvec, tvec, marker_cam = estimate_marker_translation(
                     corners, ids, K, dist_coeffs
                 )

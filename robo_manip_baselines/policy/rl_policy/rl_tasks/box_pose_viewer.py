@@ -23,11 +23,8 @@ from robo_manip_baselines.policy.rl_policy.rl_tasks.cabinet_marker_detection imp
     USE_SERIAL,
     build_big_board,
     build_small_board,
-    detect_markers,
     estimate_big_board_outer_pose,
     estimate_small_board_pose,
-    get_aruco_dictionary,
-    get_aruco_parameters,
     transform_from_rvec_tvec,
 )
 
@@ -104,9 +101,11 @@ def main():
     base_rvec, _ = cv2.Rodrigues(R_cam_base)
     base_tvec = t_cam_base.reshape(3, 1)
 
-    big_dict = get_aruco_dictionary(BIG_ARUCO_DICT_ID)
-    small_dict = get_aruco_dictionary(SMALL_BOARD_DICT_ID)
-    params = get_aruco_parameters()
+    big_dict = aruco.getPredefinedDictionary(BIG_ARUCO_DICT_ID)
+    small_dict = aruco.getPredefinedDictionary(SMALL_BOARD_DICT_ID)
+    params = aruco.DetectorParameters()
+    big_detector = aruco.ArucoDetector(big_dict, params)
+    small_detector = aruco.ArucoDetector(small_dict, params)
     small_board = build_small_board(small_dict)
     big_board = build_big_board(big_dict)
 
@@ -174,7 +173,7 @@ def main():
             outer_rpy = None
             outer_marker_count = 0
 
-            small_corners, small_ids, _ = detect_markers(gray, small_dict, params)
+            small_corners, small_ids, _ = small_detector.detectMarkers(gray)
             small_rvec, small_tvec = estimate_small_board_pose(
                 small_corners,
                 small_ids,
@@ -208,7 +207,7 @@ def main():
                 inner_base = base_T_inner[:3, 3]
                 inner_rpy = rotmat_to_rpy_deg(base_T_inner[:3, :3])
 
-            corners, ids, _ = detect_markers(gray, big_dict, params)
+            corners, ids, _ = big_detector.detectMarkers(gray)
             if ids is not None and len(ids) > 0:
                 outer_marker_count = len(ids)
                 aruco.drawDetectedMarkers(img, corners, ids)

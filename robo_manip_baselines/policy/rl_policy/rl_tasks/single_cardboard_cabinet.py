@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Dict, Mapping, Optional, Tuple
 
 import cv2
 import numpy as np
+from cv2 import aruco
 
 from robo_manip_baselines.policy.rl_policy.rl_tasks.cabinet_marker_detection import (
     BASE_CENTER_T_PATH,
@@ -20,11 +21,8 @@ from robo_manip_baselines.policy.rl_policy.rl_tasks.cabinet_marker_detection imp
     USE_SERIAL,
     build_big_board,
     build_small_board,
-    detect_markers,
     estimate_big_board_outer_pose,
     estimate_small_board_pose,
-    get_aruco_dictionary,
-    get_aruco_parameters,
     transform_from_rvec_tvec,
 )
 
@@ -88,9 +86,13 @@ class CabinetMarkerPoseProvider:
         self._latest_image_seq = 0
         self._lock = threading.Lock()
 
-        self._big_dict = get_aruco_dictionary(BIG_ARUCO_DICT_ID)
-        self._small_dict = get_aruco_dictionary(SMALL_BOARD_DICT_ID)
-        self._aruco_params = get_aruco_parameters()
+        self._big_dict = aruco.getPredefinedDictionary(BIG_ARUCO_DICT_ID)
+        self._small_dict = aruco.getPredefinedDictionary(SMALL_BOARD_DICT_ID)
+        self._aruco_params = aruco.DetectorParameters()
+        self._big_detector = aruco.ArucoDetector(self._big_dict, self._aruco_params)
+        self._small_detector = aruco.ArucoDetector(
+            self._small_dict, self._aruco_params
+        )
         self._small_board = build_small_board(self._small_dict)
         self._big_board = build_big_board(self._big_dict)
         self._base_T_cam = np.loadtxt(self.calib_path).astype(np.float32)
@@ -189,9 +191,7 @@ class CabinetMarkerPoseProvider:
                     self._latest_front_rgb = rgb
                     self._latest_image_seq += 1
 
-                small_corners, small_ids, _ = detect_markers(
-                    gray, self._small_dict, self._aruco_params
-                )
+                small_corners, small_ids, _ = self._small_detector.detectMarkers(gray)
                 small_rvec, small_tvec = estimate_small_board_pose(
                     small_corners,
                     small_ids,
@@ -206,9 +206,7 @@ class CabinetMarkerPoseProvider:
                         self._latest_inner_transform = base_T_inner.copy()
                         self._latest_inner_marker_seq += 1
 
-                corners, ids, _ = detect_markers(
-                    gray, self._big_dict, self._aruco_params
-                )
+                corners, ids, _ = self._big_detector.detectMarkers(gray)
                 outer_rvec, outer_tvec = estimate_big_board_outer_pose(
                     corners,
                     ids,

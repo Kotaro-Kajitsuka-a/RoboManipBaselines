@@ -62,27 +62,6 @@ def rotation_y(rad: float) -> np.ndarray:
     )
 
 
-def get_aruco_dictionary(dict_id):
-    try:
-        return aruco.getPredefinedDictionary(dict_id)
-    except AttributeError:
-        return aruco.Dictionary_get(dict_id)
-
-
-def get_aruco_parameters():
-    try:
-        return aruco.DetectorParameters_create()
-    except AttributeError:
-        return aruco.DetectorParameters()
-
-
-def detect_markers(gray, aruco_dict, aruco_params):
-    if hasattr(aruco, "ArucoDetector"):
-        detector = aruco.ArucoDetector(aruco_dict, aruco_params)
-        return detector.detectMarkers(gray)
-    return aruco.detectMarkers(gray, aruco_dict, parameters=aruco_params)
-
-
 def build_small_board(small_board_dict):
     return aruco.GridBoard(
         (len(SMALL_BOARD_MARKER_IDS), 1),
