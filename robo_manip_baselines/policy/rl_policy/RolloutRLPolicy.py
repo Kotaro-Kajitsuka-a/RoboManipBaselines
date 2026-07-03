@@ -31,7 +31,7 @@ EXPECTED_STATE_KEYS = [
 EXPECTED_STATE_DIM = 33
 EXPECTED_ACTION_DIM = 8
 ARM_JOINT_DELTA_LIMIT = 0.06
-GRIPPER_JOINT_DELTA_LIMIT = 0.03
+GRIPPER_JOINT_DELTA_LIMIT = 0.01
 STATE_COMPONENTS = [
     ("agent/qpos", 8),
     ("agent/qvel", 7),
@@ -432,7 +432,7 @@ class RolloutRLPolicy(RolloutBase):
                 f"[{self.__class__.__name__}] WARNING: {label} stagnated for {stagnation} steps.",
                 flush=True,
             )
-        if stagnation >= 4:
+        if stagnation >= 9:
             raise RuntimeError(
                 f"[{self.__class__.__name__}] {label} stalled for {stagnation} steps."
             )
