@@ -19,9 +19,8 @@ DEFAULT_INTRINSICS_PATH = (
     Path(__file__).resolve().parent.parent / "camera_intrinsics.yaml"
 )
 
-WIDTH_MARGIN_M = 0.0175 # actual 0.012
-HEIGHT_MARGIN_M = 0.0525 #actual 0.022
-
+WIDTH_MARGIN_M = 0.0165  # actual 0.012
+HEIGHT_MARGIN_M = 0.0225  # actual 0.022
 
 
 def load_camera_intrinsics(
@@ -158,7 +157,9 @@ def build_prompt_points(corners: np.ndarray) -> np.ndarray:
 
 
 class ArucoPromptGenerator:
-    def __init__(self, camera_name: str, intrinsics_path: Optional[Path] = None) -> None:
+    def __init__(
+        self, camera_name: str, intrinsics_path: Optional[Path] = None
+    ) -> None:
         if intrinsics_path is None:
             intrinsics_path = DEFAULT_INTRINSICS_PATH
         self.K, self.dist_coeffs = load_camera_intrinsics(intrinsics_path, camera_name)
