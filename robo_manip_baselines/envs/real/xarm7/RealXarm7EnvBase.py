@@ -199,7 +199,7 @@ class RealXarm7EnvBase(RealEnvBase):
         arm_joint_pos = joint_states[0]
         arm_joint_vel = joint_states[1]
         self.arm_joint_pos_actual = arm_joint_pos.copy()
-
+        arm_joint_vel = np.zeros_like(arm_joint_vel)  # tmp
         # Get state from Robotiq gripper
         xarm_code, gripper_pos = self.xarm_api.get_gripper_position()
         if xarm_code != 0:
