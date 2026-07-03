@@ -11,6 +11,12 @@ BIG_MARKER_SEPARATION_M = 0.0050
 BIG_MARKERS_X = 5
 BIG_MARKERS_Y = 7
 BIG_ARUCO_DICT_ID = aruco.DICT_4X4_50
+BIG_BOARD_W_M = BIG_MARKERS_X * BIG_MARKER_LENGTH_M + (
+    BIG_MARKERS_X - 1
+) * BIG_MARKER_SEPARATION_M
+BIG_BOARD_H_M = BIG_MARKERS_Y * BIG_MARKER_LENGTH_M + (
+    BIG_MARKERS_Y - 1
+) * BIG_MARKER_SEPARATION_M
 BIG_PANEL_Z_OFFSET_M = 0.003
 BIG_BOARD_RZ_OFFSET_RAD = np.deg2rad(90.0)
 
@@ -138,15 +144,9 @@ def estimate_big_board_outer_pose(corners, ids, board, K, dist_coeffs):
     if retval <= 0:
         return None, None
 
-    board_w = (
-        BIG_MARKERS_X * BIG_MARKER_LENGTH_M
-        + (BIG_MARKERS_X - 1) * BIG_MARKER_SEPARATION_M
+    center_offset = np.array(
+        [BIG_BOARD_W_M * 0.5, BIG_BOARD_H_M * 0.5, 0.0], dtype=np.float32
     )
-    board_h = (
-        BIG_MARKERS_Y * BIG_MARKER_LENGTH_M
-        + (BIG_MARKERS_Y - 1) * BIG_MARKER_SEPARATION_M
-    )
-    center_offset = np.array([board_w * 0.5, board_h * 0.5, 0.0], dtype=np.float32)
     z_offset = np.array([0.0, 0.0, -BIG_PANEL_Z_OFFSET_M], dtype=np.float32)
     flip_x = np.array([[1, 0, 0], [0, -1, 0], [0, 0, -1]], dtype=np.float32)
 
