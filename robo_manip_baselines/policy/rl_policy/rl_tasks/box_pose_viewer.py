@@ -149,6 +149,25 @@ def main():
             img = np.asanyarray(cf.get_data())
             gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
+            draw_axes(
+                img,
+                K,
+                dist_coeffs,
+                base_rvec,
+                base_tvec,
+                axis_len=0.10,
+                thickness=4,
+            )
+            project_center(
+                img,
+                K,
+                dist_coeffs,
+                base_rvec,
+                base_tvec,
+                (0, 255, 255),
+                "base",
+            )
+
             inner_base = None
             inner_rpy = None
             outer_base = None
@@ -184,29 +203,7 @@ def main():
                     "inner",
                 )
 
-                draw_axes(
-                    img,
-                    K,
-                    dist_coeffs,
-                    base_rvec,
-                    base_tvec,
-                    axis_len=0.10,
-                    thickness=4,
-                )
-
-                project_center(
-                    img,
-                    K,
-                    dist_coeffs,
-                    base_rvec,
-                    base_tvec,
-                    (0, 255, 255),
-                    "base",
-                )
-
                 cam_T_inner = transform_from_rvec_tvec(small_rvec, small_tvec)
-
-                base_T_inner = base_T_cam @ cam_T_inner
                 base_T_inner = base_T_cam @ cam_T_inner
                 inner_base = base_T_inner[:3, 3]
                 inner_rpy = rotmat_to_rpy_deg(base_T_inner[:3, :3])
