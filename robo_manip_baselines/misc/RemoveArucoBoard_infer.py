@@ -40,12 +40,12 @@ BOARD_REMOVAL_CONFIGS = [
     BoardRemovalConfig(
         board_type="big",
         inpainting_color="#c8a283",
-        margin_m=(0.0215, 0.0365),
+        margin_m=(0.0220, 0.0330),
     ),
     BoardRemovalConfig(
         board_type="small",
         inpainting_color="#4A2F12",
-        margin_m=(0.040, 0.0025),
+        margin_m=(0.038, 0.0025),
     ),
     # BoardRemovalConfig(
     #     board_type="long",
@@ -480,6 +480,49 @@ def mask_path_for_frame(mask_dir: Path, frame_idx: int) -> Path:
     return mask_dir / f"{frame_idx:05d}.npy"
 
 
+def _open_video_writer(
+    output_mp4: Path, fps: float, width: int, height: int
+) -> subprocess.Popen:
+    cmd = [
+        "ffmpeg",
+        "-y",
+        "-f",
+        "rawvideo",
+        "-pix_fmt",
+        "bgr24",
+        "-s",
+        f"{width}x{height}",
+        "-r",
+        str(fps),
+        "-i",
+        "-",
+        "-an",
+        "-c:v",
+        "libx264",
+        "-pix_fmt",
+        "yuv420p",
+        "-crf",
+        "18",
+        "-preset",
+        "medium",
+        str(output_mp4),
+    ]
+    return subprocess.Popen(
+        cmd,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+
+
+def _close_video_writer(process: subprocess.Popen, output_mp4: Path) -> None:
+    assert process.stdin is not None
+    process.stdin.close()
+    return_code = process.wait()
+    if return_code != 0:
+        raise RuntimeError(f"ffmpeg failed with return code {return_code}: {output_mp4}")
+
+
 def copy_dataset_dir(input_dir: Path) -> Path:
     if not input_dir.exists():
         raise FileNotFoundError(f"input_dir not found: {input_dir}")
@@ -534,7 +577,6 @@ def run(
 
         relative_mp4 = mp4_path.relative_to(input_dir)
         output_mp4 = output_dir / relative_mp4
-        tmp_path = output_mp4.with_suffix(".tmp.mp4")
 
         cap = cv2.VideoCapture(str(mp4_path))
         if not cap.isOpened():
@@ -546,8 +588,8 @@ def run(
         if fps <= 0:
             fps = 30.0
 
-        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-        writer = cv2.VideoWriter(str(tmp_path), fourcc, fps, (width, height))
+        writer = _open_video_writer(output_mp4, fps, width, height)
+        assert writer.stdin is not None
 
         frame_idx = 0
         last_good_corners: dict[str, np.ndarray | None] = {
@@ -597,42 +639,13 @@ def run(
                         box_mask=box_mask,
                     )
 
-            writer.write(frame)
+            writer.stdin.write(frame.tobytes())
             prev_frame = raw_frame
             frame_idx += 1
 
         cap.release()
-        writer.release()
-
-        ffmpeg = "ffmpeg"
-        cmd = [
-            ffmpeg,
-            "-y",
-            "-i",
-            str(tmp_path),
-            "-c:v",
-            "libx264",
-            "-pix_fmt",
-            "yuv420p",
-            "-crf",
-            "18",
-            "-preset",
-            "medium",
-            str(output_mp4),
-        ]
-        try:
-            subprocess.run(
-                cmd,
-                check=True,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-            print(f"Saved: {output_mp4}")
-            tmp_path.unlink(missing_ok=True)
-        except FileNotFoundError:
-            print("ffmpeg not found; kept intermediate mp4.")
-        except subprocess.CalledProcessError as exc:
-            print(f"ffmpeg failed: {exc}")
+        _close_video_writer(writer, output_mp4)
+        print(f"Saved: {output_mp4}")
 
 
 def main() -> None:
