@@ -13,6 +13,7 @@ from robo_manip_baselines.misc.arucoboard.arucoboard_modules.aruco_prompt import
     ArucoPromptGenerator,
 )
 
+
 @dataclass(frozen=True)
 class BoardRemovalConfig:
     board_type: str
@@ -38,13 +39,13 @@ class BoardRuntime:
 BOARD_REMOVAL_CONFIGS = [
     BoardRemovalConfig(
         board_type="big",
-        inpainting_color="#FBB88D",
-        margin_m=(0.0165, 0.0225),
+        inpainting_color="#c8a283",
+        margin_m=(0.0205, 0.0365),
     ),
     BoardRemovalConfig(
         board_type="small",
-        inpainting_color="#FBB88D",
-        margin_m=(0.0100, 0.0100),
+        inpainting_color="#4c2f11",
+        margin_m=(0.040, 0.0025),
     ),
     # BoardRemovalConfig(
     #     board_type="long",
@@ -172,9 +173,7 @@ def _candidate_gray_images(image: np.ndarray, scales: tuple[float, ...]):
     contrast = clahe.apply(gray)
     blur = cv2.GaussianBlur(gray, (0, 0), 1.0)
     sharpened = cv2.addWeighted(gray, 1.7, blur, -0.7, 0.0)
-    _, otsu = cv2.threshold(
-        contrast, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU
-    )
+    _, otsu = cv2.threshold(contrast, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
 
     base_images = (gray, contrast, sharpened, otsu)
     for scale in scales:
@@ -513,7 +512,9 @@ def _require_repo_cwd() -> Path:
     return cwd
 
 
-def run(camera_name: str, dataset_dir: Path, intrinsics_path: Path | None = None) -> None:
+def run(
+    camera_name: str, dataset_dir: Path, intrinsics_path: Path | None = None
+) -> None:
     _require_repo_cwd()
     if not camera_name:
         raise ValueError("camera_name must be a non-empty string.")
