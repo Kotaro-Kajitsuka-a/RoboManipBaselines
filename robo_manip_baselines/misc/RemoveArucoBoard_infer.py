@@ -256,6 +256,34 @@ def detect_board_corners(
     return proj.reshape(4, 2).astype(np.float32)
 
 
+def track_corners(
+    prev_frame: np.ndarray,
+    frame: np.ndarray,
+    prev_corners: np.ndarray,
+    max_point_move_px: float = 80.0,
+) -> np.ndarray | None:
+    prev_gray = _gray_image(prev_frame)
+    gray = _gray_image(frame)
+    prev_points = np.asarray(prev_corners, dtype=np.float32).reshape(-1, 1, 2)
+    points, status, _ = cv2.calcOpticalFlowPyrLK(
+        prev_gray,
+        gray,
+        prev_points,
+        None,
+        winSize=(31, 31),
+        maxLevel=3,
+        criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 30, 0.01),
+    )
+    if points is None or status is None or not np.all(status):
+        return None
+
+    tracked = points.reshape(4, 2)
+    deltas = np.linalg.norm(tracked - prev_points.reshape(4, 2), axis=1)
+    if np.any(deltas > max_point_move_px):
+        return None
+    return tracked.astype(np.float32)
+
+
 def apply_whiteout(
     frame: np.ndarray,
     corners: np.ndarray,
@@ -421,10 +449,12 @@ def run(camera_name: str, dataset_dir: Path, intrinsics_path: Path | None = None
         frame_idx = 0
         last_good_corners = None
         last_good_small_corners = None
+        prev_frame = None
         while True:
             ok, frame = cap.read()
             if not ok:
                 break
+            raw_frame = frame.copy()
 
             corners = None
             if remove_big_board:
@@ -476,6 +506,15 @@ def run(camera_name: str, dataset_dir: Path, intrinsics_path: Path | None = None
                         small_corners = last_good_small_corners.copy()
                     else:
                         last_good_small_corners = small_corners.copy()
+                elif prev_frame is not None and last_good_small_corners is not None:
+                    tracked_corners = track_corners(
+                        prev_frame, frame, last_good_small_corners
+                    )
+                    if tracked_corners is not None:
+                        small_corners = tracked_corners
+                        last_good_small_corners = tracked_corners.copy()
+                    else:
+                        small_corners = last_good_small_corners.copy()
                 elif last_good_small_corners is not None:
                     small_corners = last_good_small_corners.copy()
 
@@ -506,6 +545,7 @@ def run(camera_name: str, dataset_dir: Path, intrinsics_path: Path | None = None
                     )
 
             writer.write(frame)
+            prev_frame = raw_frame
             frame_idx += 1
 
         cap.release()

@@ -26,7 +26,7 @@ dependencies = [
   "h5py",
   "scipy>=1.7.0",
   "matplotlib>=3.3.4",
-  "opencv-python",
+  "opencv-contrib-python==4.12.0.88",
   "ffmpeg-python",
   "imageio>=2.14.1",
   "videoio==0.3.0",
