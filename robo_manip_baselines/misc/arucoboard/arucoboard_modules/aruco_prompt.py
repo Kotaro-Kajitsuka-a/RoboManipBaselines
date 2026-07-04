@@ -21,6 +21,7 @@ DEFAULT_INTRINSICS_PATH = (
 
 WIDTH_MARGIN_M = 0.0165  # actual 0.012
 HEIGHT_MARGIN_M = 0.0225  # actual 0.022
+LOWER_EDGE_PROMPT_OFFSET_M = 0.04
 
 
 def load_camera_intrinsics(
@@ -145,7 +146,33 @@ def build_prompt_points(corners: np.ndarray) -> np.ndarray:
         _add_point(points, a + (b - a) * 0.50, seen)
         _add_point(points, a + (b - a) * 0.75, seen)
 
+    # ===============================
+    # Add points along the lower edge of the board, offset downwards by LOWER_EDGE_PROMPT_OFFSET_M
+    # ===============================
+    selected_edges = [
+        (p2, p3),  # short edge: bottom
+        (p3, p0),  # long edge: right
+    ]
+    vertical_px_per_m = ((edge_lens[1] + edge_lens[3]) * 0.5) / GRIDBOARD_H_M
+    lower_offset_px = LOWER_EDGE_PROMPT_OFFSET_M * vertical_px_per_m
+    lower_offset = np.array([0.0, lower_offset_px], dtype=np.float32)
+    for a, b in selected_edges:
+        _add_point(points, a + (b - a) * 0.25 + lower_offset, seen)
+        _add_point(points, a + (b - a) * 0.50 + lower_offset, seen)
+        _add_point(points, a + (b - a) * 0.75 + lower_offset, seen)
+    for a, b in selected_edges:
+        _add_point(points, a + (b - a) * 0.25 + 2 * lower_offset, seen)
+        _add_point(points, a + (b - a) * 0.50 + 2 * lower_offset, seen)
+        _add_point(points, a + (b - a) * 0.75 + 2 * lower_offset, seen)
+    for a, b in selected_edges:
+        _add_point(points, a + (b - a) * 0.25 + 3 * lower_offset, seen)
+        _add_point(points, a + (b - a) * 0.50 + 3 * lower_offset, seen)
+        _add_point(points, a + (b - a) * 0.75 + 3 * lower_offset, seen)
+
+    # ===============================
     # Diagonals: add 1/4, 1/2, 3/4 points on each diagonal
+    # ===============================
+
     diag1 = (p0, p2)
     diag2 = (p1, p3)
     for a, b in (diag1, diag2):
