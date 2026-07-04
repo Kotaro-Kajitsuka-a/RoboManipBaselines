@@ -16,23 +16,23 @@ from robo_manip_baselines.misc.arucoboard.arucoboard_modules.aruco_prompt import
 @dataclass(frozen=True)
 class BoardRemovalConfig:
     board_type: str
-    inpainting_color_bgr: tuple[int, int, int]
+    inpainting_color: str
     margin_m: tuple[float, float]
 
 
 # ========= User settings =========
 # board_type: "big" or "small"
-# inpainting_color_bgr: OpenCV BGR order
+# inpainting_color: "#RRGGBB"
 # margin_m: (width_margin_m, height_margin_m)
 BOARD_REMOVAL_CONFIGS = [
     BoardRemovalConfig(
         board_type="big",
-        inpainting_color_bgr=(0x8D, 0xB8, 0xFB),
+        inpainting_color="#FBB88D",
         margin_m=(0.0165, 0.0225),
     ),
     BoardRemovalConfig(
         board_type="small",
-        inpainting_color_bgr=(0x8D, 0xB8, 0xFB),
+        inpainting_color="#FBB88D",
         margin_m=(0.0100, 0.0100),
     ),
 ]
@@ -55,6 +55,15 @@ SMALL_BOARD_W_M = SMALL_BOARD_MARKER_LENGTH_M * len(
 SMALL_BOARD_H_M = SMALL_BOARD_MARKER_LENGTH_M
 
 
+def rgb_hex_to_bgr(rgb_hex: str) -> tuple[int, int, int]:
+    if not rgb_hex.startswith("#") or len(rgb_hex) != 7:
+        raise ValueError(f"Expected '#RRGGBB', got: {rgb_hex}")
+    red = int(rgb_hex[1:3], 16)
+    green = int(rgb_hex[3:5], 16)
+    blue = int(rgb_hex[5:7], 16)
+    return blue, green, red
+
+
 def is_valid_corners(corners: np.ndarray) -> bool:
     if corners.shape != (4, 2):
         return False
@@ -75,6 +84,83 @@ def _is_jump_outlier(
 ) -> bool:
     deltas = np.linalg.norm(corners - prev_corners, axis=-1)
     return bool(np.any(deltas > max_jump_px))
+
+
+def _aruco_dict(dict_id: int):
+    try:
+        return aruco.getPredefinedDictionary(dict_id)
+    except AttributeError:
+        return aruco.Dictionary_get(dict_id)
+
+
+def _detector_parameters():
+    try:
+        params = aruco.DetectorParameters_create()
+    except AttributeError:
+        params = aruco.DetectorParameters()
+
+    params.adaptiveThreshWinSizeMin = 3
+    params.adaptiveThreshWinSizeMax = 53
+    params.adaptiveThreshWinSizeStep = 4
+    params.minMarkerPerimeterRate = 0.01
+    params.maxMarkerPerimeterRate = 4.0
+    params.polygonalApproxAccuracyRate = 0.05
+    params.errorCorrectionRate = 0.8
+    if hasattr(aruco, "CORNER_REFINE_SUBPIX"):
+        params.cornerRefinementMethod = aruco.CORNER_REFINE_SUBPIX
+        params.cornerRefinementWinSize = 5
+        params.cornerRefinementMaxIterations = 30
+        params.cornerRefinementMinAccuracy = 0.01
+    return params
+
+
+def _gray_image(image: np.ndarray) -> np.ndarray:
+    if image.ndim == 3:
+        return cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    return image
+
+
+def _candidate_gray_images(image: np.ndarray, scales: tuple[float, ...]):
+    gray = _gray_image(image)
+    clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
+    contrast = clahe.apply(gray)
+    blur = cv2.GaussianBlur(gray, (0, 0), 1.0)
+    sharpened = cv2.addWeighted(gray, 1.7, blur, -0.7, 0.0)
+    _, otsu = cv2.threshold(
+        contrast, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU
+    )
+
+    base_images = (gray, contrast, sharpened, otsu)
+    for scale in scales:
+        for candidate in base_images:
+            if scale == 1.0:
+                yield candidate, scale
+                continue
+            height, width = candidate.shape[:2]
+            resized = cv2.resize(
+                candidate,
+                (int(width * scale), int(height * scale)),
+                interpolation=cv2.INTER_CUBIC,
+            )
+            yield resized, scale
+
+
+def detect_markers_robust(
+    image: np.ndarray,
+    aruco_dict,
+    parameters,
+    scales: tuple[float, ...],
+):
+    for candidate, scale in _candidate_gray_images(image, scales):
+        corners, ids, _ = aruco.detectMarkers(
+            candidate, aruco_dict, parameters=parameters
+        )
+        if ids is None or len(ids) == 0:
+            continue
+        if scale != 1.0:
+            corners = [corner / scale for corner in corners]
+        return corners, ids
+    return None, None
 
 
 def expand_corners(
@@ -115,14 +201,8 @@ def expand_corners(
 
 
 def _build_small_board():
-    try:
-        aruco_dict = aruco.getPredefinedDictionary(SMALL_BOARD_DICT_ID)
-    except AttributeError:
-        aruco_dict = aruco.Dictionary_get(SMALL_BOARD_DICT_ID)
-    try:
-        parameters = aruco.DetectorParameters_create()
-    except AttributeError:
-        parameters = aruco.DetectorParameters()
+    aruco_dict = _aruco_dict(SMALL_BOARD_DICT_ID)
+    parameters = _detector_parameters()
     board = aruco.GridBoard(
         (len(SMALL_BOARD_MARKER_IDS), 1),
         SMALL_BOARD_MARKER_LENGTH_M,
@@ -133,20 +213,27 @@ def _build_small_board():
     return aruco_dict, parameters, board
 
 
-def detect_small_board_corners(
+def _build_big_board():
+    aruco_dict = _aruco_dict(aruco.DICT_4X4_50)
+    parameters = _detector_parameters()
+    board = aruco.GridBoard(
+        (MARKERS_X, MARKERS_Y), MARKER_LENGTH_M, MARKER_SEPARATION_M, aruco_dict
+    )
+    return aruco_dict, parameters, board
+
+
+def detect_board_corners(
     image: np.ndarray,
     K: np.ndarray,
     dist_coeffs: np.ndarray,
     aruco_dict,
     parameters,
     board,
+    board_w_m: float,
+    board_h_m: float,
+    scales: tuple[float, ...],
 ) -> np.ndarray | None:
-    if image.ndim == 3:
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    else:
-        gray = image
-
-    corners, ids, _ = aruco.detectMarkers(gray, aruco_dict, parameters=parameters)
+    corners, ids = detect_markers_robust(image, aruco_dict, parameters, scales)
     if ids is None or len(ids) == 0:
         return None
 
@@ -159,9 +246,9 @@ def detect_small_board_corners(
     board_corners_3d = np.array(
         [
             [0.0, 0.0, 0.0],
-            [SMALL_BOARD_W_M, 0.0, 0.0],
-            [SMALL_BOARD_W_M, SMALL_BOARD_H_M, 0.0],
-            [0.0, SMALL_BOARD_H_M, 0.0],
+            [board_w_m, 0.0, 0.0],
+            [board_w_m, board_h_m, 0.0],
+            [0.0, board_h_m, 0.0],
         ],
         dtype=np.float32,
     )
@@ -229,7 +316,7 @@ def board_removal_specs(
                 board_h_m,
                 width_margin_m,
                 height_margin_m,
-                config.inpainting_color_bgr,
+                rgb_hex_to_bgr(config.inpainting_color),
             )
         )
     return specs
@@ -298,6 +385,10 @@ def run(camera_name: str, dataset_dir: Path, intrinsics_path: Path | None = None
     gen = ArucoPromptGenerator(camera_name=camera_name, intrinsics_path=intrinsics_path)
     remove_big_board = use_board("big")
     remove_small_board = use_board("small")
+    if remove_big_board:
+        big_dict, big_params, big_board = _build_big_board()
+    else:
+        big_dict, big_params, big_board = None, None, None
     if remove_small_board:
         small_dict, small_params, small_board = _build_small_board()
     else:
@@ -337,8 +428,20 @@ def run(camera_name: str, dataset_dir: Path, intrinsics_path: Path | None = None
 
             corners = None
             if remove_big_board:
-                _ = gen.infer(frame)
-                corners = gen.last_corners()
+                assert big_dict is not None
+                assert big_params is not None
+                assert big_board is not None
+                corners = detect_board_corners(
+                    frame,
+                    gen.K,
+                    gen.dist_coeffs,
+                    big_dict,
+                    big_params,
+                    big_board,
+                    GRIDBOARD_W_M,
+                    GRIDBOARD_H_M,
+                    scales=(1.0, 1.5),
+                )
                 if corners is not None:
                     corners = np.asarray(corners, dtype=np.float32).reshape(4, 2)
                     if last_good_corners is not None and _is_jump_outlier(
@@ -347,19 +450,24 @@ def run(camera_name: str, dataset_dir: Path, intrinsics_path: Path | None = None
                         corners = last_good_corners.copy()
                     else:
                         last_good_corners = corners.copy()
+                elif last_good_corners is not None:
+                    corners = last_good_corners.copy()
 
             small_corners = None
             if remove_small_board:
                 assert small_dict is not None
                 assert small_params is not None
                 assert small_board is not None
-                small_corners = detect_small_board_corners(
+                small_corners = detect_board_corners(
                     frame,
                     gen.K,
                     gen.dist_coeffs,
                     small_dict,
                     small_params,
                     small_board,
+                    SMALL_BOARD_W_M,
+                    SMALL_BOARD_H_M,
+                    scales=(1.0, 1.5, 2.0),
                 )
                 if small_corners is not None:
                     if last_good_small_corners is not None and _is_jump_outlier(
