@@ -40,11 +40,11 @@ BOARD_REMOVAL_CONFIGS = [
     BoardRemovalConfig(
         board_type="big",
         inpainting_color="#c8a283",
-        margin_m=(0.0205, 0.0365),
+        margin_m=(0.0215, 0.0365),
     ),
     BoardRemovalConfig(
         board_type="small",
-        inpainting_color="#4c2f11",
+        inpainting_color="#4A2F12",
         margin_m=(0.040, 0.0025),
     ),
     # BoardRemovalConfig(
