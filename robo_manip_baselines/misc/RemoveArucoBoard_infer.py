@@ -27,6 +27,7 @@ class BoardRuntime:
     board_w_m: float
     board_h_m: float
     scales: tuple[float, ...]
+    max_jump_px: float
     aruco_dict: object | None = None
     parameters: object | None = None
     board: object | None = None
@@ -60,7 +61,9 @@ MARKERS_X = 5
 MARKERS_Y = 7
 GRIDBOARD_W_M = MARKERS_X * MARKER_LENGTH_M + (MARKERS_X - 1) * MARKER_SEPARATION_M
 GRIDBOARD_H_M = MARKERS_Y * MARKER_LENGTH_M + (MARKERS_Y - 1) * MARKER_SEPARATION_M
-MAX_JUMP_PX = 10.0
+BIG_BOARD_MAX_JUMP_PX = 10.0
+SMALL_BOARD_MAX_JUMP_PX = 60.0
+LONG_BOARD_MAX_JUMP_PX = 10.0
 
 SMALL_BOARD_DICT_ID = aruco.DICT_5X5_250
 SMALL_BOARD_MARKER_IDS = [100, 101, 102]
@@ -110,10 +113,11 @@ def _is_jump_outlier(
 def _is_raw_corners_outlier(
     corners: np.ndarray,
     prev_corners: np.ndarray | None,
+    max_jump_px: float,
 ) -> bool:
     if prev_corners is None:
         return False
-    return _is_jump_outlier(corners, prev_corners, MAX_JUMP_PX)
+    return _is_jump_outlier(corners, prev_corners, max_jump_px)
 
 
 def _aruco_dict(dict_id: int):
@@ -239,6 +243,7 @@ def _build_big_runtime(config: BoardRemovalConfig) -> BoardRuntime:
         board_w_m=GRIDBOARD_W_M,
         board_h_m=GRIDBOARD_H_M,
         scales=(1.0, 1.5),
+        max_jump_px=BIG_BOARD_MAX_JUMP_PX,
         aruco_dict=aruco_dict,
         parameters=parameters,
         board=board,
@@ -260,6 +265,7 @@ def _build_small_runtime(config: BoardRemovalConfig) -> BoardRuntime:
         board_w_m=SMALL_BOARD_W_M,
         board_h_m=SMALL_BOARD_H_M,
         scales=(1.0, 1.5, 2.0),
+        max_jump_px=SMALL_BOARD_MAX_JUMP_PX,
         aruco_dict=aruco_dict,
         parameters=parameters,
         board=board,
@@ -272,6 +278,7 @@ def _build_long_runtime(config: BoardRemovalConfig) -> BoardRuntime:
         board_w_m=LONG_BOARD_W_M,
         board_h_m=LONG_BOARD_H_M,
         scales=(1.0, 1.5),
+        max_jump_px=LONG_BOARD_MAX_JUMP_PX,
     )
 
 
@@ -386,10 +393,11 @@ def select_corners_with_fallback(
     last_good_corners: np.ndarray | None,
     prev_frame: np.ndarray | None,
     frame: np.ndarray,
+    max_jump_px: float,
 ) -> tuple[np.ndarray | None, np.ndarray | None]:
     if raw_corners is not None:
         raw_corners = np.asarray(raw_corners, dtype=np.float32).reshape(4, 2)
-        if not _is_raw_corners_outlier(raw_corners, last_good_corners):
+        if not _is_raw_corners_outlier(raw_corners, last_good_corners, max_jump_px):
             return raw_corners, raw_corners.copy()
 
     if prev_frame is not None and last_good_corners is not None:
@@ -592,7 +600,11 @@ def run(
                     frame, gen.K, gen.dist_coeffs, runtime
                 )
                 corners, last_good_corners[board_type] = select_corners_with_fallback(
-                    raw_corners, last_good_corners[board_type], prev_frame, frame
+                    raw_corners,
+                    last_good_corners[board_type],
+                    prev_frame,
+                    frame,
+                    runtime.max_jump_px,
                 )
                 if corners is not None and is_valid_corners(corners):
                     removal_specs.append(board_removal_spec(runtime, corners))
