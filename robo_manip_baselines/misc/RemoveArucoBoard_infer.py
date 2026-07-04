@@ -60,8 +60,7 @@ MARKERS_X = 5
 MARKERS_Y = 7
 GRIDBOARD_W_M = MARKERS_X * MARKER_LENGTH_M + (MARKERS_X - 1) * MARKER_SEPARATION_M
 GRIDBOARD_H_M = MARKERS_Y * MARKER_LENGTH_M + (MARKERS_Y - 1) * MARKER_SEPARATION_M
-MAX_JUMP_PX = 50.0
-MIN_AREA_RATIO = 0.70
+MAX_JUMP_PX = 10.0
 
 SMALL_BOARD_DICT_ID = aruco.DICT_5X5_250
 SMALL_BOARD_MARKER_IDS = [100, 101, 102]
@@ -108,29 +107,13 @@ def _is_jump_outlier(
     return bool(np.any(deltas > max_jump_px))
 
 
-def _corners_area(corners: np.ndarray) -> float:
-    corners = np.asarray(corners, dtype=np.float32).reshape(4, 2)
-    return float(cv2.contourArea(corners))
-
-
-def _is_area_shrink_outlier(
-    corners: np.ndarray, prev_corners: np.ndarray, min_area_ratio: float
-) -> bool:
-    prev_area = _corners_area(prev_corners)
-    if prev_area < 1e-6:
-        return False
-    return _corners_area(corners) < prev_area * min_area_ratio
-
-
 def _is_raw_corners_outlier(
     corners: np.ndarray,
     prev_corners: np.ndarray | None,
 ) -> bool:
     if prev_corners is None:
         return False
-    if _is_jump_outlier(corners, prev_corners, MAX_JUMP_PX):
-        return True
-    return _is_area_shrink_outlier(corners, prev_corners, MIN_AREA_RATIO)
+    return _is_jump_outlier(corners, prev_corners, MAX_JUMP_PX)
 
 
 def _aruco_dict(dict_id: int):
