@@ -12,6 +12,11 @@ import torch.nn as nn
 from torch.distributions.normal import Normal
 
 from robo_manip_baselines.common import DataKey, RolloutBase, denormalize_data
+from robo_manip_baselines.policy.rl_policy_dual.rl_tasks.single_aruco_marker import (
+    ArucoMarkerPoseProvider,
+    MARKER_ID,
+    rotation_matrix_to_6d,
+)
 
 from .gripper_utils import (
     gripper_q_maniskill_to_robomanip,
@@ -20,7 +25,17 @@ from .gripper_utils import (
 )
 
 
-STATE_DIM = 32
+STATE_KEYS = [
+    "left_measured_joint_pos",
+    "left_measured_joint_vel",
+    "right_measured_joint_pos",
+    "right_measured_joint_vel",
+    "marker_position",
+    "marker_rotation_6d",
+]
+JOINT_STATE_DIM = 32
+MARKER_STATE_DIM = 9
+STATE_DIM = JOINT_STATE_DIM + MARKER_STATE_DIM
 ACTION_DIM = 16
 LEFT_JOINT_IDX = np.arange(0, 8, dtype=np.int64)
 RIGHT_JOINT_IDX = np.arange(8, 16, dtype=np.int64)
@@ -72,7 +87,7 @@ class ManiSkillPpoAgent(nn.Module):
 
 
 class RolloutRLPolicyDual(RolloutBase):
-    """RealXarm7Dual-only PPO rollout with fixed 32D joint observations."""
+    """RealXarm7Dual-only PPO rollout with joint and ArUco marker observations."""
 
     def set_additional_args(self, parser):
         parser.add_argument(
@@ -84,8 +99,20 @@ class RolloutRLPolicyDual(RolloutBase):
     def setup_model_meta_info(self):
         super().setup_model_meta_info()
         self._validate_meta_info()
+        self._marker_provider = ArucoMarkerPoseProvider()
+        self._marker_provider.start()
+
+    def __del__(self):
+        marker_provider = getattr(self, "_marker_provider", None)
+        if marker_provider is not None:
+            marker_provider.stop()
 
     def _validate_meta_info(self):
+        if list(self.state_keys) != STATE_KEYS:
+            raise ValueError(
+                f"[{self.__class__.__name__}] state keys must be {STATE_KEYS}, "
+                f"got {self.state_keys}"
+            )
         if list(self.action_keys) != [DataKey.COMMAND_JOINT_POS]:
             raise ValueError(
                 f"[{self.__class__.__name__}] action keys must be {[DataKey.COMMAND_JOINT_POS]}, "
@@ -186,6 +213,12 @@ class RolloutRLPolicyDual(RolloutBase):
         delta[GRIPPER_JOINT_IDX] = GRIPPER_JOINT_DELTA_LIMIT
         return -delta, delta
 
+    def _overwrite_gripper_command(self, action: np.ndarray) -> np.ndarray:
+        action = np.asarray(action, dtype=np.float64).reshape(-1).copy()
+        assert action.size == ACTION_DIM
+        action[GRIPPER_JOINT_IDX] = FIXED_GRIPPER_COMMAND
+        return action
+
     def setup_variables(self):
         super().setup_variables()
         self.camera_names = []
@@ -197,6 +230,32 @@ class RolloutRLPolicyDual(RolloutBase):
     def reset_variables(self):
         super().reset_variables()
         self.policy_action_buf = None
+        self._marker_seq_prev = None
+        self._marker_stagnation = 0
+        self._image_seq_prev = None
+        self._image_stagnation = 0
+
+    def _update_stagnation(self, label, seq, prev_seq, stagnation):
+        if prev_seq is None:
+            prev_seq = seq
+            if seq is None:
+                stagnation = 1
+        elif seq == prev_seq:
+            stagnation += 1
+        else:
+            stagnation = 0
+            prev_seq = seq
+
+        if stagnation >= 2:
+            print(
+                f"[{self.__class__.__name__}] WARNING: {label} stagnated for {stagnation} steps.",
+                flush=True,
+            )
+        if stagnation >= 9:
+            raise RuntimeError(
+                f"[{self.__class__.__name__}] {label} stalled for {stagnation} steps."
+            )
+        return prev_seq, stagnation
 
     def get_state(self):
         qpos = np.asarray(
@@ -221,7 +280,7 @@ class RolloutRLPolicyDual(RolloutBase):
         self._latest_joint_pos_tensor = torch.as_tensor(
             qpos_ms, dtype=torch.float32, device=self.device
         )
-        state = np.concatenate(
+        joint_state = np.concatenate(
             [
                 qpos_ms[LEFT_JOINT_IDX],
                 qvel_ms[LEFT_JOINT_IDX],
@@ -229,7 +288,23 @@ class RolloutRLPolicyDual(RolloutBase):
                 qvel_ms[RIGHT_JOINT_IDX],
             ]
         ).astype(np.float32)
+        assert joint_state.size == JOINT_STATE_DIM
+
+        marker_T, marker_seq = self._marker_provider.get_latest_marker_transform()
+        if marker_T is None:
+            raise RuntimeError(
+                f"[{self.__class__.__name__}] ArUco marker id={MARKER_ID} is not detected yet."
+            )
+        marker_position = marker_T[:3, 3].astype(np.float32)
+        marker_rotation_6d = rotation_matrix_to_6d(marker_T[:3, :3])
+        marker_state = np.concatenate([marker_position, marker_rotation_6d]).astype(
+            np.float32
+        )
+        assert marker_state.size == MARKER_STATE_DIM
+
+        state = np.concatenate([joint_state, marker_state]).astype(np.float32)
         assert state.size == STATE_DIM
+        self._latest_marker_seq = marker_seq
         self.state_for_policy = state
         return torch.as_tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
 
@@ -266,7 +341,7 @@ class RolloutRLPolicyDual(RolloutBase):
                 )
 
             physical_np = direct_joint_command.detach().cpu().numpy().astype(np.float64)
-            physical_np[GRIPPER_JOINT_IDX] = FIXED_GRIPPER_COMMAND
+            physical_np = self._overwrite_gripper_command(physical_np)
             self._append_state_action_csv(physical_np)
             if self._log_path is not None:
                 with open(self._log_path, "a", newline="") as f:
@@ -284,6 +359,7 @@ class RolloutRLPolicyDual(RolloutBase):
         self.policy_action = denormalize_data(
             self.policy_action_buf.pop(0), self.model_meta_info["action"]
         )
+        self.policy_action = self._overwrite_gripper_command(self.policy_action)
         self.policy_action_list = np.concatenate(
             [self.policy_action_list, self.policy_action[np.newaxis]]
         )
@@ -300,7 +376,33 @@ class RolloutRLPolicyDual(RolloutBase):
                 + np.asarray(action, dtype=float).reshape(-1).tolist()
             )
 
+    def record_data(self):
+        super().record_data()
+
+        marker_seq = self._marker_provider.get_latest_marker_seq()
+        image_seq = self._marker_provider.get_latest_image_seq()
+        self.data_manager.append_single_data(
+            "marker_seq", -1 if marker_seq is None else int(marker_seq)
+        )
+        self.data_manager.append_single_data(
+            "image_seq", -1 if image_seq is None else int(image_seq)
+        )
+
+        self._marker_seq_prev, self._marker_stagnation = self._update_stagnation(
+            "marker detection",
+            marker_seq,
+            self._marker_seq_prev,
+            self._marker_stagnation,
+        )
+        self._image_seq_prev, self._image_stagnation = self._update_stagnation(
+            "image capture",
+            image_seq,
+            self._image_seq_prev,
+            self._image_stagnation,
+        )
+
     def set_command_data(self, action_keys=None):
+        self.policy_action = self._overwrite_gripper_command(self.policy_action)
         super().set_command_data(action_keys)
 
     def draw_plot(self):
