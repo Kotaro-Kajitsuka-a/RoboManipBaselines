@@ -43,7 +43,9 @@ def main() -> None:
 
     hdf5_paths = sorted(dataset_dir.glob("**/main_eval.hdf5"))
     count = len(hdf5_paths)
-    print(f"{COLOR_CYAN_BOLD}[EvalBoxRotationTPR] Found {count} main_eval.hdf5 files{COLOR_RESET}")
+    print(
+        f"{COLOR_CYAN_BOLD}[EvalBoxRotationTPR] Found {count} main_eval.hdf5 files{COLOR_RESET}"
+    )
     if count == 0:
         raise FileNotFoundError(f"No main_eval.hdf5 found under: {dataset_dir}")
 
@@ -71,7 +73,9 @@ def main() -> None:
 
         duration = float(time_seq[-1] - time_seq[0])
         if duration <= 0.0:
-            raise AssertionError(f"non-positive duration in {hdf5_path}: {duration:.6f}")
+            raise AssertionError(
+                f"non-positive duration in {hdf5_path}: {duration:.6f}"
+            )
 
         initial_angle = float(angle_seq[0])
         if duration >= T_MAX_SECONDS:

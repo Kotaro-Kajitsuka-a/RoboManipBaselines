@@ -8,7 +8,6 @@ import numpy as np
 
 from robo_manip_baselines.common import DataKey, RmbData, find_rmb_files
 
-
 CSV_COLUMNS = ["rmb_path", "camera", "completion_frame", "completion_time", "success"]
 
 
@@ -54,9 +53,9 @@ def load_done_paths(csv_path):
 
     with csv_path.open("r", newline="") as f:
         reader = csv.DictReader(f)
-        assert reader.fieldnames == CSV_COLUMNS, (
-            f"Unexpected csv columns: {reader.fieldnames}. Expected: {CSV_COLUMNS}"
-        )
+        assert (
+            reader.fieldnames == CSV_COLUMNS
+        ), f"Unexpected csv columns: {reader.fieldnames}. Expected: {CSV_COLUMNS}"
         return {row["rmb_path"] for row in reader}
 
 
@@ -99,7 +98,9 @@ class RmbFrameReader:
         self.rgb_key = rgb_key
         self.rmb_data = RmbData(rmb_path)
         self.rmb_data.open()
-        self.time_seq = np.asarray(self.rmb_data[DataKey.TIME][:], dtype=np.float64).reshape(-1)
+        self.time_seq = np.asarray(
+            self.rmb_data[DataKey.TIME][:], dtype=np.float64
+        ).reshape(-1)
         assert len(self.time_seq) > 0
 
         self.cap = None
@@ -117,9 +118,9 @@ class RmbFrameReader:
             self.rgb_seq = None
             self.length = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
-        assert self.length == len(self.time_seq), (
-            f"frame length mismatch: {self.length} != {len(self.time_seq)}"
-        )
+        assert self.length == len(
+            self.time_seq
+        ), f"frame length mismatch: {self.length} != {len(self.time_seq)}"
         self._last_idx = None
         self._last_frame = None
 

@@ -50,7 +50,9 @@ def main() -> None:
     count = len(hdf5_paths)
 
     # Bold cyan for visibility in terminal.
-    print(f"{COLOR_CYAN_BOLD}[EvalBoxRotation] Found {count} main_eval.hdf5 files{COLOR_RESET}")
+    print(
+        f"{COLOR_CYAN_BOLD}[EvalBoxRotation] Found {count} main_eval.hdf5 files{COLOR_RESET}"
+    )
 
     if count == 0:
         raise FileNotFoundError(f"No main_eval.hdf5 found under: {dataset_dir}")
