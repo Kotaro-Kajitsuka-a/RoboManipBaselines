@@ -14,6 +14,7 @@ class RolloutMain:
         "Ppo",
         "PpoCus",
         "RLPolicy",
+        "RLPolicyDual",
         "Mlp",
         "Sarnn",
         "Act",
