@@ -16,4 +16,10 @@ python ./robo_manip_baselines/bin/Rollout.py RLPolicy RealXarm7Demo \
   --config ./robo_manip_baselines/envs/configs/RealXarm7DemoEnvCabinetOpen.yaml \
   --world_idx_repeat_count 45
 
+
+python ./robo_manip_baselines/bin/Rollout.py DiffusionPolicy RealXarm7Demo \
+  --config ./robo_manip_baselines/envs/configs/RealXarm7DemoEnv.yaml \
+  --checkpoint robo_manip_baselines/checkpoint/DiffusionPolicy/training_DiffusionPolicy_20260627_224706/policy_last.ckpt \
+  --wait_before_start --skip_draw 50000 --save_rollout --world_idx_repeat_count 10
+
 ###########################################################################

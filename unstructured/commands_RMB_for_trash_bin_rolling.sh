@@ -1,5 +1,4 @@
-
-uv run python -m robo_manip_baselines.policy.rl_policy_dual.rl_tasks.view_single_aruco_marker
+python robo_manip_baselines/policy/rl_policy_dual/rl_tasks/view_single_aruco_marker.py
 
 
 
