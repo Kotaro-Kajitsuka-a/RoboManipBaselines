@@ -8,6 +8,8 @@ from .RealXarm7DualEnvBase import RealXarm7DualEnvBase
 
 
 class RealXarm7DualFixedGripperDemoEnv(RealXarm7DualEnvBase):
+    fixed_gripper_joint_pos = np.array([119.0, 119.0], dtype=np.float64)
+
     def __init__(
         self,
         **kwargs,
@@ -18,9 +20,9 @@ class RealXarm7DualFixedGripperDemoEnv(RealXarm7DualEnvBase):
             init_qpos=np.concatenate(
                 [
                     np.deg2rad([0.0, -30.0, 0.0, 45.0, 0.0, 75.0, 0.0]),
-                    np.array([0.0]),
+                    self.fixed_gripper_joint_pos[[0]],
                     np.deg2rad([0.0, -30.0, 0.0, 45.0, 0.0, 75.0, 0.0]),
-                    np.array([0.0]),
+                    self.fixed_gripper_joint_pos[[1]],
                 ]
             ),
             **kwargs,
@@ -39,7 +41,7 @@ class RealXarm7DualFixedGripperDemoEnv(RealXarm7DualEnvBase):
                 gripper_joint_idxes_in_gripper_joint_pos=np.array([0]),
                 eef_idx=0,
                 init_arm_joint_pos=self.init_qpos[0:7],
-                init_gripper_joint_pos=np.array([119.0]),
+                init_gripper_joint_pos=self.fixed_gripper_joint_pos[[0]],
             ),
             ArmConfig(
                 arm_urdf_path=path.join(
@@ -53,9 +55,19 @@ class RealXarm7DualFixedGripperDemoEnv(RealXarm7DualEnvBase):
                 gripper_joint_idxes_in_gripper_joint_pos=np.array([1]),
                 eef_idx=1,
                 init_arm_joint_pos=self.init_qpos[8:15],
-                init_gripper_joint_pos=np.array([119.0]),
+                init_gripper_joint_pos=self.fixed_gripper_joint_pos[[1]],
             ),
         ]
+
+    def _set_action(self, action, duration=None, joint_vel_limit_scale=0.5, wait=False):
+        action = action.copy()
+        action[self.body_config_list[0].gripper_joint_idxes] = (
+            self.fixed_gripper_joint_pos[0]
+        )
+        action[self.body_config_list[1].gripper_joint_idxes] = (
+            self.fixed_gripper_joint_pos[1]
+        )
+        super()._set_action(action, duration, joint_vel_limit_scale, wait)
 
     def get_input_device_kwargs(self, input_device_name):
         if input_device_name == "spacemouse":

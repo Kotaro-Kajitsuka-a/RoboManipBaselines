@@ -20,7 +20,7 @@ class OperationRealXarm7DualFixedGripperDemo:
 
     def setup_env(self, render_mode="human"):
         self.env = gym.make(
-            "robo_manip_baselines/RealXarm7DualDemoEnv-v0",
+            "robo_manip_baselines/RealXarm7DualFixedGripperDemoEnv-v0",
             robot_ip_left=self.robot_ip_left,
             robot_ip_right=self.robot_ip_right,
             camera_ids=self.camera_ids,
