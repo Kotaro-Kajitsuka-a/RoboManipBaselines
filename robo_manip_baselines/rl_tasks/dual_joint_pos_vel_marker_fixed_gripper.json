@@ -65,7 +65,7 @@
     "state": "joint_pos_vel_marker",
     "marker_dict": "DICT_4X4_50",
     "marker_id": 0,
-    "marker_size_m": 0.09265,
+    "marker_size_m": 0.051,
     "marker_frame": "base",
     "action": "joint_pos_with_fixed_gripper",
     "fixed_gripper_command": 119.0,

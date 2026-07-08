@@ -19,7 +19,7 @@ from robo_manip_baselines.policy.rl_policy.rl_tasks.cabinet_marker_detection imp
 )
 
 MARKER_ID = 0
-MARKER_SIZE_M = 0.09265
+MARKER_SIZE_M = 0.0510
 ARUCO_DICT_ID = aruco.DICT_4X4_50
 
 
@@ -280,6 +280,15 @@ def run_viewer():
                 marker_base = base_T_marker[:3, 3]
                 project_marker_center(
                     img, K, dist_coeffs, rvec, tvec, (255, 0, 255), f"marker {MARKER_ID}"
+                )
+                cv2.drawFrameAxes(
+                    img,
+                    K,
+                    dist_coeffs,
+                    rvec,
+                    tvec,
+                    MARKER_SIZE_M * 0.5,
+                    3,
                 )
 
             now = time.time()
