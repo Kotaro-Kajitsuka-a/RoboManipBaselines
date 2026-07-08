@@ -115,7 +115,7 @@ class RealXarm7DualEnvBase(RealEnvBase):
         self.xarm_api_left.clean_error()
         self.xarm_api_left.set_mode(6)
         self.xarm_api_left.set_state(0)
-        self.xarm_api_left.set_collision_sensitivity(1)
+        self.xarm_api_left.set_collision_sensitivity(5)
         self.xarm_api_left.clean_gripper_error()
         self.xarm_api_left.set_gripper_mode(0)
         self.xarm_api_left.set_gripper_enable(True)

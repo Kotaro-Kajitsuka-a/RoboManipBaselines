@@ -1,1 +1,2 @@
 from .RealXarm7DualDemoEnv import RealXarm7DualDemoEnv
+from .RealXarm7DualFixedGripperDemoEnv import RealXarm7DualFixedGripperDemoEnv
