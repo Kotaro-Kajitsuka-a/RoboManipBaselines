@@ -12,11 +12,6 @@ import torch.nn as nn
 from torch.distributions.normal import Normal
 
 from robo_manip_baselines.common import DataKey, RolloutBase, denormalize_data
-from robo_manip_baselines.policy.rl_policy_dual.rl_tasks.single_aruco_marker import (
-    ArucoMarkerPoseProvider,
-    MARKER_ID,
-    rotation_matrix_to_6d,
-)
 
 from .gripper_utils import (
     gripper_q_maniskill_to_robomanip,
@@ -99,13 +94,24 @@ class RolloutRLPolicyDual(RolloutBase):
     def setup_model_meta_info(self):
         super().setup_model_meta_info()
         self._validate_meta_info()
-        self._marker_provider = ArucoMarkerPoseProvider()
-        self._marker_provider.start()
+        self.rl_task_handler = None
+        self._setup_marker_task()
 
     def __del__(self):
-        marker_provider = getattr(self, "_marker_provider", None)
-        if marker_provider is not None:
-            marker_provider.stop()
+        rl_task_handler = getattr(self, "rl_task_handler", None)
+        if rl_task_handler is not None and hasattr(rl_task_handler, "_provider"):
+            rl_task_handler._provider.stop()
+
+    def _setup_marker_task(self):
+        from robo_manip_baselines.policy.sac.sac_tasks.single_aruco_marker import (
+            build_rl_task,
+        )
+
+        task_cfg = self.model_meta_info.get("rl_task") or {}
+        params = task_cfg.get("params", {}) if isinstance(task_cfg, dict) else {}
+        if not isinstance(params, dict):
+            raise TypeError("model_meta_info['rl_task']['params'] must be a dict.")
+        self.rl_task_handler = build_rl_task(self, params)
 
     def _validate_meta_info(self):
         if list(self.state_keys) != STATE_KEYS:
@@ -222,6 +228,11 @@ class RolloutRLPolicyDual(RolloutBase):
     def setup_variables(self):
         super().setup_variables()
         self.camera_names = []
+        self._detector_camera_name = "front"
+        camera_names = list(self.data_manager.meta_data.get("camera_names", []))
+        if self._detector_camera_name not in camera_names:
+            camera_names.append(self._detector_camera_name)
+        self.data_manager.meta_data["camera_names"] = camera_names
 
     def setup_plot(self):
         fig_ax = plt.subplots(2, 1, figsize=(13.5, 6.0), dpi=60, squeeze=False)
@@ -230,6 +241,7 @@ class RolloutRLPolicyDual(RolloutBase):
     def reset_variables(self):
         super().reset_variables()
         self.policy_action_buf = None
+        self._record_detector_rgb_last = None
         self._marker_seq_prev = None
         self._marker_stagnation = 0
         self._image_seq_prev = None
@@ -290,21 +302,17 @@ class RolloutRLPolicyDual(RolloutBase):
         ).astype(np.float32)
         assert joint_state.size == JOINT_STATE_DIM
 
-        marker_T, marker_seq = self._marker_provider.get_latest_marker_transform()
-        if marker_T is None:
-            raise RuntimeError(
-                f"[{self.__class__.__name__}] ArUco marker id={MARKER_ID} is not detected yet."
-            )
-        marker_position = marker_T[:3, 3].astype(np.float32)
-        marker_rotation_6d = rotation_matrix_to_6d(marker_T[:3, :3])
-        marker_state = np.concatenate([marker_position, marker_rotation_6d]).astype(
-            np.float32
-        )
+        extra = self.rl_task_handler.get_extra_state()
+        marker_state = np.concatenate(
+            [
+                np.asarray(extra["marker_position"], dtype=np.float32).reshape(-1),
+                np.asarray(extra["marker_rotation_6d"], dtype=np.float32).reshape(-1),
+            ]
+        ).astype(np.float32)
         assert marker_state.size == MARKER_STATE_DIM
 
         state = np.concatenate([joint_state, marker_state]).astype(np.float32)
         assert state.size == STATE_DIM
-        self._latest_marker_seq = marker_seq
         self.state_for_policy = state
         return torch.as_tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
 
@@ -379,8 +387,19 @@ class RolloutRLPolicyDual(RolloutBase):
     def record_data(self):
         super().record_data()
 
-        marker_seq = self._marker_provider.get_latest_marker_seq()
-        image_seq = self._marker_provider.get_latest_image_seq()
+        rgb = self.rl_task_handler.get_latest_front_rgb()
+        if rgb is None:
+            if self._record_detector_rgb_last is None:
+                self._record_detector_rgb_last = np.zeros((480, 640, 3), dtype=np.uint8)
+            rgb = self._record_detector_rgb_last
+        else:
+            self._record_detector_rgb_last = rgb
+        self.data_manager.append_single_data(
+            DataKey.get_rgb_image_key(self._detector_camera_name), rgb
+        )
+
+        marker_seq = self.rl_task_handler.get_latest_marker_seq()
+        image_seq = self.rl_task_handler.get_latest_image_seq()
         self.data_manager.append_single_data(
             "marker_seq", -1 if marker_seq is None else int(marker_seq)
         )

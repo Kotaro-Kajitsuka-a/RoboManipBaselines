@@ -261,6 +261,12 @@ class YoloBoxRotationTask(DualBoxRotationTask):
     def get_latest_top_aruco_board_corners(self) -> Optional[np.ndarray]:
         return self.get_latest_front_aruco_board_corners()
 
+    def get_record_data(self) -> Dict[str, np.ndarray | int]:
+        record = super().get_record_data()
+        record["top_rgb_image"] = record.pop("front_rgb_image")
+        record["top_aruco_board_corners"] = record.pop("front_aruco_board_corners")
+        return record
+
 
 def build_ppo_task(rollout: "RolloutSac", params: Optional[Mapping[str, object]] = None):
     if params is None:

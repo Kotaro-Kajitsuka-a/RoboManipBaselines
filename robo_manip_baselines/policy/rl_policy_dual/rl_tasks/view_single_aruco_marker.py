@@ -1,4 +1,4 @@
-from robo_manip_baselines.policy.rl_policy_dual.rl_tasks.single_aruco_marker import (
+from robo_manip_baselines.policy.sac.sac_tasks.single_aruco_marker import (
     run_viewer,
 )
 

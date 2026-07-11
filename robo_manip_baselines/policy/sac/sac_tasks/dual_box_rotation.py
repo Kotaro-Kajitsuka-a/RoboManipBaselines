@@ -11,6 +11,10 @@ import numpy as np
 import pyrealsense2 as rs
 from cv2 import aruco
 
+from .dual_box_rotation_policy_state import (
+    get_policy_state as get_dual_box_rotation_policy_state,
+)
+
 BOX_MARKER_ID = 2  # must match the hard-coded marker in RolloutSac
 # Downward offset (marker frame -> box frame) along marker -Z axis [m]
 BOX_MARKER_Z_OFFSET_M = 0.05625
@@ -279,6 +283,9 @@ class DualBoxRotationTask:
         except Exception:
             pass
 
+    def on_reset(self) -> None:
+        return
+
     def _rotation_matrix_to_6d(self, rotation: np.ndarray) -> np.ndarray:
         if rotation.shape != (3, 3):
             raise ValueError(
@@ -397,6 +404,27 @@ class DualBoxRotationTask:
     def get_latest_front_aruco_board_corners(self) -> Optional[np.ndarray]:
         """Return the latest ArUco board corners in the recorded frame."""
         return self._provider.get_latest_board_corners()
+
+    def get_record_data(self) -> Dict[str, np.ndarray | int]:
+        rgb = self.get_latest_front_rgb()
+        if rgb is None:
+            rgb = np.zeros((480, 640, 3), dtype=np.uint8)
+
+        board_corners = self.get_latest_front_aruco_board_corners()
+        if board_corners is None:
+            board_corners = np.full((4, 2), -1.0, dtype=np.float32)
+
+        box_seq = self.get_latest_box_pose_seq()
+        image_seq = self.get_latest_image_seq()
+        return {
+            "front_rgb_image": rgb,
+            "front_aruco_board_corners": board_corners,
+            "pose_estimator_seq": -1 if box_seq is None else int(box_seq),
+            "image_seq": -1 if image_seq is None else int(image_seq),
+        }
+
+    def get_policy_state(self):
+        return get_dual_box_rotation_policy_state(self, self.rollout)
 
 
 def build_ppo_task(
