@@ -43,6 +43,7 @@ def build_policy(model_meta_info) -> Actor:
 def infer_policy(rollout):
     if rollout.policy_action_buf is None or len(rollout.policy_action_buf) == 0:
         obs_tensor = rollout.get_state()
+        rollout._latest_policy_state_tensor = obs_tensor
 
         with torch.no_grad():
             if rollout._deterministic:
@@ -83,6 +84,9 @@ def infer_policy(rollout):
 
     rollout.policy_action = denormalize_data(
         rollout.policy_action_buf.pop(0), rollout.model_meta_info["action"]
+    )
+    rollout.append_state_action_csv(
+        rollout._latest_policy_state_tensor, rollout.policy_action
     )
     rollout.policy_action_list = np.concatenate(
         [rollout.policy_action_list, rollout.policy_action[np.newaxis]]

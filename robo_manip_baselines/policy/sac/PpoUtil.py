@@ -21,6 +21,7 @@ def build_policy(state_dict, state_dim: int, action_dim: int) -> ManiSkillPpoAge
 def infer_policy(rollout):
     if rollout.policy_action_buf is None or len(rollout.policy_action_buf) == 0:
         obs_tensor = rollout.get_state()
+        rollout._latest_policy_state_tensor = obs_tensor
         with torch.no_grad():
             raw_action = rollout.policy.get_action(
                 obs_tensor, deterministic=rollout._deterministic
@@ -54,6 +55,9 @@ def infer_policy(rollout):
     )
     rollout.policy_action[rollout._gripper_joint_indices] = (
         rollout._fixed_gripper_command
+    )
+    rollout.append_state_action_csv(
+        rollout._latest_policy_state_tensor, rollout.policy_action
     )
     rollout.policy_action_list = np.concatenate(
         [rollout.policy_action_list, rollout.policy_action[np.newaxis]]

@@ -1,3 +1,4 @@
+import csv
 import importlib
 import os
 from typing import Any, Dict
@@ -221,6 +222,48 @@ class RolloutSac(RolloutBase):
         print(
             f"[{self.__class__.__name__}] Load ManiSkill {self.policy_algo.upper()} checkpoint on {self.device}"
         )
+        self._setup_state_action_csv()
+
+    def _setup_state_action_csv(self):
+        checkpoint_dir = os.path.dirname(os.path.abspath(self.args.checkpoint))
+        self._state_action_csv_path = os.path.join(
+            checkpoint_dir, "rollout_sac_state_action.csv"
+        )
+        with open(self._state_action_csv_path, "w", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(
+                ["episode_idx", "rollout_step", "time"]
+                + [f"state_{idx}" for idx in range(self.state_dim)]
+                + [f"action_command_joint_pos_{idx}" for idx in range(self.action_dim)]
+            )
+        print(
+            f"[{self.__class__.__name__}] Save state/action CSV: {self._state_action_csv_path}"
+        )
+
+    def append_state_action_csv(self, state_tensor, action):
+        state = state_tensor.squeeze(0).detach().cpu().numpy().astype(float).reshape(-1)
+        action = np.asarray(action, dtype=float).reshape(-1)
+        if state.size != self.state_dim:
+            raise ValueError(
+                f"[{self.__class__.__name__}] state CSV dim mismatch: "
+                f"{state.size} != {self.state_dim}."
+            )
+        if action.size != self.action_dim:
+            raise ValueError(
+                f"[{self.__class__.__name__}] action CSV dim mismatch: "
+                f"{action.size} != {self.action_dim}."
+            )
+
+        episode_idx = int(getattr(self.data_manager, "episode_idx", 0))
+        rollout_step = int(getattr(self, "rollout_time_idx", 0))
+        elapsed_time = self.phase_manager.phase.get_elapsed_duration()
+        with open(self._state_action_csv_path, "a", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(
+                [episode_idx, rollout_step, float(elapsed_time)]
+                + state.tolist()
+                + action.tolist()
+            )
 
     def setup_variables(self):
         super().setup_variables()
