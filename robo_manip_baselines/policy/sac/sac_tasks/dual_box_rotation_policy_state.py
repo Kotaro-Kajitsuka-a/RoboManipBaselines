@@ -9,6 +9,44 @@ from ..gripper_utils import (
 )
 from ..state_utils import get_adjusted_measured_eef_pose
 
+_LEFT_TCP_OFFSET_M = np.array([0.0, -0.3291, 0.27589], dtype=np.float32)
+_RIGHT_TCP_OFFSET_M = np.array([0.0, 0.3291, 0.27589], dtype=np.float32)
+_TCP_ROTATION_ADJUST = np.array(
+    [
+        [0.0, 0.0, 1.0],
+        [1.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0],
+    ],
+    dtype=np.float32,
+)
+
+
+def _rot6d_to_matrix(rot6d: np.ndarray) -> np.ndarray:
+    rot6d = np.asarray(rot6d, dtype=np.float32).reshape(6)
+    x_axis = rot6d[0:3]
+    y_axis = rot6d[3:6]
+    x_axis = x_axis / (np.linalg.norm(x_axis) + 1e-8)
+    y_axis = y_axis - np.dot(x_axis, y_axis) * x_axis
+    y_axis = y_axis / (np.linalg.norm(y_axis) + 1e-8)
+    z_axis = np.cross(x_axis, y_axis)
+    return np.stack([x_axis, y_axis, z_axis], axis=1)
+
+
+def _matrix_to_rot6d(rotation: np.ndarray) -> np.ndarray:
+    rotation = np.asarray(rotation, dtype=np.float32).reshape(3, 3)
+    return np.concatenate([rotation[:, 0], rotation[:, 1]]).astype(np.float32)
+
+
+def _adjust_tcp_pose(tcp_pose_6d: np.ndarray, offset: np.ndarray) -> np.ndarray:
+    tcp_pose_6d = np.asarray(tcp_pose_6d, dtype=np.float32).reshape(9)
+    position = tcp_pose_6d[0:3]
+    rotation = _rot6d_to_matrix(tcp_pose_6d[3:9])
+    adjusted_position = position + rotation @ offset
+    adjusted_rotation = rotation @ _TCP_ROTATION_ADJUST
+    return np.concatenate(
+        [adjusted_position, _matrix_to_rot6d(adjusted_rotation)]
+    ).astype(np.float32)
+
 
 def get_box_pose(task, rollout) -> np.ndarray:
     extra_state = task.get_extra_state()
@@ -59,6 +97,8 @@ def get_policy_state(task, rollout):
     left_tcp_pose_6d, right_tcp_pose_6d = get_adjusted_measured_eef_pose(
         measured_eef_pose
     )
+    left_tcp_pose_6d = _adjust_tcp_pose(left_tcp_pose_6d, _LEFT_TCP_OFFSET_M)
+    right_tcp_pose_6d = _adjust_tcp_pose(right_tcp_pose_6d, _RIGHT_TCP_OFFSET_M)
 
     parts = [
         qpos_ms[left_idx],
