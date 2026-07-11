@@ -11,6 +11,8 @@ import numpy as np
 import pyrealsense2 as rs
 from cv2 import aruco
 
+from robo_manip_baselines.policy.sac import RolloutSac
+
 BOX_MARKER_ID = 2  # must match the hard-coded marker in RolloutSac
 # Downward offset (marker frame -> box frame) along marker -Z axis [m]
 BOX_MARKER_Z_OFFSET_M = 0.05625
@@ -24,10 +26,10 @@ BOX_DEPTH_M = 0.1140
 GRIDBOARD_W_M = MARKERS_X * MARKER_LENGTH_M + (MARKERS_X - 1) * MARKER_SEPARATION_M
 GRIDBOARD_H_M = MARKERS_Y * MARKER_LENGTH_M + (MARKERS_Y - 1) * MARKER_SEPARATION_M
 BOX_HALF_SIZE = np.array([0.2170 * 0.5, 0.2845 * 0.5, 0.1140 * 0.5], dtype=np.float32)
-BASE_CENTER_T_PATH = Path("robo_manip_baselines/calib/base_center_T_top.calib")
+BASE_CENTER_T_PATH = Path("robo_manip_baselines/calib/base_center_T.calib")
 # Use 1280x720 (16:9) for detection stability while keeping dataset recording at 640x480.
 RES_W, RES_H, FPS = 1280, 720, 30
-USE_SERIAL = "310522071235"
+USE_SERIAL = "314422070401"
 
 
 def _rotmat_to_rpy_deg(R: np.ndarray) -> np.ndarray:
@@ -110,7 +112,10 @@ class BoxPoseProvider:
         except AttributeError:
             self._aruco_params = aruco.DetectorParameters()
         self._board = aruco.GridBoard(
-            (MARKERS_X, MARKERS_Y), MARKER_LENGTH_M, MARKER_SEPARATION_M, self._aruco_dict
+            (MARKERS_X, MARKERS_Y),
+            MARKER_LENGTH_M,
+            MARKER_SEPARATION_M,
+            self._aruco_dict,
         )
 
         self._base_T_cam = np.loadtxt(self.calib_path).astype(np.float32)
@@ -119,7 +124,9 @@ class BoxPoseProvider:
         if self._thread and self._thread.is_alive():
             return
         self._stop_event.clear()
-        self._thread = threading.Thread(target=self._run, name="box_pose_provider", daemon=True)
+        self._thread = threading.Thread(
+            target=self._run, name="box_pose_provider", daemon=True
+        )
         self._thread.start()
 
     def stop(self) -> None:
@@ -133,7 +140,7 @@ class BoxPoseProvider:
             if self._latest_transform is None:
                 return None, None
             T = self._latest_transform.copy()
-            #T[2, 3] = -0.03175  # force z to fixed value at the source
+            # T[2, 3] = -0.03175  # force z to fixed value at the source
             return T, self._latest_timestamp
 
     def get_latest_front_rgb(self) -> Tuple[Optional[np.ndarray], Optional[float]]:
@@ -167,12 +174,17 @@ class BoxPoseProvider:
         config = rs.config()
         config.enable_device(self.serial)
         # Request RGB frames to avoid BGR<->RGB conversion in the hot path.
-        config.enable_stream(rs.stream.color, self.res_w, self.res_h, rs.format.rgb8, self.fps)
+        config.enable_stream(
+            rs.stream.color, self.res_w, self.res_h, rs.format.rgb8, self.fps
+        )
 
         try:
             profile = pipeline.start(config)
         except Exception as exc:  # pragma: no cover - hardware dependent
-            print(f"[BoxPoseProvider] Failed to start RealSense pipeline: {exc}", flush=True)
+            print(
+                f"[BoxPoseProvider] Failed to start RealSense pipeline: {exc}",
+                flush=True,
+            )
             return
 
         # Match normal record-data camera behavior (no manual exposure/gain override).
@@ -185,7 +197,9 @@ class BoxPoseProvider:
         dist_coeffs = np.array(intr.coeffs[:5], dtype=np.float32)
 
         R_flip_x = np.array([[1, 0, 0], [0, -1, 0], [0, 0, -1]], dtype=np.float32)
-        center_offset = np.array([GRIDBOARD_W_M * 0.5, GRIDBOARD_H_M * 0.5, 0.0], dtype=np.float32)
+        center_offset = np.array(
+            [GRIDBOARD_W_M * 0.5, GRIDBOARD_H_M * 0.5, 0.0], dtype=np.float32
+        )
         z_offset = np.array([0.0, 0.0, -BOX_DEPTH_M * 0.5], dtype=np.float32)
 
         try:
@@ -204,7 +218,9 @@ class BoxPoseProvider:
 
                 board_corners_record = np.full((4, 2), -1.0, dtype=np.float32)
 
-                corners, ids, _ = aruco.detectMarkers(gray, self._aruco_dict, parameters=self._aruco_params)
+                corners, ids, _ = aruco.detectMarkers(
+                    gray, self._aruco_dict, parameters=self._aruco_params
+                )
                 if ids is None or len(ids) == 0:
                     with self._lock:
                         self._latest_front_rgb = rgb
@@ -212,7 +228,9 @@ class BoxPoseProvider:
                         self._latest_board_corners = board_corners_record
                         self._latest_board_seq += 1
                     continue
-                retval, rvec, tvec = aruco.estimatePoseBoard(corners, ids, self._board, K, dist_coeffs, None, None)
+                retval, rvec, tvec = aruco.estimatePoseBoard(
+                    corners, ids, self._board, K, dist_coeffs, None, None
+                )
                 if retval <= 0:
                     with self._lock:
                         self._latest_front_rgb = rgb
@@ -230,7 +248,9 @@ class BoxPoseProvider:
                     ],
                     dtype=np.float32,
                 )
-                proj, _ = cv2.projectPoints(board_corners_3d, rvec, tvec, K, dist_coeffs)
+                proj, _ = cv2.projectPoints(
+                    board_corners_3d, rvec, tvec, K, dist_coeffs
+                )
                 board_corners_px = proj.reshape(-1, 2)
                 board_corners_record = _map_points_to_record_frame(
                     board_corners_px, self.res_w, self.res_h
@@ -312,7 +332,9 @@ class DualBoxRotationTask:
         z_axis = np.cross(x_axis, y_axis)
         return np.stack([x_axis, y_axis, z_axis], axis=1)
 
-    def _init_pushpoint_locals(self, position: np.ndarray, rotation: np.ndarray) -> None:
+    def _init_pushpoint_locals(
+        self, position: np.ndarray, rotation: np.ndarray
+    ) -> None:
         if self._pushpoint_local_right is not None:
             return
         hx = float(BOX_HALF_SIZE[0])
@@ -333,7 +355,9 @@ class DualBoxRotationTask:
         initial_pushpoint_by_left = 2.0 * position - initial_pushpoint_by_right
 
         rotation_T = rotation.T
-        self._pushpoint_local_right = rotation_T @ (initial_pushpoint_by_right - position)
+        self._pushpoint_local_right = rotation_T @ (
+            initial_pushpoint_by_right - position
+        )
         self._pushpoint_local_left = rotation_T @ (initial_pushpoint_by_left - position)
 
     def _get_box_pushpoint(self, box_pose: np.ndarray) -> np.ndarray:
@@ -365,7 +389,9 @@ class DualBoxRotationTask:
         translation = T_base_to_box[:3, 3].astype(np.float32)
         rotation = T_base_to_box[:3, :3]
         rotation6d = self._rotation_matrix_to_6d(rotation).astype(np.float32)
-        self._last_box_pose = np.concatenate([translation, rotation6d]).astype(np.float32)
+        self._last_box_pose = np.concatenate([translation, rotation6d]).astype(
+            np.float32
+        )
         return self._last_box_pose.copy()
 
     def get_extra_state(self) -> Dict[str, np.ndarray]:

@@ -113,16 +113,15 @@ class RealXarm7DualEnvBase(RealEnvBase):
         self.xarm_api_left.motion_enable(enable=True)
         self.xarm_api_left.set_ft_sensor_enable(1)
         time.sleep(0.2)
-        #self.xarm_api_left.set_ft_sensor_zero()
+        # self.xarm_api_left.set_ft_sensor_zero()
         time.sleep(0.2)
         self.xarm_api_left.clean_error()
         self.xarm_api_left.set_mode(1)
         self.xarm_api_left.set_state(0)
         self.xarm_api_left.set_collision_sensitivity(2)
-        #self.xarm_api_left.clean_gripper_error()
-        #self.xarm_api_left.set_gripper_mode(0)
-        #self.xarm_api_left.set_gripper_enable(True)
-
+        # self.xarm_api_left.clean_gripper_error()
+        # self.xarm_api_left.set_gripper_mode(0)
+        # self.xarm_api_left.set_gripper_enable(True)
 
         time.sleep(0.2)
         xarm_code, left_joint_states = self.xarm_api_left.get_joint_states(
@@ -139,15 +138,15 @@ class RealXarm7DualEnvBase(RealEnvBase):
         self.xarm_api_right.motion_enable(enable=True)
         self.xarm_api_right.set_ft_sensor_enable(1)
         time.sleep(0.2)
-        #self.xarm_api_right.set_ft_sensor_zero()
+        # self.xarm_api_right.set_ft_sensor_zero()
         time.sleep(0.2)
         self.xarm_api_right.clean_error()
         self.xarm_api_right.set_mode(1)
         self.xarm_api_right.set_state(0)
         self.xarm_api_right.set_collision_sensitivity(1)
-        #self.xarm_api_right.clean_gripper_error()
-        #self.xarm_api_right.set_gripper_mode(0)
-        #self.xarm_api_right.set_gripper_enable(True)
+        # self.xarm_api_right.clean_gripper_error()
+        # self.xarm_api_right.set_gripper_mode(0)
+        # self.xarm_api_right.set_gripper_enable(True)
         time.sleep(0.2)
         xarm_code, right_joint_states = self.xarm_api_right.get_joint_states(
             is_radian=True
@@ -220,7 +219,6 @@ class RealXarm7DualEnvBase(RealEnvBase):
             f"[{self.__class__.__name__}] Finish moving the robot to the reset position."
         )
 
-        
         if False:
             start = time.monotonic()
             code, result = self.xarm_api_right.iden_ft_sensor_load_offset()
@@ -231,18 +229,23 @@ class RealXarm7DualEnvBase(RealEnvBase):
 
             apply_code = self.xarm_api_right.set_ft_sensor_load_offset(result)
             if apply_code != 0:
-                raise RuntimeError(f"set_ft_sensor_load_offset failed: code={apply_code}")
-            print(f"applied load offsets")
+                raise RuntimeError(
+                    f"set_ft_sensor_load_offset failed: code={apply_code}"
+                )
+            print("applied load offsets")
 
             save_code = self.xarm_api_right.save_conf()
             if save_code != 0:
                 raise RuntimeError(f"save_conf failed: code={save_code}")
-            print(f"saved configuration to controller flash")
-
-
+            print("saved configuration to controller flash")
 
     def _set_action(
-        self, action, duration=None, joint_vel_limit_scale=10.0, wait=False, reset_bool=False
+        self,
+        action,
+        duration=None,
+        joint_vel_limit_scale=10.0,
+        wait=False,
+        reset_bool=False,
     ):
         start_time = time.time()
 
@@ -266,12 +269,13 @@ class RealXarm7DualEnvBase(RealEnvBase):
 
             for _ in range(10):
                 time.sleep(0.2)
-                if (
-                    self.xarm_api_left.mode == 6
-                    and self.xarm_api_right.mode == 6
-                ):
-                    print(f"[{self.__class__.__name__}] self.xarm_api_left.mode: {self.xarm_api_left.mode}")
-                    print(f"[{self.__class__.__name__}] self.xarm_api_right.mode: {self.xarm_api_right.mode}")
+                if self.xarm_api_left.mode == 6 and self.xarm_api_right.mode == 6:
+                    print(
+                        f"[{self.__class__.__name__}] self.xarm_api_left.mode: {self.xarm_api_left.mode}"
+                    )
+                    print(
+                        f"[{self.__class__.__name__}] self.xarm_api_right.mode: {self.xarm_api_right.mode}"
+                    )
                     break
 
             # send command to the left arm
@@ -302,7 +306,7 @@ class RealXarm7DualEnvBase(RealEnvBase):
                 raise RuntimeError(
                     f"[{self.__class__.__name__}] Invalid xArm API code: {right_xarm_code} ({right_err})"
                 )
-            
+
             self.xarm_api_left.set_mode(1)
             self.xarm_api_right.set_mode(1)
             self.xarm_api_left.set_state(0)
@@ -333,31 +337,23 @@ class RealXarm7DualEnvBase(RealEnvBase):
         else:
             raise ValueError("Unexpectedly xarm_api.mode != 1 in _set_action function")
 
-        # Send command to xArm gripper
-        if self.fixed_gripper_joint_pos is None:
-            left_gripper_pos = action[self.body_config_list[0].gripper_joint_idxes][0]
-            right_gripper_pos = action[self.body_config_list[1].gripper_joint_idxes][0]
-        else:
-            left_gripper_pos = self.fixed_gripper_joint_pos[0]
-            right_gripper_pos = self.fixed_gripper_joint_pos[1]
+        # xarm_code = self.xarm_api_left.set_gripper_position(left_gripper_pos, wait=False)
+        # if xarm_code != 0:
+        # raise RuntimeError(
+        # f"[{self.__class__.__name__}] Invalid xArm API code: {xarm_code}"
+        # )
 
-        #xarm_code = self.xarm_api_left.set_gripper_position(left_gripper_pos, wait=False)
-        #if xarm_code != 0:
-            #raise RuntimeError(
-                #f"[{self.__class__.__name__}] Invalid xArm API code: {xarm_code}"
-            #)
+        # xarm_code = self.xarm_api_right.set_gripper_position(right_gripper_pos, wait=False)
+        # if xarm_code != 0:
+        # raise RuntimeError(
+        # f"[{self.__class__.__name__}] Invalid xArm API code: {xarm_code}"
+        # )
 
-        #xarm_code = self.xarm_api_right.set_gripper_position(right_gripper_pos, wait=False)
-        #if xarm_code != 0:
-            #raise RuntimeError(
-                #f"[{self.__class__.__name__}] Invalid xArm API code: {xarm_code}"
-            #)
-        
         # Wait
         elapsed_duration = time.time() - start_time
         if wait and elapsed_duration < duration:
             time.sleep(duration - elapsed_duration)
-        
+
     def _get_obs(self):
         # Get state from xArm7Dual
         left_code, left_joint_states = self.xarm_api_left.get_joint_states(
@@ -402,13 +398,13 @@ class RealXarm7DualEnvBase(RealEnvBase):
         # right_gripper_joint_pos = np.array([right_gripper_pos], dtype=np.float64)
         # right_gripper_joint_vel = np.zeros(1)
 
-        #gripperのobsは固定量
+        # gripperのobsは固定量
         left_gripper_joint_pos = [119.0]
         right_gripper_joint_pos = [119.0]
-        
+
         left_gripper_joint_vel = np.zeros(1)
         right_gripper_joint_vel = np.zeros(1)
-        
+
         # Get wrench from force sensor
         wrench_left = np.array(
             self.xarm_api_left.get_ft_sensor_data(is_raw=True)[1], dtype=np.float64
@@ -419,24 +415,21 @@ class RealXarm7DualEnvBase(RealEnvBase):
         force = np.concatenate((wrench_left[0:3], wrench_right[0:3]), dtype=np.float64)
         torque = np.concatenate((wrench_left[3:6], wrench_right[3:6]), dtype=np.float64)
 
-
         # print("get_ft_sensor_config")
         # left_code, left_config = self.xarm_api_left.get_ft_sensor_config()
         # right_code, right_config = self.xarm_api_right.get_ft_sensor_config()
         # assert left_code==0  and right_code == 0
         # print(f"left_config\n{left_config}")
         # print(f"right_config\n{right_config}")
-        
-        
+
         # print()
 
         # print()
         # print("#######################################################################")
-        # print(wrench_left)       
+        # print(wrench_left)
         # print(wrench_right)
         # print("#######################################################################")
         # print()
-    
 
         return {
             "joint_pos": np.concatenate(
@@ -464,7 +457,9 @@ class RealXarm7DualEnvBase(RealEnvBase):
         get_code, err_warn = xarm_api.get_err_warn_code()
         # err_warn is [err, warn] if get_code == 0, otherwise cached values
         err_code, warn_code = (
-            err_warn if isinstance(err_warn, (list, tuple)) and len(err_warn) >= 2 else (None, None)
+            err_warn
+            if isinstance(err_warn, (list, tuple)) and len(err_warn) >= 2
+            else (None, None)
         )
         mode = getattr(xarm_api, "mode", None)
         state = getattr(xarm_api, "state", None)
