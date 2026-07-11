@@ -14,8 +14,6 @@ from robo_manip_baselines.policy.rl_policy.rl_tasks.cabinet_marker_detection imp
     BASE_CENTER_T_PATH,
     BIG_ARUCO_DICT_ID,
     FPS,
-    RES_H,
-    RES_W,
     SMALL_BOARD_DICT_ID,
     SMALL_BOARD_MARKER_IDS,
     USE_SERIAL,
@@ -28,6 +26,10 @@ from robo_manip_baselines.policy.rl_policy.rl_tasks.cabinet_marker_detection imp
 
 if TYPE_CHECKING:
     from robo_manip_baselines.policy.rl_policy.RolloutRLPolicy import RolloutRLPolicy
+
+
+DETECTION_RES_W = 1280
+DETECTION_RES_H = 720
 
 
 def _center_crop_4x3(img: np.ndarray) -> np.ndarray:
@@ -66,8 +68,8 @@ class CabinetMarkerPoseProvider:
         self,
         serial: str = USE_SERIAL,
         calib_path: Path = BASE_CENTER_T_PATH,
-        res_w: int = RES_W,
-        res_h: int = RES_H,
+        res_w: int = DETECTION_RES_W,
+        res_h: int = DETECTION_RES_H,
         fps: int = FPS,
     ) -> None:
         self.serial = serial

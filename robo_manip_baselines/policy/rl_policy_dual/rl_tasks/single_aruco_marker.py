@@ -12,8 +12,6 @@ from cv2 import aruco
 from robo_manip_baselines.policy.rl_policy.rl_tasks.cabinet_marker_detection import (
     BASE_CENTER_T_PATH,
     FPS,
-    RES_H,
-    RES_W,
     USE_SERIAL,
     transform_from_rvec_tvec,
 )
@@ -21,6 +19,8 @@ from robo_manip_baselines.policy.rl_policy.rl_tasks.cabinet_marker_detection imp
 MARKER_ID = 0
 MARKER_SIZE_M = 0.0510
 ARUCO_DICT_ID = aruco.DICT_4X4_50
+DETECTION_RES_W = 1280
+DETECTION_RES_H = 720
 
 
 def rotation_matrix_to_6d(rotation: np.ndarray) -> np.ndarray:
@@ -100,8 +100,8 @@ class ArucoMarkerPoseProvider:
         self,
         serial: str = USE_SERIAL,
         calib_path: Path = BASE_CENTER_T_PATH,
-        res_w: int = RES_W,
-        res_h: int = RES_H,
+        res_w: int = DETECTION_RES_W,
+        res_h: int = DETECTION_RES_H,
         fps: int = FPS,
     ) -> None:
         self.serial = serial
@@ -247,7 +247,9 @@ def run_viewer():
     pipeline = rs.pipeline()
     config = rs.config()
     config.enable_device(USE_SERIAL)
-    config.enable_stream(rs.stream.color, RES_W, RES_H, rs.format.bgr8, FPS)
+    config.enable_stream(
+        rs.stream.color, DETECTION_RES_W, DETECTION_RES_H, rs.format.bgr8, FPS
+    )
     profile = pipeline.start(config)
 
     color_stream = profile.get_stream(rs.stream.color).as_video_stream_profile()
@@ -301,7 +303,7 @@ def run_viewer():
 
             overlay = img.copy()
             panel_w = 620
-            cv2.rectangle(overlay, (0, 0), (panel_w, RES_H), (0, 0, 0), -1)
+            cv2.rectangle(overlay, (0, 0), (panel_w, DETECTION_RES_H), (0, 0, 0), -1)
             img = cv2.addWeighted(overlay, 0.35, img, 0.65, 0)
             y = 30
             y = put_line(img, f"Marker {MARKER_ID} viewer  FPS: {fps_est:.1f}", y)
