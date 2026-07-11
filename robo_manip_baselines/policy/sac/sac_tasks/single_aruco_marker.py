@@ -17,6 +17,7 @@ from robo_manip_baselines.policy.rl_policy.rl_tasks.cabinet_marker_detection imp
     transform_from_rvec_tvec,
 )
 
+from ..pose_filter import DEFAULT_MAX_POSITION_JUMP_M, PoseJumpRejector
 from .single_aruco_marker_policy_state import (
     get_policy_state as get_single_aruco_marker_policy_state,
 )
@@ -117,12 +118,14 @@ class ArucoMarkerPoseProvider:
         res_w: int = DETECTION_RES_W,
         res_h: int = DETECTION_RES_H,
         fps: int = FPS,
+        max_pose_jump_m: float = DEFAULT_MAX_POSITION_JUMP_M,
     ) -> None:
         self.serial = serial
         self.calib_path = Path(calib_path)
         self.res_w = int(res_w)
         self.res_h = int(res_h)
         self.fps = int(fps)
+        self._pose_filter = PoseJumpRejector(max_pose_jump_m)
 
         self._stop_event = threading.Event()
         self._thread: Optional[threading.Thread] = None
@@ -149,6 +152,9 @@ class ArucoMarkerPoseProvider:
         if self._thread:
             self._thread.join(timeout=2.0)
             self._thread = None
+
+    def reset_pose_filter(self) -> None:
+        self._pose_filter.reset()
 
     def get_latest_marker_transform(self) -> Tuple[Optional[np.ndarray], Optional[int]]:
         with self._lock:
@@ -214,9 +220,11 @@ class ArucoMarkerPoseProvider:
 
                 cam_T_marker = transform_from_rvec_tvec(rvec, tvec)
                 base_T_marker = self._base_T_cam @ cam_T_marker
+                base_T_marker, pose_accepted = self._pose_filter.update(base_T_marker)
                 with self._lock:
                     self._latest_marker_transform = base_T_marker.copy()
-                    self._latest_marker_seq += 1
+                    if pose_accepted:
+                        self._latest_marker_seq += 1
         except Exception as exc:
             print(
                 f"[ArucoMarkerPoseProvider] Error during detection loop: {exc}",
@@ -235,7 +243,7 @@ class SingleArucoMarkerTask:
     def __post_init__(self) -> None:
         params = dict(self.params) if isinstance(self.params, Mapping) else {}
         provider_kwargs = {}
-        for key in ("serial", "calib_path", "res_w", "res_h", "fps"):
+        for key in ("serial", "calib_path", "res_w", "res_h", "fps", "max_pose_jump_m"):
             if key in params:
                 provider_kwargs[key] = params[key]
         self._provider = ArucoMarkerPoseProvider(**provider_kwargs)
@@ -248,7 +256,7 @@ class SingleArucoMarkerTask:
             pass
 
     def on_reset(self) -> None:
-        return
+        self._provider.reset_pose_filter()
 
     def get_extra_state(self) -> Dict[str, np.ndarray]:
         marker_T, _marker_seq = self._provider.get_latest_marker_transform()
