@@ -93,9 +93,11 @@ def _convert_section(section_name: str, section_cfg: Dict[str, Any]) -> Dict[str
     return result
 
 
-def _convert_ppo_task_section(section_cfg: Dict[str, Any]) -> Dict[str, Any]:
+def _convert_task_section(section_name: str, section_cfg: Dict[str, Any]) -> Dict[str, Any]:
     if not isinstance(section_cfg, dict):
-        raise TypeError(f"'ppo_task' section must be an object, got {type(section_cfg)}")
+        raise TypeError(
+            f"'{section_name}' section must be an object, got {type(section_cfg)}"
+        )
 
     result: Dict[str, Any] = dict(section_cfg)
 
@@ -104,8 +106,12 @@ def _convert_ppo_task_section(section_cfg: Dict[str, Any]) -> Dict[str, Any]:
         result["name"] = str(name)
 
     module = result.get("module")
-    if not module or not isinstance(module, str):
-        raise ValueError("'ppo_task.module' must be a non-empty string")
+    if module is not None:
+        if not isinstance(module, str) or not module:
+            raise ValueError(f"'{section_name}.module' must be a non-empty string")
+        result["module"] = module
+    if not result.get("name") and not result.get("module"):
+        raise ValueError(f"'{section_name}' must provide either 'name' or 'module'")
 
     extra_keys_cfg: Sequence[Any] = result.get("extra_keys", [])
     normalized_extra_keys = []
@@ -114,27 +120,27 @@ def _convert_ppo_task_section(section_cfg: Dict[str, Any]) -> Dict[str, Any]:
             key_name = item.get("name")
             if not key_name or not isinstance(key_name, str):
                 raise ValueError(
-                    f"'ppo_task.extra_keys[{idx}].name' must be a non-empty string"
+                    f"'{section_name}.extra_keys[{idx}].name' must be a non-empty string"
                 )
             dim = item.get("dim")
             if dim is None:
                 raise ValueError(
-                    f"'ppo_task.extra_keys[{idx}].dim' must be provided for key '{key_name}'"
+                    f"'{section_name}.extra_keys[{idx}].dim' must be provided for key '{key_name}'"
                 )
             try:
                 dim_int = int(dim)
             except Exception as exc:  # pragma: no cover - defensive
                 raise ValueError(
-                    f"'ppo_task.extra_keys[{idx}].dim' must be an integer"
+                    f"'{section_name}.extra_keys[{idx}].dim' must be an integer"
                 ) from exc
             if dim_int <= 0:
                 raise ValueError(
-                    f"'ppo_task.extra_keys[{idx}].dim' must be positive, got {dim_int}"
+                    f"'{section_name}.extra_keys[{idx}].dim' must be positive, got {dim_int}"
                 )
             normalized_extra_keys.append({"name": key_name, "dim": dim_int})
         else:
             raise TypeError(
-                "'ppo_task.extra_keys' entries must be objects with 'name' and 'dim'"
+                f"'{section_name}.extra_keys' entries must be objects with 'name' and 'dim'"
             )
     result["extra_keys"] = normalized_extra_keys
 
@@ -144,7 +150,9 @@ def _convert_ppo_task_section(section_cfg: Dict[str, Any]) -> Dict[str, Any]:
     elif isinstance(marker_cameras, (list, tuple)):
         result["marker_cameras"] = [str(cam) for cam in marker_cameras]
     else:
-        raise TypeError("'ppo_task.marker_cameras' must be a list of strings if provided")
+        raise TypeError(
+            f"'{section_name}.marker_cameras' must be a list of strings if provided"
+        )
 
     markers_cfg = result.get("markers")
     if markers_cfg is None:
@@ -155,21 +163,21 @@ def _convert_ppo_task_section(section_cfg: Dict[str, Any]) -> Dict[str, Any]:
         for idx, item in enumerate(markers_cfg):
             if not isinstance(item, Mapping):
                 raise TypeError(
-                    "'ppo_task.markers' entries must be objects with at least an 'id'."
+                    f"'{section_name}.markers' entries must be objects with at least an 'id'."
                 )
             if "id" not in item:
                 raise ValueError(
-                    f"'ppo_task.markers[{idx}]' must contain an 'id' field."
+                    f"'{section_name}.markers[{idx}]' must contain an 'id' field."
                 )
             try:
                 tag_id = int(item["id"])
             except Exception as exc:
                 raise ValueError(
-                    f"'ppo_task.markers[{idx}].id' must be convertible to int."
+                    f"'{section_name}.markers[{idx}].id' must be convertible to int."
                 ) from exc
             if tag_id in seen_ids:
                 raise ValueError(
-                    f"Duplicate marker id {tag_id} in 'ppo_task.markers'."
+                    f"Duplicate marker id {tag_id} in '{section_name}.markers'."
                 )
             seen_ids.add(tag_id)
 
@@ -180,7 +188,7 @@ def _convert_ppo_task_section(section_cfg: Dict[str, Any]) -> Dict[str, Any]:
                     marker_entry["size_m"] = float(item["size_m"])
                 except Exception as exc:
                     raise ValueError(
-                        f"'ppo_task.markers[{idx}].size_m' must be convertible to float."
+                        f"'{section_name}.markers[{idx}].size_m' must be convertible to float."
                     ) from exc
 
             if "name" in item and item["name"] is not None:
@@ -189,13 +197,13 @@ def _convert_ppo_task_section(section_cfg: Dict[str, Any]) -> Dict[str, Any]:
             normalized_markers.append(marker_entry)
         result["markers"] = normalized_markers
     else:
-        raise TypeError("'ppo_task.markers' must be a list if provided")
+        raise TypeError(f"'{section_name}.markers' must be a list if provided")
 
     params = result.get("params")
     if params is None:
         result["params"] = {}
     elif not isinstance(params, Mapping):
-        raise TypeError("'ppo_task.params' must be an object if provided")
+        raise TypeError(f"'{section_name}.params' must be an object if provided")
 
     return result
 
@@ -229,13 +237,13 @@ def _build_meta_info(config: Dict[str, Any]) -> Dict[str, Any]:
     meta_info: Dict[str, Any] = {}
     for section_name, section_cfg in config.items():
         if not isinstance(section_cfg, dict):
-            if section_name == "ppo_task":
-                raise TypeError("'ppo_task' section must be an object")
+            if section_name in ("ppo_task", "rl_task"):
+                raise TypeError(f"'{section_name}' section must be an object")
             meta_info[section_name] = section_cfg
             continue
 
-        if section_name == "ppo_task":
-            meta_info[section_name] = _convert_ppo_task_section(section_cfg)
+        if section_name in ("ppo_task", "rl_task"):
+            meta_info[section_name] = _convert_task_section(section_name, section_cfg)
             continue
 
         converted_section = _convert_section(section_name, section_cfg)

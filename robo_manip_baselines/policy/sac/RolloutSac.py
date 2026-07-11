@@ -25,6 +25,21 @@ _DEFAULT_GRIPPER_JOINT_DELTA_LIMIT = 0.1
 _FIXED_GRIPPER_COMMAND = 119.0
 _DETERMINISTIC = True
 _USE_CUDA = torch.cuda.is_available()
+_ROLLOUT_TASK_MODULES = {
+    "DualBoxRotation": "robo_manip_baselines.policy.sac.sac_tasks.dual_box_rotation",
+    "TrashBinRolling": "robo_manip_baselines.policy.sac.sac_tasks.single_aruco_marker",
+    "DualSimple": "robo_manip_baselines.policy.sac.sac_tasks.dual_simple",
+    "Align": "robo_manip_baselines.policy.sac.sac_tasks.align",
+    "JointHoldMarkerCheck": "robo_manip_baselines.policy.sac.sac_tasks.jointhold_marker_check",
+}
+_ROLLOUT_TASK_NAME_ALIASES = {
+    "dual_box_rotation": "DualBoxRotation",
+    "single_aruco_marker": "TrashBinRolling",
+    "trash_bin_rolling": "TrashBinRolling",
+    "dual_simple": "DualSimple",
+    "align": "Align",
+    "jointhold_marker_check": "JointHoldMarkerCheck",
+}
 
 
 class RolloutSac(RolloutBase):
@@ -86,8 +101,7 @@ class RolloutSac(RolloutBase):
         task_cfg = self.model_meta_info.get("ppo_task") or self.model_meta_info.get("rl_task")
         if not task_cfg and self._is_dual_marker_policy():
             task_cfg = {
-                "name": "single_aruco_marker",
-                "module": "robo_manip_baselines.policy.sac.sac_tasks.single_aruco_marker",
+                "name": "TrashBinRolling",
                 "params": {},
             }
         if not task_cfg:
@@ -111,10 +125,15 @@ class RolloutSac(RolloutBase):
         assert isinstance(params, dict)
         self.ppo_task_params = dict(params)
 
-        module_path = task_cfg["module"]
-        assert isinstance(module_path, str) and module_path
+        task_name = self._get_rollout_task_name(task_cfg)
+        module_path = _ROLLOUT_TASK_MODULES[task_name]
 
         if self.args.yolo_pt:
+            if task_name != "DualBoxRotation":
+                raise ValueError(
+                    f"[{self.__class__.__name__}] --yolo_pt is only supported for "
+                    f"DualBoxRotation, got {task_name}."
+                )
             module_path = "robo_manip_baselines.policy.sac.sac_tasks.box_estimator"
             self.ppo_task_params["pt_path"] = self.args.yolo_pt
             self.ppo_task_params["camera_name"] = "top"
@@ -131,11 +150,27 @@ class RolloutSac(RolloutBase):
         self.ppo_task_handler = task_module.build_ppo_task(self, self.ppo_task_params)
         assert self.ppo_task_handler is not None
 
-        task_name = task_cfg.get("name") or module_path
         print(
             f"[{self.__class__.__name__}] Loaded rollout task '{task_name}'. "
             f"Extra state keys: {self.extra_state_keys}"
         )
+
+    def _get_rollout_task_name(self, task_cfg: Dict[str, Any]) -> str:
+        raw_name = task_cfg.get("name")
+        if raw_name is None:
+            module_path = task_cfg.get("module")
+            assert isinstance(module_path, str) and module_path
+            raw_name = module_path.rsplit(".", 1)[-1]
+
+        assert isinstance(raw_name, str) and raw_name
+        task_name = _ROLLOUT_TASK_NAME_ALIASES.get(raw_name, raw_name)
+        if task_name not in _ROLLOUT_TASK_MODULES:
+            known = ", ".join(sorted(_ROLLOUT_TASK_MODULES))
+            raise ValueError(
+                f"[{self.__class__.__name__}] Unsupported rollout task name "
+                f"'{raw_name}'. Known tasks: {known}."
+            )
+        return task_name
 
     def _is_dual_marker_policy(self) -> bool:
         return list(self.state_keys) == [

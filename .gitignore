@@ -24,6 +24,7 @@ GTAGS
 commit.sh
 
 /wandb
+/runs
 
 AGENTS.md
 

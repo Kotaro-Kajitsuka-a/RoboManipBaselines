@@ -281,8 +281,7 @@
   },
   "policy": {},
   "ppo_task": {
-    "name": "dual_box_rotation",
-    "module": "robo_manip_baselines.policy.sac.sac_tasks.dual_box_rotation",
+    "name": "DualBoxRotation",
     "extra_keys": [
       {
         "name": "box_pose",
