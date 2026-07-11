@@ -79,6 +79,10 @@ def detect_marker_pose(frame_bgr, detector, K, dist_coeffs):
 def make_detector():
     aruco_dict = aruco.getPredefinedDictionary(ARUCO_DICT_ID)
     params = aruco.DetectorParameters()
+    params.cornerRefinementMethod = aruco.CORNER_REFINE_APRILTAG
+    params.cornerRefinementWinSize = 5
+    params.cornerRefinementMaxIterations = 30
+    params.cornerRefinementMinAccuracy = 0.01
     return aruco.ArucoDetector(aruco_dict, params)
 
 
