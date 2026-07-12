@@ -378,6 +378,7 @@ def run_viewer():
             )
 
             marker_base = None
+            marker_rotation_6d = None
             if marker_corners is not None:
                 aruco.drawDetectedMarkers(
                     img,
@@ -387,6 +388,7 @@ def run_viewer():
                 cam_T_marker = transform_from_rvec_tvec(rvec, tvec)
                 base_T_marker = base_T_cam @ cam_T_marker
                 marker_base = base_T_marker[:3, 3]
+                marker_rotation_6d = rotation_matrix_to_6d(base_T_marker[:3, :3])
                 project_marker_center(
                     img,
                     K,
@@ -429,11 +431,17 @@ def run_viewer():
             )
             if marker_base is not None:
                 y = put_line(img, f"  base position: {np.round(marker_base, 4)}", y)
+                y = put_line(
+                    img,
+                    f"  policy rotation_6d: {np.round(marker_rotation_6d, 4)}",
+                    y,
+                )
 
             if time.time() - last_print > 1.0:
                 if marker_base is not None:
                     print(
-                        f"[Marker{MARKER_ID}] base_position={marker_base}",
+                        f"[Marker{MARKER_ID}] base_position={marker_base} "
+                        f"policy_rotation_6d={marker_rotation_6d}",
                         flush=True,
                     )
                 else:
