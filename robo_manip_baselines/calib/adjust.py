@@ -25,27 +25,29 @@ def save_calib(path, T):
 
 def adjust_transform(T):
     """
-    calibに入っている R_base_camera に対して、
-    cameraローカル座標系で回転補正をかける。
+    viewerで描画している base center frame の原点位置は固定し、
+    base center frame のローカルx軸まわりに回転補正をかける。
     """
 
-    R_base_camera = T[:3, :3]
+    # calib は base <- camera として使われる。
+    # viewer の drawFrameAxes はその逆の camera <- base を描くので、
+    # まず camera <- base に直してから、原点 tvec を固定したまま回す。
+    T_camera_base = np.linalg.inv(T)
 
-    # camera <- base
-    R_camera_base = R_base_camera.T
+    R_camera_base = T_camera_base[:3, :3]
+    t_camera_base = T_camera_base[:3, 3].copy()
 
-    rot_local = (R.from_euler("x", -40.0, degrees=True)).as_matrix()
+    rot_local = (R.from_euler("x", -0.90, degrees=True)).as_matrix()
 
-    # base 座標系で回転
+    # base center frame のローカルx軸まわりに回す。
     R_camera_base_new = R_camera_base @ rot_local
 
-    # 元の形式(base <- camera)に戻す
-    R_base_camera_new = R_camera_base_new.T
+    T_camera_base_new = np.eye(4)
+    T_camera_base_new[:3, :3] = R_camera_base_new
+    T_camera_base_new[:3, 3] = t_camera_base
 
-    T_new = T.copy()
-    T_new[:3, :3] = R_base_camera_new
-
-    return T_new
+    # 元の calib 形式(base <- camera)に戻す。
+    return np.linalg.inv(T_camera_base_new)
 
 
 def main():

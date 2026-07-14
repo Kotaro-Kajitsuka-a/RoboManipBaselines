@@ -381,6 +381,10 @@ def run_viewer():
 
     color_stream = profile.get_stream(rs.stream.color).as_video_stream_profile()
     K, dist_coeffs = camera_matrix_from_intrinsics(color_stream.get_intrinsics())
+    cam_T_base = np.linalg.inv(base_T_cam)
+    R_base = cam_T_base[:3, :3]
+    base_rvec, _ = cv2.Rodrigues(R_base)
+    base_tvec = cam_T_base[:3, 3].reshape(3, 1)
 
     print(f"base_T_cam: {Path(BASE_CENTER_T_PATH)}")
     print(f"marker id={MARKER_ID}, size={MARKER_SIZE_M} m, dict=DICT_4X4_50")
@@ -411,10 +415,6 @@ def run_viewer():
                 )
                 cam_T_marker = transform_from_rvec_tvec(rvec, tvec)
                 base_T_marker = base_T_cam @ cam_T_marker
-                cam_T_base = np.linalg.inv(base_T_cam)
-                R_base = cam_T_base[:3, :3]
-                base_rvec, _ = cv2.Rodrigues(R_base)
-                base_tvec = cam_T_base[:3, 3].reshape(3, 1)
 
                 marker_base = base_T_marker[:3, 3]
                 marker_rotation_6d = rotation_matrix_to_6d(base_T_marker[:3, :3])
@@ -436,15 +436,15 @@ def run_viewer():
                     MARKER_SIZE_M * 0.5,
                     3,
                 )
-                cv2.drawFrameAxes(
-                    img,
-                    K,
-                    dist_coeffs,
-                    base_rvec,
-                    base_tvec,
-                    0.20,
-                    4,
-                )
+            cv2.drawFrameAxes(
+                img,
+                K,
+                dist_coeffs,
+                base_rvec,
+                base_tvec,
+                0.20,
+                4,
+            )
             now = time.time()
             fps_est = 0.9 * fps_est + 0.1 * (1.0 / max(1e-6, now - t_prev))
             t_prev = now
