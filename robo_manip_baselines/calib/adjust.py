@@ -2,6 +2,7 @@ import argparse
 from pathlib import Path
 
 import numpy as np
+from scipy.spatial.transform import Rotation as R
 
 
 def load_calib(path):
@@ -24,28 +25,27 @@ def save_calib(path, T):
 
 def adjust_transform(T):
     """
-    回転のみを調整する。
-
-    現在は:
-      1. Local X : -1 deg
-      2. Local Z : -1 deg
+    calibに入っている R_base_camera に対して、
+    cameraローカル座標系で回転補正をかける。
     """
 
-    # R_current = T[:3, :3]
+    R_base_camera = T[:3, :3]
 
-    # rot_local = (
-    #     #R.from_euler("x", -1.0, degrees=True)
-    #     #* R.from_euler("z", -1.0, degrees=True)
-    # ).as_matrix()
+    # camera <- base
+    R_camera_base = R_base_camera.T
 
-    # # Local座標系で回転を適用
-    # R_new = R_current @ rot_local
+    rot_local = (R.from_euler("x", -40.0, degrees=True)).as_matrix()
 
-    # T_new = T.copy()
-    # T_new[:3, :3] = R_new
+    # base 座標系で回転
+    R_camera_base_new = R_camera_base @ rot_local
 
-    # return T_new
-    return T
+    # 元の形式(base <- camera)に戻す
+    R_base_camera_new = R_camera_base_new.T
+
+    T_new = T.copy()
+    T_new[:3, :3] = R_base_camera_new
+
+    return T_new
 
 
 def main():

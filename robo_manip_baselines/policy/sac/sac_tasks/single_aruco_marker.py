@@ -420,7 +420,7 @@ def run_viewer():
                     dist_coeffs,
                     base_rvec,
                     base_tvec,
-                    0.40,
+                    0.20,
                     4,
                 )
             now = time.time()
