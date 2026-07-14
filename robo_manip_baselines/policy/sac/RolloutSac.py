@@ -98,7 +98,9 @@ class RolloutSac(RolloutBase):
         }
 
     def _setup_task_from_meta(self) -> None:
-        task_cfg = self.model_meta_info.get("ppo_task") or self.model_meta_info.get("rl_task")
+        task_cfg = self.model_meta_info.get("ppo_task") or self.model_meta_info.get(
+            "rl_task"
+        )
         if not task_cfg and self._is_dual_marker_policy():
             task_cfg = {
                 "name": "TrashBinRolling",
@@ -225,7 +227,11 @@ class RolloutSac(RolloutBase):
         )
 
         raw_ckpt = torch.load(self.args.checkpoint, map_location="cpu")
-        state_dict = raw_ckpt["actor"] if isinstance(raw_ckpt, dict) and "actor" in raw_ckpt else raw_ckpt
+        state_dict = (
+            raw_ckpt["actor"]
+            if isinstance(raw_ckpt, dict) and "actor" in raw_ckpt
+            else raw_ckpt
+        )
 
         if self.policy_algo == "sac":
             self.policy = SacUtil.build_policy(self.model_meta_info)
@@ -250,7 +256,9 @@ class RolloutSac(RolloutBase):
             (self.action_dim,), float(_NORMALIZED_ACTION_LOW.item()), device=self.device
         )
         self._normalized_action_high = torch.full(
-            (self.action_dim,), float(_NORMALIZED_ACTION_HIGH.item()), device=self.device
+            (self.action_dim,),
+            float(_NORMALIZED_ACTION_HIGH.item()),
+            device=self.device,
         )
         self._init_action_scaling_tensors()
 
@@ -305,9 +313,7 @@ class RolloutSac(RolloutBase):
 
         # Disable vision/image pipelines for this rollout; box pose is handled in the task.
         self.camera_names = []
-        self._detector_camera_name = (
-            "top" if self.args.yolo_pt else "front"
-        )
+        self._detector_camera_name = "top" if self.args.yolo_pt else "front"
         # Even if the env does not provide the detector camera (e.g. disabled to avoid
         # RealSense conflicts), we still record the detector-thread image under a fixed
         # camera key in metadata.
@@ -355,7 +361,7 @@ class RolloutSac(RolloutBase):
                 f"{stagnation} steps.",
                 flush=True,
             )
-        if stagnation >= 4:
+        if stagnation >= 16:
             raise RuntimeError(
                 f"[{self.__class__.__name__}] {label} stalled for {stagnation} steps."
             )

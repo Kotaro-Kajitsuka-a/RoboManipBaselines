@@ -11,9 +11,7 @@ import numpy as np
 from cv2 import aruco
 
 from robo_manip_baselines.policy.rl_policy.rl_tasks.cabinet_marker_detection import (
-    BASE_CENTER_T_PATH,
     FPS,
-    USE_SERIAL,
     transform_from_rvec_tvec,
 )
 
@@ -22,6 +20,10 @@ from .single_aruco_marker_policy_state import (
     get_policy_state as get_single_aruco_marker_policy_state,
 )
 
+USE_SERIAL = "332522070075"  # neo_front
+BASE_CENTER_T_PATH = Path(
+    "robo_manip_baselines/calib/base_center_T_neo_front_adjusted.calib"
+)
 MARKER_ID = 0
 MARKER_SIZE_M = 0.0510
 ARUCO_DICT_ID = aruco.DICT_4X4_50
@@ -387,6 +389,11 @@ def run_viewer():
                 )
                 cam_T_marker = transform_from_rvec_tvec(rvec, tvec)
                 base_T_marker = base_T_cam @ cam_T_marker
+                cam_T_base = np.linalg.inv(base_T_cam)
+                R_base = cam_T_base[:3, :3]
+                base_rvec, _ = cv2.Rodrigues(R_base)
+                base_tvec = cam_T_base[:3, 3].reshape(3, 1)
+
                 marker_base = base_T_marker[:3, 3]
                 marker_rotation_6d = rotation_matrix_to_6d(base_T_marker[:3, :3])
                 project_marker_center(
@@ -407,7 +414,15 @@ def run_viewer():
                     MARKER_SIZE_M * 0.5,
                     3,
                 )
-
+                cv2.drawFrameAxes(
+                    img,
+                    K,
+                    dist_coeffs,
+                    base_rvec,
+                    base_tvec,
+                    0.40,
+                    4,
+                )
             now = time.time()
             fps_est = 0.9 * fps_est + 0.1 * (1.0 / max(1e-6, now - t_prev))
             t_prev = now
