@@ -42,14 +42,30 @@ def get_policy_state(task, rollout):
     left_idx = rollout._get_arm_joint_indices(0)
     right_idx = rollout._get_arm_joint_indices(1)
     extra = task.get_extra_state()
+    if "trash_bin_position" in rollout.state_keys:
+        position_key = "trash_bin_position"
+        rotation_key = "trash_bin_rotation_6d"
+        prev_position_key = "prev_trash_bin_position"
+        prev_rotation_key = "prev_trash_bin_rotation_6d"
+    else:
+        position_key = "marker_position"
+        rotation_key = "marker_rotation_6d"
+        prev_position_key = "prev_marker_position"
+        prev_rotation_key = "prev_marker_rotation_6d"
+
     parts = [
         qpos_ms[left_idx],
         qvel_ms[left_idx],
         qpos_ms[right_idx],
         qvel_ms[right_idx],
-        extra["marker_position"],
-        extra["marker_rotation_6d"],
+        extra[position_key],
+        extra[rotation_key],
     ]
+    if prev_position_key in rollout.state_keys:
+        parts += [
+            extra[prev_position_key],
+            extra[prev_rotation_key],
+        ]
     state_vector = np.concatenate(
         [np.asarray(part, dtype=np.float32).reshape(-1) for part in parts]
     ).astype(np.float32)

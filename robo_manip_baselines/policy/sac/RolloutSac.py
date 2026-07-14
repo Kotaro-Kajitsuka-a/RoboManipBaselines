@@ -175,7 +175,7 @@ class RolloutSac(RolloutBase):
         return task_name
 
     def _is_dual_marker_policy(self) -> bool:
-        return list(self.state_keys) == [
+        marker_state_keys = [
             "left_measured_joint_pos",
             "left_measured_joint_vel",
             "right_measured_joint_pos",
@@ -183,6 +183,17 @@ class RolloutSac(RolloutBase):
             "marker_position",
             "marker_rotation_6d",
         ]
+        trash_bin_state_keys = [
+            "left_measured_joint_pos",
+            "left_measured_joint_vel",
+            "right_measured_joint_pos",
+            "right_measured_joint_vel",
+            "trash_bin_position",
+            "trash_bin_rotation_6d",
+            "prev_trash_bin_position",
+            "prev_trash_bin_rotation_6d",
+        ]
+        return list(self.state_keys) in (marker_state_keys, trash_bin_state_keys)
 
     def _init_action_scaling_tensors(self) -> None:
         """Initialize tensors describing per-joint min/max and delta limits."""

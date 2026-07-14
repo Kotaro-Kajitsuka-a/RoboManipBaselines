@@ -241,6 +241,8 @@ class SingleArucoMarkerTask:
     rollout: object
     params: Mapping[str, object] = field(default_factory=dict)
     _provider: ArucoMarkerPoseProvider = field(init=False, repr=False)
+    _prev_marker_position: Optional[np.ndarray] = field(default=None, init=False, repr=False)
+    _prev_marker_rotation_6d: Optional[np.ndarray] = field(default=None, init=False, repr=False)
 
     def __post_init__(self) -> None:
         params = dict(self.params) if isinstance(self.params, Mapping) else {}
@@ -259,6 +261,8 @@ class SingleArucoMarkerTask:
 
     def on_reset(self) -> None:
         self._provider.reset_pose_filter()
+        self._prev_marker_position = None
+        self._prev_marker_rotation_6d = None
 
     def get_extra_state(self) -> Dict[str, np.ndarray]:
         marker_T, _marker_seq = self._provider.get_latest_marker_transform()
@@ -266,9 +270,27 @@ class SingleArucoMarkerTask:
             raise RuntimeError(
                 f"[SingleArucoMarkerTask] ArUco marker id={MARKER_ID} is not detected yet."
             )
+        marker_position = marker_T[:3, 3].astype(np.float32)
+        marker_rotation_6d = rotation_matrix_to_6d(marker_T[:3, :3])
+        if self._prev_marker_position is None:
+            prev_marker_position = marker_position.copy()
+            prev_marker_rotation_6d = marker_rotation_6d.copy()
+        else:
+            prev_marker_position = self._prev_marker_position.copy()
+            prev_marker_rotation_6d = self._prev_marker_rotation_6d.copy()
+
+        self._prev_marker_position = marker_position.copy()
+        self._prev_marker_rotation_6d = marker_rotation_6d.copy()
+
         return {
-            "marker_position": marker_T[:3, 3].astype(np.float32),
-            "marker_rotation_6d": rotation_matrix_to_6d(marker_T[:3, :3]),
+            "marker_position": marker_position,
+            "marker_rotation_6d": marker_rotation_6d,
+            "prev_marker_position": prev_marker_position,
+            "prev_marker_rotation_6d": prev_marker_rotation_6d,
+            "trash_bin_position": marker_position,
+            "trash_bin_rotation_6d": marker_rotation_6d,
+            "prev_trash_bin_position": prev_marker_position,
+            "prev_trash_bin_rotation_6d": prev_marker_rotation_6d,
         }
 
     def get_latest_front_rgb(self) -> Optional[np.ndarray]:
