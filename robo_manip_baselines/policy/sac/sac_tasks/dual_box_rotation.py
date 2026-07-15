@@ -11,7 +11,6 @@ import numpy as np
 import pyrealsense2 as rs
 from cv2 import aruco
 
-from ..pose_filter import DEFAULT_MAX_POSITION_JUMP_M, PoseJumpRejector
 from ..RolloutSac import RolloutSac
 from .dual_box_rotation_policy_state import (
     get_policy_state as get_dual_box_rotation_policy_state,
@@ -88,14 +87,12 @@ class BoxPoseProvider:
         res_w: int = RES_W,
         res_h: int = RES_H,
         fps: int = FPS,
-        max_pose_jump_m: float = DEFAULT_MAX_POSITION_JUMP_M,
     ) -> None:
         self.serial = serial
         self.calib_path = Path(calib_path)
         self.res_w = int(res_w)
         self.res_h = int(res_h)
         self.fps = int(fps)
-        self._pose_filter = PoseJumpRejector(max_pose_jump_m)
 
         self._stop_event = threading.Event()
         self._thread: Optional[threading.Thread] = None
@@ -140,9 +137,6 @@ class BoxPoseProvider:
         if self._thread:
             self._thread.join(timeout=2.0)
             self._thread = None
-
-    def reset_pose_filter(self) -> None:
-        self._pose_filter.reset()
 
     def get_latest_box_transform(self) -> Tuple[Optional[np.ndarray], Optional[float]]:
         with self._lock:
@@ -274,7 +268,6 @@ class BoxPoseProvider:
                 cam_T_box[:3, :3] = R_cam_box.astype(np.float32)
                 cam_T_box[:3, 3] = t_cam_box.flatten().astype(np.float32)
                 base_T_box = self._base_T_cam @ cam_T_box
-                base_T_box, pose_accepted = self._pose_filter.update(base_T_box)
 
                 with self._lock:
                     self._latest_front_rgb = rgb
@@ -283,8 +276,7 @@ class BoxPoseProvider:
                     self._latest_board_seq += 1
                     self._latest_transform = base_T_box.copy()
                     self._latest_timestamp = time.time()
-                    if pose_accepted:
-                        self._latest_box_pose_seq += 1
+                    self._latest_box_pose_seq += 1
         except Exception as exc:  # pragma: no cover - runtime errors
             print(f"[BoxPoseProvider] Error during detection loop: {exc}", flush=True)
         finally:
@@ -300,7 +292,7 @@ class DualBoxRotationTask:
     def __post_init__(self) -> None:
         params = dict(self.params) if isinstance(self.params, Mapping) else {}
         provider_kwargs = {}
-        for key in ("serial", "calib_path", "res_w", "res_h", "fps", "max_pose_jump_m"):
+        for key in ("serial", "calib_path", "res_w", "res_h", "fps"):
             if key in params:
                 provider_kwargs[key] = params[key]
         self._provider = BoxPoseProvider(**provider_kwargs)
@@ -316,7 +308,7 @@ class DualBoxRotationTask:
             pass
 
     def on_reset(self) -> None:
-        self._provider.reset_pose_filter()
+        pass
 
     def _rotation_matrix_to_6d(self, rotation: np.ndarray) -> np.ndarray:
         if rotation.shape != (3, 3):

@@ -11,7 +11,6 @@ import numpy as np
 import pyrealsense2 as rs
 from ultralytics import YOLO
 
-from ..pose_filter import DEFAULT_MAX_POSITION_JUMP_M, PoseJumpRejector
 from .dual_box_rotation import (
     BASE_CENTER_T_PATH,
     BOX_DEPTH_M,
@@ -65,7 +64,6 @@ class YoloBoxPoseProvider:
         res_w: int = RES_W,
         res_h: int = RES_H,
         fps: int = FPS,
-        max_pose_jump_m: float = DEFAULT_MAX_POSITION_JUMP_M,
     ) -> None:
         if not pt_path:
             raise ValueError("pt_path must be a non-empty string.")
@@ -75,7 +73,6 @@ class YoloBoxPoseProvider:
         self.res_h = int(res_h)
         self.fps = int(fps)
         self._base_T_cam = np.loadtxt(Path(calib_path).expanduser().resolve()).astype(np.float32)
-        self._pose_filter = PoseJumpRejector(max_pose_jump_m)
 
         self._model = YOLO(pt_path)
 
@@ -104,9 +101,6 @@ class YoloBoxPoseProvider:
         if self._thread:
             self._thread.join(timeout=2.0)
             self._thread = None
-
-    def reset_pose_filter(self) -> None:
-        self._pose_filter.reset()
 
     def get_latest_box_transform(self) -> Tuple[Optional[np.ndarray], Optional[float]]:
         with self._lock:
@@ -218,7 +212,6 @@ class YoloBoxPoseProvider:
                 cam_T_box[:3, :3] = R_cam_box.astype(np.float32)
                 cam_T_box[:3, 3] = t_cam_box.flatten().astype(np.float32)
                 base_T_box = self._base_T_cam @ cam_T_box
-                base_T_box, pose_accepted = self._pose_filter.update(base_T_box)
 
                 with self._lock:
                     self._latest_front_rgb = rgb
@@ -227,8 +220,7 @@ class YoloBoxPoseProvider:
                     self._latest_board_seq += 1
                     self._latest_transform = base_T_box.copy()
                     self._latest_timestamp = time.time()
-                    if pose_accepted:
-                        self._latest_box_pose_seq += 1
+                    self._latest_box_pose_seq += 1
         except Exception as exc:
             print(f"[YoloBoxPoseProvider] Error during detection loop: {exc}", flush=True)
         finally:
@@ -248,7 +240,7 @@ class YoloBoxRotationTask(DualBoxRotationTask):
             raise ValueError("pt_path must be provided for YoloBoxRotationTask.")
 
         provider_kwargs = {"pt_path": str(pt_path)}
-        for key in ("serial", "calib_path", "res_w", "res_h", "fps", "max_pose_jump_m"):
+        for key in ("serial", "calib_path", "res_w", "res_h", "fps"):
             if key in params_dict:
                 provider_kwargs[key] = params_dict[key]
 
