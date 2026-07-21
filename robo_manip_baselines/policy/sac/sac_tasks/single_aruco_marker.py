@@ -25,6 +25,7 @@ BASE_CENTER_T_PATH = Path(
 )
 MARKER_ID = 0
 MARKER_SIZE_M = 0.0510
+MARKER_LOCAL_Z_OFFSET_M = 0.0035
 ARUCO_DICT_ID = aruco.DICT_4X4_50
 DETECTION_RES_W = 1280
 DETECTION_RES_H = 720
@@ -46,6 +47,12 @@ def rotation_matrix_to_6d(rotation: np.ndarray) -> np.ndarray:
     y_axis = y_axis - np.dot(x_axis, y_axis) * x_axis
     y_axis = y_axis / (np.linalg.norm(y_axis) + 1e-8)
     return np.concatenate([x_axis, y_axis]).astype(np.float32)
+
+
+def offset_pose_along_local_z(transform: np.ndarray) -> np.ndarray:
+    offset_transform = transform.copy()
+    offset_transform[:3, 3] += offset_transform[:3, 2] * MARKER_LOCAL_Z_OFFSET_M
+    return offset_transform
 
 
 def estimate_marker_pose_from_corners(marker_corners, marker_size_m, K, dist_coeffs):
@@ -215,7 +222,9 @@ class ArucoMarkerPoseProvider:
                     continue
 
                 cam_T_marker = transform_from_rvec_tvec(rvec, tvec)
-                base_T_marker = self._base_T_cam @ cam_T_marker
+                base_T_marker = offset_pose_along_local_z(
+                    self._base_T_cam @ cam_T_marker
+                )
                 with self._lock:
                     self._latest_marker_transform = base_T_marker.copy()
                     self._latest_marker_seq += 1
@@ -405,7 +414,7 @@ def run_viewer():
                     np.array([[MARKER_ID]], dtype=np.int32),
                 )
                 cam_T_marker = transform_from_rvec_tvec(rvec, tvec)
-                base_T_marker = base_T_cam @ cam_T_marker
+                base_T_marker = offset_pose_along_local_z(base_T_cam @ cam_T_marker)
 
                 marker_base = base_T_marker[:3, 3]
                 marker_rotation_6d = rotation_matrix_to_6d(base_T_marker[:3, :3])
