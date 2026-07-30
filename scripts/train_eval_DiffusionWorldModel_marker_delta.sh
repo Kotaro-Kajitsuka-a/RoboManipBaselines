@@ -28,7 +28,4 @@ uv run python robo_manip_baselines/bin/Train.py DiffusionWorldModel \
 uv run python robo_manip_baselines/policy/diffusion_world_model/EvalDiffusionWorldModelMarkerSweepDir.py \
   "${CHECKPOINT_DIR}" \
   "${VAL_DIR}" \
-  --max_material_object_id 2 \
-  --checkpoint_names policy_best.ckpt policy_last.ckpt \
-  --output_suffix _delta \
-  --no_plot
+  --max_material_object_id 2
