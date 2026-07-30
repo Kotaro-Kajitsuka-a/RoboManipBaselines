@@ -7,6 +7,10 @@ from .ur5e.MujocoUR5eDoorEnv import MujocoUR5eDoorEnv
 from .ur5e.MujocoUR5eCabinetEnv import MujocoUR5eCabinetEnv
 from .ur5e.MujocoUR5eToolboxEnv import MujocoUR5eToolboxEnv
 from .ur5e.MujocoUR5ePickEnv import MujocoUR5ePickEnv
+from .ur5e.MujocoUR5eLiftingi_I0Env import MujocoUR5eLiftingi_I0Env
+from .ur5e.MujocoUR5eLiftingi_I1Env import MujocoUR5eLiftingi_I1Env
+from .ur5e.MujocoUR5eLiftingi_I2Env import MujocoUR5eLiftingi_I2Env
+from .ur5e.MujocoUR5eLiftingi_I3Env import MujocoUR5eLiftingi_I3Env
 
 from .ur5e_dual.MujocoUR5eDualCableEnv import MujocoUR5eDualCableEnv
 
@@ -34,18 +38,6 @@ from .xarm7.MujocoXarm7AdmittancePusht_T3Env import (
 )
 from .xarm7.MujocoXarm7AdmittancePusht_T4Env import (
     MujocoXarm7AdmittancePusht_T4Env,
-)
-from .xarm7.MujocoXarm7AdmittancePushi_I0Env import (
-    MujocoXarm7AdmittancePushi_I0Env,
-)
-from .xarm7.MujocoXarm7AdmittancePushi_I1Env import (
-    MujocoXarm7AdmittancePushi_I1Env,
-)
-from .xarm7.MujocoXarm7AdmittancePushi_I2Env import (
-    MujocoXarm7AdmittancePushi_I2Env,
-)
-from .xarm7.MujocoXarm7AdmittancePushi_I3Env import (
-    MujocoXarm7AdmittancePushi_I3Env,
 )
 from .xarm7_dual.MujocoXarm7DualBoxEnv import MujocoXarm7DualBoxEnv
 from .xarm7_dual.MujocoXarm7DualAdmittanceBoxEnv import MujocoXarm7DualAdmittanceBoxEnv

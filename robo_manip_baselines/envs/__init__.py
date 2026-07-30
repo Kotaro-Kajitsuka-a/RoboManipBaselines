@@ -38,6 +38,22 @@ register(
     id="robo_manip_baselines/MujocoUR5ePickEnv-v0",
     entry_point="robo_manip_baselines.envs.mujoco:MujocoUR5ePickEnv",
 )
+register(
+    id="robo_manip_baselines/MujocoUR5eLiftingi_I0Env-v0",
+    entry_point="robo_manip_baselines.envs.mujoco:MujocoUR5eLiftingi_I0Env",
+)
+register(
+    id="robo_manip_baselines/MujocoUR5eLiftingi_I1Env-v0",
+    entry_point="robo_manip_baselines.envs.mujoco:MujocoUR5eLiftingi_I1Env",
+)
+register(
+    id="robo_manip_baselines/MujocoUR5eLiftingi_I2Env-v0",
+    entry_point="robo_manip_baselines.envs.mujoco:MujocoUR5eLiftingi_I2Env",
+)
+register(
+    id="robo_manip_baselines/MujocoUR5eLiftingi_I3Env-v0",
+    entry_point="robo_manip_baselines.envs.mujoco:MujocoUR5eLiftingi_I3Env",
+)
 
 ## UR5e-Dual
 register(
@@ -108,23 +124,6 @@ register(
     id="robo_manip_baselines/MujocoXarm7AdmittancePusht_T4Env-v0",
     entry_point="robo_manip_baselines.envs.mujoco:MujocoXarm7AdmittancePusht_T4Env",
 )
-register(
-    id="robo_manip_baselines/MujocoXarm7AdmittancePushi_I0Env-v0",
-    entry_point="robo_manip_baselines.envs.mujoco:MujocoXarm7AdmittancePushi_I0Env",
-)
-register(
-    id="robo_manip_baselines/MujocoXarm7AdmittancePushi_I1Env-v0",
-    entry_point="robo_manip_baselines.envs.mujoco:MujocoXarm7AdmittancePushi_I1Env",
-)
-register(
-    id="robo_manip_baselines/MujocoXarm7AdmittancePushi_I2Env-v0",
-    entry_point="robo_manip_baselines.envs.mujoco:MujocoXarm7AdmittancePushi_I2Env",
-)
-register(
-    id="robo_manip_baselines/MujocoXarm7AdmittancePushi_I3Env-v0",
-    entry_point="robo_manip_baselines.envs.mujoco:MujocoXarm7AdmittancePushi_I3Env",
-)
-
 ## xArm7-Dual
 register(
     id="robo_manip_baselines/MujocoXarm7DualBoxEnv-v0",

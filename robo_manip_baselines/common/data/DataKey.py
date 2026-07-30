@@ -47,6 +47,10 @@ class DataKey:
     # Note: This is the target end-effector pose for IK, not the end-effector pose corresponding to the command joint position.
     COMMAND_EEF_POSE = "command_eef_pose"
 
+    # Measured I-shape block pose (tx, ty, tz, qw, qx, qy, qz)
+    # Note: The block is named "tblock" in the MuJoCo model.
+    MEASURED_TBLOCK_POSE = "measured_tblock_pose"
+
     # Measured end-effector pose relative to previous step in the previous pose frame (tx, ty, tz, roll, pitch, yaw)
     MEASURED_EEF_POSE_REL = "measured_eef_pose_rel"
     # Command end-effector pose relative to previous step in the previous pose frame (tx, ty, tz, roll, pitch, yaw)
@@ -89,6 +93,7 @@ class DataKey:
         MEASURED_GRIPPER_JOINT_POS_REL,
         MEASURED_EEF_POSE,
         MEASURED_EEF_POSE_REL,
+        MEASURED_TBLOCK_POSE,
         # MEASURED_EEF_VEL,
         MEASURED_EEF_WRENCH,
         MEASURED_EEF_WRENCH_MOVING_AVERAGE,
@@ -131,6 +136,8 @@ class DataKey:
 
         if key == DataKey.TIME:
             return 1
+        elif key == DataKey.MEASURED_TBLOCK_POSE:
+            return 7
         elif key in (
             DataKey.MEASURED_JOINT_POS,
             DataKey.COMMAND_JOINT_POS,
@@ -200,7 +207,13 @@ class DataKey:
     @classmethod
     def get_dim_for_policy(cls, key, env):
         """Get the policy input/output dimension of the data specified by key."""
-        if key in (DataKey.MEASURED_EEF_POSE, DataKey.COMMAND_EEF_POSE):
+        if key in (
+            DataKey.MEASURED_EEF_POSE,
+            DataKey.COMMAND_EEF_POSE,
+            DataKey.MEASURED_TBLOCK_POSE,
+        ):
+            if key == DataKey.MEASURED_TBLOCK_POSE:
+                return 9
             return 9 * cls.get_num_eef(env)
         return cls.get_dim(key, env)
 
@@ -335,6 +348,10 @@ class DataKey:
     @classmethod
     def get_plot_scale_for_policy(cls, key, env):
         """Get scale to plot policy representation data."""
-        if key in (DataKey.MEASURED_EEF_POSE, DataKey.COMMAND_EEF_POSE):
+        if key in (
+            DataKey.MEASURED_EEF_POSE,
+            DataKey.COMMAND_EEF_POSE,
+            DataKey.MEASURED_TBLOCK_POSE,
+        ):
             return np.ones(cls.get_dim_for_policy(key, env))
         return cls.get_plot_scale(key, env)

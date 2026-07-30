@@ -5,8 +5,6 @@ python ./robo_manip_baselines/bin/Teleop.py MujocoXarm7DualAdmittanceBox --input
 #ただのteleopration
 python robo_manip_baselines/bin/Teleop.py MujocoXarm7AdmittancePusht
 
-python robo_manip_baselines/bin/Teleop.py MujocoXarm7AdmittancePushi_I0 --input_device keyboard --world_idx_list 0 1 2 3
-
 #replay_log
 python robo_manip_baselines/bin/Teleop.py MujocoXarm7AdmittancePusht \
   --replay_log \
@@ -101,3 +99,37 @@ uv run python robo_manip_baselines/misc/AddAprilTagPoseToRmbData.py \
   --tag_id 0 \
   --save_video \
   --overwrite
+
+
+
+
+7月30日
+ uv run python robo_manip_baselines/bin/Train.py DiffusionPolicy \
+    --dataset_dir robo_manip_baselines/dataset/MujocoUR5eLiftingi_I1_20260730_171251 \
+    --camera_names \
+    --state_keys \
+      measured_eef_pose \
+      measured_gripper_joint_pos \
+      measured_tblock_pose \
+    --action_keys \
+      command_eef_pose \
+      command_gripper_joint_pos \
+    --scheduler ddim \
+    --horizon 16 \
+    --n_obs_steps 2 \
+    --n_action_steps 8 \
+    --skip 3 \
+    --batch_size 16 \
+    --num_workers 2 \
+    --num_epochs 500 \
+    --train_ratio 1.0 --val_ratio 0.01
+
+uv run python robo_manip_baselines/bin/Rollout.py \
+    DiffusionPolicy \
+    MujocoUR5eLiftingi_I1 \
+    --checkpoint /path/to/policy_best.ckpt \
+    --world_idx_list {111..149} \
+    --auto_exit \
+    --max_duration 8 \
+    --save_rollout \
+    --no_plot
