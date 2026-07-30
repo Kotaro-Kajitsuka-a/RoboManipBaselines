@@ -49,6 +49,26 @@ class EvalDiffusionWorldModelMarkerSweepDir(EvalDiffusionWorldModelSweepBase):
     def get_heatmap_png_name(self, checkpoint_stem):
         return f"{checkpoint_stem}_marker_sweep_heatmap.png"
 
+    def setup_paths(self):
+        super().setup_paths()
+        self.episode_manifest_csv = os.path.join(
+            self.raw_dir,
+            "marker_episode_manifest.csv",
+        )
+        with open(self.episode_manifest_csv, "w", newline="") as f:
+            writer = csv.DictWriter(
+                f,
+                fieldnames=[
+                    "checkpoint",
+                    "actual_object_key",
+                    "rmb_rel_path",
+                    "target_offset",
+                    "output_png",
+                    "output_mp4",
+                ],
+            )
+            writer.writeheader()
+
     def evaluate_object_pair(
         self,
         checkpoint,
@@ -236,36 +256,115 @@ class EvalDiffusionWorldModelMarkerSweepDir(EvalDiffusionWorldModelSweepBase):
         os.makedirs(plot_dir, exist_ok=True)
 
         for filename in filenames:
-            plot_data = self.evaluate_marker_episode_for_plot(filename)
-            rmb_stem = os.path.basename(filename.rstrip("/")).replace(".rmb", "")
-            output_png = os.path.join(
-                plot_dir,
-                f"{rmb_stem}_hstep_marker_pose.png",
+            rmb_rel_path = self.get_rmb_rel_path(filename)
+            rmb_display_name = rmb_rel_path.replace(".rmb", "")
+            for target_offset in self.get_plot_time_offsets():
+                plot_data = self.evaluate_marker_episode_for_plot(
+                    filename,
+                    target_offset,
+                )
+                output_episode_dir = self.get_episode_output_dir(
+                    plot_dir,
+                    actual_object_key,
+                    rmb_rel_path,
+                    target_offset,
+                )
+                os.makedirs(output_episode_dir, exist_ok=True)
+                output_png = os.path.join(
+                    output_episode_dir,
+                    "marker_pose.png",
+                )
+                output_mp4 = os.path.join(
+                    output_episode_dir,
+                    "marker_overlay.mp4",
+                )
+                self.save_marker_episode_plot(
+                    output_png,
+                    checkpoint_stem,
+                    actual_object_key,
+                    rmb_display_name,
+                    target_offset,
+                    plot_data,
+                )
+                self.save_marker_episode_video(
+                    output_mp4,
+                    filename,
+                    checkpoint_stem,
+                    actual_object_key,
+                    rmb_display_name,
+                    target_offset,
+                    plot_data,
+                )
+                self.append_episode_manifest_row(
+                    checkpoint_stem,
+                    actual_object_key,
+                    rmb_rel_path,
+                    target_offset,
+                    output_png,
+                    output_mp4,
+                )
+
+    def get_rmb_rel_path(self, filename):
+        return os.path.relpath(filename.rstrip("/"), self.rmb_dir)
+
+    def get_plot_time_offsets(self):
+        if self.plot_time_offsets is None:
+            return [self.model_meta_info["data"]["horizon"] - 1]
+        return self.plot_time_offsets
+
+    def get_episode_output_dir(
+        self,
+        plot_dir,
+        actual_object_key,
+        rmb_rel_path,
+        target_offset,
+    ):
+        rel_path = rmb_rel_path
+        if rel_path.endswith(".rmb"):
+            rel_path = rel_path[: -len(".rmb")]
+        path_parts = rel_path.split(os.sep)
+        if len(path_parts) > 0 and path_parts[0] == actual_object_key:
+            path_parts = path_parts[1:]
+        return os.path.join(plot_dir, f"offset_{target_offset:02d}", *path_parts)
+
+    def append_episode_manifest_row(
+        self,
+        checkpoint_stem,
+        actual_object_key,
+        rmb_rel_path,
+        target_offset,
+        output_png,
+        output_mp4,
+    ):
+        with open(self.episode_manifest_csv, "a", newline="") as f:
+            writer = csv.DictWriter(
+                f,
+                fieldnames=[
+                    "checkpoint",
+                    "actual_object_key",
+                    "rmb_rel_path",
+                    "target_offset",
+                    "output_png",
+                    "output_mp4",
+                ],
             )
-            output_mp4 = os.path.join(
-                plot_dir,
-                f"{rmb_stem}_hstep_marker_overlay.mp4",
-            )
-            self.save_marker_episode_plot(
-                output_png,
-                checkpoint_stem,
-                actual_object_key,
-                rmb_stem,
-                plot_data,
-            )
-            self.save_marker_episode_video(
-                output_mp4,
-                filename,
-                checkpoint_stem,
-                actual_object_key,
-                rmb_stem,
-                plot_data,
+            writer.writerow(
+                {
+                    "checkpoint": f"{checkpoint_stem}.ckpt",
+                    "actual_object_key": actual_object_key,
+                    "rmb_rel_path": rmb_rel_path,
+                    "target_offset": target_offset,
+                    "output_png": output_png,
+                    "output_mp4": output_mp4,
+                }
             )
 
-    def evaluate_marker_episode_for_plot(self, filename):
+    def evaluate_marker_episode_for_plot(self, filename, target_offset=None):
+        if target_offset is None:
+            target_offset = self.model_meta_info["data"]["horizon"] - 1
         dataset, dataloader = self.make_dataloader([filename])
 
-        final_time_idx = self.get_final_time_idx(filename, dataset)
+        target_time_idx = self.get_target_time_idx(filename, dataset, target_offset)
         gt_marker = None
         material_key_to_pred_marker = {}
 
@@ -280,9 +379,12 @@ class EvalDiffusionWorldModelMarkerSweepDir(EvalDiffusionWorldModelSweepBase):
                 with torch.inference_mode():
                     pred = self.policy.predict(batch)
 
-                batch_gt_marker, batch_pred_marker = self.compute_hstep_marker_plot_data(
-                    batch,
-                    pred,
+                batch_gt_marker, batch_pred_marker = (
+                    self.compute_offset_marker_plot_data(
+                        batch,
+                        pred,
+                        target_offset,
+                    )
                 )
                 gt_marker_list.append(batch_gt_marker)
                 pred_marker_list.append(batch_pred_marker)
@@ -295,14 +397,28 @@ class EvalDiffusionWorldModelMarkerSweepDir(EvalDiffusionWorldModelSweepBase):
             )
 
         return {
-            "time_idx": final_time_idx,
+            "time_idx": target_time_idx,
+            "target_offset": target_offset,
             "gt_marker": gt_marker,
             "material_key_to_pred_marker": material_key_to_pred_marker,
         }
 
-    def compute_hstep_marker_plot_data(self, batch, pred):
-        gt_marker = batch["image_feature"][:, -1].detach().cpu().numpy()
-        pred_marker = pred["image_feature"][:, -1].detach().cpu().numpy()
+    def get_target_time_idx(self, filename, dataset, target_offset):
+        skip = self.model_meta_info["data"]["skip"]
+        with RmbData(filename) as rmb_data:
+            episode_len = rmb_data[DataKey.TIME][::skip].shape[0]
+
+        return np.asarray(
+            [
+                np.clip(start_time_idx + target_offset, 0, episode_len - 1)
+                for _episode_idx, start_time_idx in dataset.chunk_info_list
+            ],
+            dtype=np.int64,
+        )
+
+    def compute_offset_marker_plot_data(self, batch, pred, target_offset):
+        gt_marker = batch["image_feature"][:, target_offset].detach().cpu().numpy()
+        pred_marker = pred["image_feature"][:, target_offset].detach().cpu().numpy()
 
         gt_marker = denormalize_data(
             gt_marker,
@@ -320,6 +436,7 @@ class EvalDiffusionWorldModelMarkerSweepDir(EvalDiffusionWorldModelSweepBase):
         checkpoint_stem,
         actual_object_key,
         rmb_stem,
+        target_offset,
         plot_data,
     ):
         fig, axes = plt.subplots(4, 1, figsize=(12, 10), sharex=True)
@@ -360,9 +477,9 @@ class EvalDiffusionWorldModelMarkerSweepDir(EvalDiffusionWorldModelSweepBase):
             ax.grid(True)
             ax.legend(loc="best", fontsize=8)
 
-        axes[-1].set_xlabel("skipped time index of t + H - 1")
+        axes[-1].set_xlabel(f"skipped time index of t + {target_offset}")
         fig.suptitle(
-            f"{checkpoint_stem} / actual={actual_object_key} / {rmb_stem}",
+            f"{checkpoint_stem} / actual={actual_object_key} / t+{target_offset} / {rmb_stem}",
             fontsize=11,
         )
         fig.tight_layout()
@@ -376,6 +493,7 @@ class EvalDiffusionWorldModelMarkerSweepDir(EvalDiffusionWorldModelSweepBase):
         checkpoint_stem,
         actual_object_key,
         rmb_stem,
+        target_offset,
         plot_data,
     ):
         rgb_image_seq, camera_matrix, fps = self.load_video_rgb_frames(filename)
@@ -445,7 +563,7 @@ class EvalDiffusionWorldModelMarkerSweepDir(EvalDiffusionWorldModelSweepBase):
             )
             cv2.putText(
                 frame,
-                f"skipped time={skipped_time_idx}",
+                f"skipped time={skipped_time_idx}, target=t+{target_offset}",
                 (12, 48),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.55,
@@ -458,11 +576,8 @@ class EvalDiffusionWorldModelMarkerSweepDir(EvalDiffusionWorldModelSweepBase):
         print(f"[{self.__class__.__name__}] Save marker overlay video: {output_mp4}")
 
     def get_time_idx_to_plot_idx(self, time_idx):
-        horizon = self.model_meta_info["data"]["horizon"]
         time_idx_to_plot_idx = {}
         for plot_idx, skipped_time_idx in enumerate(time_idx):
-            if skipped_time_idx < horizon - 1:
-                continue
             time_idx_to_plot_idx[int(skipped_time_idx)] = plot_idx
         return time_idx_to_plot_idx
 

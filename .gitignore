@@ -8,6 +8,8 @@ robo_manip_baselines.egg-info
 
 MUJOCO_LOG.TXT
 
+/logs/
+
 GPATH
 GRTAGS
 GSYMS

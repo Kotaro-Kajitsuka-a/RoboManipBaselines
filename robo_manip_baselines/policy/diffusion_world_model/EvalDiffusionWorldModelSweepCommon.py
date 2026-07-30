@@ -68,6 +68,26 @@ def parse_sweep_argument():
         default=DEFAULT_MAX_MATERIAL_OBJECT_ID,
         help="maximum WrenchPredObject id used as material PB sweep targets",
     )
+    parser.add_argument(
+        "--plot_time_offsets",
+        type=int,
+        nargs="*",
+        default=None,
+        help="target offsets used for episode plots and videos; default is horizon - 1",
+    )
+    parser.add_argument(
+        "--checkpoint_names",
+        type=str,
+        nargs="*",
+        default=None,
+        help="checkpoint basenames to evaluate, e.g. policy_best.ckpt policy_last.ckpt",
+    )
+    parser.add_argument(
+        "--output_suffix",
+        type=str,
+        default="",
+        help="suffix appended to the evaluation output directory name",
+    )
     return parser.parse_args()
 
 
@@ -147,6 +167,9 @@ class EvalDiffusionWorldModelSweepBase:
         no_plot=False,
         seed=42,
         max_material_object_id=DEFAULT_MAX_MATERIAL_OBJECT_ID,
+        plot_time_offsets=None,
+        checkpoint_names=None,
+        output_suffix="",
     ):
         self.checkpoint_dir = checkpoint_dir
         self.rmb_dir = rmb_dir
@@ -154,6 +177,9 @@ class EvalDiffusionWorldModelSweepBase:
         self.num_files = num_files
         self.no_plot = no_plot
         self.seed = seed
+        self.plot_time_offsets = plot_time_offsets
+        self.checkpoint_names = checkpoint_names
+        self.output_suffix = output_suffix
         assert max_material_object_id >= 0, max_material_object_id
         self.material_object_keys = [
             f"WrenchPredObject{object_id}"
@@ -211,6 +237,13 @@ class EvalDiffusionWorldModelSweepBase:
         self.checkpoints = sorted(
             glob.glob(os.path.join(self.checkpoint_dir, "policy_*.ckpt"))
         )
+        if self.checkpoint_names is not None:
+            checkpoint_name_set = set(self.checkpoint_names)
+            self.checkpoints = [
+                checkpoint
+                for checkpoint in self.checkpoints
+                if os.path.basename(checkpoint) in checkpoint_name_set
+            ]
         assert len(self.checkpoints) > 0, self.checkpoint_dir
 
         rmb_path_list = find_rmb_files(self.rmb_dir, num_files=self.num_files)
@@ -228,7 +261,7 @@ class EvalDiffusionWorldModelSweepBase:
         self.output_dir = os.path.join(
             self.checkpoint_dir,
             "eval",
-            self.get_output_name(rmb_dir_name),
+            self.get_output_name(rmb_dir_name) + self.output_suffix,
         )
         self.raw_dir = os.path.join(self.output_dir, "raw")
         self.summary_dir = os.path.join(self.output_dir, "summary")
