@@ -6,6 +6,7 @@ from robo_manip_baselines.common import (
     DataKey,
     DatasetBase,
     RmbData,
+    convert_data_to_policy,
     crop_and_resize,
     get_skipped_data_seq,
     normalize_data,
@@ -28,7 +29,10 @@ class SarnnDataset(DatasetBase):
             # Load state
             state = np.concatenate(
                 [
-                    get_skipped_data_seq(rmb_data[key][:], key, skip)
+                    convert_data_to_policy(
+                        get_skipped_data_seq(rmb_data[key][:], key, skip),
+                        key,
+                    )
                     for key in self.model_meta_info["state"]["keys"]
                 ],
                 axis=1,

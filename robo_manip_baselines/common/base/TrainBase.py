@@ -16,7 +16,7 @@ from torch.utils.tensorboard import SummaryWriter
 from ..data.CachedDataset import CachedDataset
 from ..data.DataKey import DataKey
 from ..data.RmbData import RmbData
-from ..utils.DataUtils import get_skipped_data_seq
+from ..utils.DataUtils import convert_data_to_policy, get_skipped_data_seq
 from ..utils.FileUtils import find_rmb_files
 from ..utils.MathUtils import set_random_seed
 from ..utils.MiscUtils import remove_prefix
@@ -86,7 +86,7 @@ class TrainBase(ABC):
             type=str,
             nargs="*",
             default=[DataKey.MEASURED_JOINT_POS],
-            choices=DataKey.MEASURED_DATA_KEYS,
+            choices=DataKey.MEASURED_DATA_KEYS + DataKey.COMMAND_DATA_KEYS,
             help="state data keys",
         )
         parser.add_argument(
@@ -286,7 +286,12 @@ class TrainBase(ABC):
                 else:
                     state = np.concatenate(
                         [
-                            get_skipped_data_seq(rmb_data[key][:], key, self.args.skip)
+                            convert_data_to_policy(
+                                get_skipped_data_seq(
+                                    rmb_data[key][:], key, self.args.skip
+                                ),
+                                key,
+                            )
                             for key in self.args.state_keys
                         ],
                         axis=1,
@@ -299,7 +304,12 @@ class TrainBase(ABC):
                 else:
                     action = np.concatenate(
                         [
-                            get_skipped_data_seq(rmb_data[key][:], key, self.args.skip)
+                            convert_data_to_policy(
+                                get_skipped_data_seq(
+                                    rmb_data[key][:], key, self.args.skip
+                                ),
+                                key,
+                            )
                             for key in self.args.action_keys
                         ],
                         axis=1,

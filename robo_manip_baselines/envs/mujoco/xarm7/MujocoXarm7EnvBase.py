@@ -87,7 +87,8 @@ class MujocoXarm7EnvBase(MujocoEnvBase):
                     ]
                 )
             }
-        return {}
+        else:
+            return {}
 
     def _get_obs(self):
         arm_joint_name_list = [

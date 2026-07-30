@@ -3,7 +3,12 @@ import matplotlib.pylab as plt
 import numpy as np
 import torch
 
-from robo_manip_baselines.common import RolloutBase, denormalize_data, normalize_data
+from robo_manip_baselines.common import (
+    RolloutBase,
+    convert_data_to_policy,
+    denormalize_data,
+    normalize_data,
+)
 
 from .MlpPolicy import MlpPolicy
 
@@ -28,9 +33,15 @@ class RolloutMlp(RolloutBase):
         self.load_ckpt()
 
     def setup_plot(self):
+        if len(self.camera_names) == 0:
+            num_plot_rows = 1
+            num_plot_cols = 1
+        else:
+            num_plot_rows = 2
+            num_plot_cols = len(self.camera_names)
         fig_ax = plt.subplots(
-            2,
-            len(self.camera_names),
+            num_plot_rows,
+            num_plot_cols,
             figsize=(13.5, 6.0),
             dpi=60,
             squeeze=False,
@@ -51,7 +62,9 @@ class RolloutMlp(RolloutBase):
         else:
             state = np.concatenate(
                 [
-                    self.motion_manager.get_data(state_key, self.obs)
+                    convert_data_to_policy(
+                        self.motion_manager.get_data(state_key, self.obs), state_key
+                    )
                     for state_key in self.state_keys
                 ]
             )
@@ -71,6 +84,11 @@ class RolloutMlp(RolloutBase):
         return torch.stack(self.state_buf, dim=0)[torch.newaxis].to(self.device)
 
     def update_images_buf(self):
+        if len(self.camera_names) == 0:
+            raise RuntimeError(
+                f"[{self.__class__.__name__}] update_images_buf() requires image observations."
+            )
+
         images = []
         for camera_name in self.camera_names:
             image = self.info["rgb_images"][camera_name]
@@ -92,6 +110,9 @@ class RolloutMlp(RolloutBase):
                 single_images_buf.append(image)
 
     def get_images(self):
+        if len(self.camera_names) == 0:
+            return torch.empty(0, dtype=torch.float32).to(self.device)
+
         return torch.stack(
             [
                 torch.stack(single_images_buf, dim=0)[torch.newaxis].to(self.device)
@@ -102,7 +123,8 @@ class RolloutMlp(RolloutBase):
     def infer_policy(self):
         # Update observation buffer
         self.update_state_buf()
-        self.update_images_buf()
+        if len(self.camera_names) > 0:
+            self.update_images_buf()
 
         # Infer
         if self.policy_action_buf is None or len(self.policy_action_buf) == 0:
@@ -127,11 +149,15 @@ class RolloutMlp(RolloutBase):
             _ax.cla()
             _ax.axis("off")
 
-        # Plot images
-        self.plot_images(self.ax[0, 0 : len(self.camera_names)])
+        if len(self.camera_names) == 0:
+            # Plot action
+            self.plot_action(self.ax[0, 0])
+        else:
+            # Plot images
+            self.plot_images(self.ax[0, 0 : len(self.camera_names)])
 
-        # Plot action
-        self.plot_action(self.ax[1, 0])
+            # Plot action
+            self.plot_action(self.ax[1, 0])
 
         # Finalize plot
         self.canvas.draw()

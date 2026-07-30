@@ -16,6 +16,7 @@ sys.path.append(
 from robo_manip_baselines.common import (
     DataKey,
     RolloutBase,
+    convert_data_to_policy,
     convert_depth_image_to_pointcloud,
     denormalize_data,
     euler_to_rotation_matrix,
@@ -134,7 +135,9 @@ class RolloutManiFlowPolicy(RolloutBase):
     def update_state_buf(self):
         state = np.concatenate(
             [
-                self.motion_manager.get_data(state_key, self.obs)
+                convert_data_to_policy(
+                    self.motion_manager.get_data(state_key, self.obs), state_key
+                )
                 for state_key in self.state_keys
             ]
         )

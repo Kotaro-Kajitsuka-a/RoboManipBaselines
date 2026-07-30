@@ -4,6 +4,7 @@ import numpy as np
 
 from ..data.DataKey import DataKey
 from .MathUtils import get_rel_pose_from_se3, get_se3_from_rel_pose
+from .PoseUtils import get_pose7_from_pose9, get_pose9_from_pose7
 
 
 def normalize_data(data, stats):
@@ -38,6 +39,20 @@ def denormalize_data(data, stats):
         return scale * (data - norm_config["out_min"]) + stats["min"]
     else:
         raise ValueError(f"[denormalize_data] Invalid normalization type: {norm_type}")
+
+
+def convert_data_to_policy(data, key):
+    """Convert data from RMB/env representation to policy representation."""
+    if key in (DataKey.MEASURED_EEF_POSE, DataKey.COMMAND_EEF_POSE):
+        return get_pose9_from_pose7(data)
+    return data
+
+
+def convert_data_from_policy(data, key):
+    """Convert data from policy representation to RMB/env representation."""
+    if key in (DataKey.MEASURED_EEF_POSE, DataKey.COMMAND_EEF_POSE):
+        return get_pose7_from_pose9(data)
+    return data
 
 
 def _aggregate_data_seq_with_skip(data_seq, skip, agg_func):

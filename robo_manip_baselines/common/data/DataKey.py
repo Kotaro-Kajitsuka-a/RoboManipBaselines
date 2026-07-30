@@ -112,6 +112,19 @@ class DataKey:
     ]
 
     @classmethod
+    def get_num_eef(cls, env):
+        from ..body.ArmManager import ArmConfig
+
+        return len(
+            [
+                body_config
+                for body_config in env.unwrapped.body_config_list
+                if isinstance(body_config, ArmConfig)
+                and (body_config.eef_idx is not None)
+            ]
+        )
+
+    @classmethod
     def get_dim(cls, key, env):
         """Get the dimension of the data specified by key."""
         from ..body.ArmManager import ArmConfig
@@ -159,14 +172,7 @@ class DataKey:
             DataKey.SUBSTEP_COMPENSATED_LPF_EEF_WRENCH,
             DataKey.COMMAND_EEF_WRENCH,
         ):
-            num_eef = len(
-                [
-                    body_config
-                    for body_config in env.unwrapped.body_config_list
-                    if isinstance(body_config, ArmConfig)
-                    and (body_config.eef_idx is not None)
-                ]
-            )
+            num_eef = cls.get_num_eef(env)
 
             if key in (DataKey.MEASURED_EEF_POSE, DataKey.COMMAND_EEF_POSE):
                 return 7 * num_eef
@@ -190,6 +196,13 @@ class DataKey:
             return 3
         else:
             raise ValueError(f"[{cls.__name__}] Invalid data key: {key}")
+
+    @classmethod
+    def get_dim_for_policy(cls, key, env):
+        """Get the policy input/output dimension of the data specified by key."""
+        if key in (DataKey.MEASURED_EEF_POSE, DataKey.COMMAND_EEF_POSE):
+            return 9 * cls.get_num_eef(env)
+        return cls.get_dim(key, env)
 
     @classmethod
     def get_measured_key(cls, key):
@@ -318,3 +331,10 @@ class DataKey:
             return np.full(cls.get_dim(key, env), 100.0)
         else:
             return np.ones(cls.get_dim(key, env))
+
+    @classmethod
+    def get_plot_scale_for_policy(cls, key, env):
+        """Get scale to plot policy representation data."""
+        if key in (DataKey.MEASURED_EEF_POSE, DataKey.COMMAND_EEF_POSE):
+            return np.ones(cls.get_dim_for_policy(key, env))
+        return cls.get_plot_scale(key, env)

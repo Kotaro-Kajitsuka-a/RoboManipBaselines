@@ -48,7 +48,10 @@ class RolloutSarnn(RolloutBase):
         super().setup_plot(fig_ax)
 
         self.action_plot_scale = np.concatenate(
-            [DataKey.get_plot_scale(key, self.env) for key in self.state_keys]
+            [
+                DataKey.get_plot_scale_for_policy(key, self.env)
+                for key in self.state_keys
+            ]
         )
 
     def reset_variables(self):

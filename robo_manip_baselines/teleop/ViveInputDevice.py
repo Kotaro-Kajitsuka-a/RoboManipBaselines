@@ -10,19 +10,18 @@ class ViveInputDevice(InputDeviceBase):
     def __init__(
         self,
         arm_manager,
+        device_params,
         pos_scale=1.0,
         gripper_scale=5.0,
-        device_params=None,
         vive_to_eef_frame_rotation=None,
     ):
         super().__init__()
-        assert device_params is not None
 
         self.arm_manager = arm_manager
-        self.pos_scale = pos_scale
-        self.gripper_scale = gripper_scale
         self.name = device_params["name"]
         self.serial_number = device_params["serial_number"]
+        self.pos_scale = pos_scale
+        self.gripper_scale = gripper_scale
         if vive_to_eef_frame_rotation is None:
             self.vive_to_eef_frame_rotation = np.eye(3)
         else:
@@ -37,6 +36,7 @@ class ViveInputDevice(InputDeviceBase):
         self.vive_se3_at_enable = None
         self.eef_se3_at_enable = None
         self.has_announced_ready = False
+
         if self.connected:
             return
 
@@ -56,18 +56,21 @@ class ViveInputDevice(InputDeviceBase):
             raise RuntimeError(f"[{self.__class__.__name__}] Device is not connected.")
 
         self._read_vive()
-        if self.name not in self.state:
+
+        if self.state is None:
             self.prev_is_enable_teleop_pressed = False
             self.has_announced_ready = False
             return
 
-        # Use the trigger axis (axes[2]) to enable teleop.
-        is_enable_teleop_pressed = self.state[self.name]["axes"][2] == 1.0
+        # Use the trigger axis (axes[2]) to enable teleop
+        is_enable_teleop_pressed = self.state["axes"][2] == 1.0
         if is_enable_teleop_pressed and not self.prev_is_enable_teleop_pressed:
             self.enabled_teleop = True
-            self.vive_se3_at_enable = self.state[self.name]["se3"].copy()
+            self.vive_se3_at_enable = self.state["se3"].copy()
             self.eef_se3_at_enable = self.arm_manager.current_se3.copy()
-            print(f"[{self.__class__.__name__}] Enable teleop.")
+            print(
+                f"[{self.__class__.__name__}] Teleoperation enabled for Vive '{self.name}'."
+            )
         self.prev_is_enable_teleop_pressed = is_enable_teleop_pressed
 
     def _read_vive(self):
@@ -75,8 +78,7 @@ class ViveInputDevice(InputDeviceBase):
         poses = self.vr_system.getDeviceToAbsoluteTrackingPose(
             openvr.TrackingUniverseStanding, 0, openvr.k_unMaxTrackedDeviceCount
         )
-
-        state = {}
+        state = None
 
         for i in range(openvr.k_unMaxTrackedDeviceCount):
             pose = poses[i]
@@ -91,14 +93,11 @@ class ViveInputDevice(InputDeviceBase):
             sn = self.vr_system.getStringTrackedDeviceProperty(
                 i, openvr.Prop_SerialNumber_String
             )
-
             if sn != self.serial_number:
                 continue
 
-            mat = np.eye(4)
-            mat[:3, :4] = pose.mDeviceToAbsoluteTracking.m
-
-            se3 = pin.SE3(mat[:3, :3], mat[:3, 3])
+            mat = np.asarray(pose.mDeviceToAbsoluteTracking.m, dtype=np.float64)
+            se3 = pin.SE3(mat[:, :3], mat[:, 3])
 
             _, vive_state = self.vr_system.getControllerState(i)
             axes = np.array(
@@ -117,29 +116,30 @@ class ViveInputDevice(InputDeviceBase):
                 ),
             }
 
-            state[self.name] = {
+            state = {
                 "se3": se3,
                 "axes": axes,
                 "buttons": buttons,
             }
 
+            break
+
         self.state = state
-        if (self.name in state) and (not self.has_announced_ready):
+        if (state is not None) and (not self.has_announced_ready):
             print(
-                f"[{self.__class__.__name__}] Vive is ready. Pull the trigger fully to enable teleop."
+                f"[{self.__class__.__name__}] Vive '{self.name}' is ready. Fully pull the trigger to start teleoperation."
             )
             self.has_announced_ready = True
 
     def is_ready(self):
-        return (self.state is not None) and (self.name in self.state)
+        return self.state is not None
 
     def set_command_data(self):
-        if (not self.enabled_teleop) or (self.name not in self.state):
+        if (not self.enabled_teleop) or (self.state is None):
             return
 
-        delta_vive_se3 = (
-            self.vive_se3_at_enable.inverse() * self.state[self.name]["se3"]
-        )
+        # Set arm command
+        delta_vive_se3 = self.vive_se3_at_enable.inverse() * self.state["se3"]
         adjusted_delta_vive_se3 = pin.SE3(
             self.vive_to_eef_frame_rotation
             @ delta_vive_se3.rotation
@@ -156,7 +156,7 @@ class ViveInputDevice(InputDeviceBase):
 
         # Set gripper command
         gripper_joint_pos = self.arm_manager.get_command_gripper_joint_pos().copy()
-        buttons = self.state[self.name]["buttons"]
+        buttons = self.state["buttons"]
         if buttons["application_menu"] and not buttons["trackpad_pressed"]:
             gripper_joint_pos -= self.gripper_scale
         elif buttons["trackpad_pressed"] and not buttons["application_menu"]:

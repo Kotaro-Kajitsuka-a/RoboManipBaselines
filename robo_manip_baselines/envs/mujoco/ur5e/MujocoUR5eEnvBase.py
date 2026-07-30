@@ -78,7 +78,8 @@ class MujocoUR5eEnvBase(MujocoEnvBase):
     def get_input_device_kwargs(self, input_device_name):
         if input_device_name == "vive":
             return {"vive_to_eef_frame_rotation": np.diag([-1.0, -1.0, 1.0])}
-        return {}
+        else:
+            return {}
 
     def _get_obs(self):
         arm_joint_name_list = [

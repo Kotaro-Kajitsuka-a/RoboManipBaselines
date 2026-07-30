@@ -98,7 +98,8 @@ class MujocoUR5eDualEnvBase(MujocoEnvBase):
                 0: {"vive_to_eef_frame_rotation": np.diag([-1.0, -1.0, 1.0])},
                 1: {"vive_to_eef_frame_rotation": np.diag([-1.0, -1.0, 1.0])},
             }
-        return {}
+        else:
+            return {}
 
     def _get_obs(self):
         left_obs = self._get_obs_single_arm("left")

@@ -21,7 +21,11 @@ from ..data.OperationDataMixin import OperationDataMixin
 from ..manager.DataManager import DataManager
 from ..manager.MotionManager import MotionManager
 from ..manager.PhaseManager import PhaseManager
-from ..utils.DataUtils import normalize_data
+from ..utils.DataUtils import (
+    convert_data_from_policy,
+    convert_data_to_policy,
+    normalize_data,
+)
 from ..utils.MathUtils import set_random_seed
 from ..utils.MiscUtils import remove_suffix
 from .PhaseBase import PhaseBase
@@ -141,6 +145,8 @@ class EndRolloutPhase(PhaseBase):
 
 class RolloutBase(OperationDataMixin, ABC):
     require_task_desc = False
+    MotionManagerClass = MotionManager
+    DataManagerClass = DataManager
 
     def __init__(self):
         # Setup arguments
@@ -166,11 +172,11 @@ class RolloutBase(OperationDataMixin, ABC):
             self.setup_plot()
 
         # Setup motion manager
-        self.motion_manager = MotionManager(self.env)
+        self.motion_manager = self.MotionManagerClass(self.env)
 
         # Setup data manager
         task_desc = self.args.task_desc if self.require_task_desc else ""
-        self.data_manager = DataManager(
+        self.data_manager = self.DataManagerClass(
             self.env, demo_name=self.demo_name, task_desc=task_desc
         )
         self.data_manager.setup_camera_info()
@@ -396,7 +402,10 @@ class RolloutBase(OperationDataMixin, ABC):
 
         if len(self.action_keys) > 0:
             self.action_plot_scale = np.concatenate(
-                [DataKey.get_plot_scale(key, self.env) for key in self.action_keys]
+                [
+                    DataKey.get_plot_scale_for_policy(key, self.env)
+                    for key in self.action_keys
+                ]
             )
         else:
             self.action_plot_scale = np.zeros(0)
@@ -527,7 +536,9 @@ class RolloutBase(OperationDataMixin, ABC):
         else:
             state = np.concatenate(
                 [
-                    self.motion_manager.get_data(state_key, self.obs)
+                    convert_data_to_policy(
+                        self.motion_manager.get_data(state_key, self.obs), state_key
+                    )
                     for state_key in self.state_keys
                 ]
             )
@@ -561,10 +572,13 @@ class RolloutBase(OperationDataMixin, ABC):
         is_skip = self.rollout_time_idx % self.args.skip != 0
         action_idx = 0
         for key in action_keys:
-            action_dim = DataKey.get_dim(key, self.env)
+            action_dim = DataKey.get_dim_for_policy(key, self.env)
+            command = convert_data_from_policy(
+                self.policy_action[action_idx : action_idx + action_dim], key
+            )
             self.motion_manager.set_command_data(
                 key,
-                self.policy_action[action_idx : action_idx + action_dim],
+                command,
                 is_skip,
             )
             action_idx += action_dim

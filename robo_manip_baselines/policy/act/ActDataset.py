@@ -5,6 +5,7 @@ from robo_manip_baselines.common import (
     DataKey,
     DatasetBase,
     RmbData,
+    convert_data_to_policy,
     get_skipped_data_seq,
     get_skipped_single_data,
 )
@@ -30,8 +31,11 @@ class ActDataset(DatasetBase):
             else:
                 state = np.concatenate(
                     [
-                        get_skipped_single_data(
-                            rmb_data[key], start_time_idx * skip, key, skip
+                        convert_data_to_policy(
+                            get_skipped_single_data(
+                                rmb_data[key], start_time_idx * skip, key, skip
+                            ),
+                            key,
                         )
                         for key in self.model_meta_info["state"]["keys"]
                     ]
@@ -40,10 +44,13 @@ class ActDataset(DatasetBase):
             # Load action
             action = np.concatenate(
                 [
-                    get_skipped_data_seq(
-                        rmb_data[key][start_time_idx * skip :],
+                    convert_data_to_policy(
+                        get_skipped_data_seq(
+                            rmb_data[key][start_time_idx * skip :],
+                            key,
+                            skip,
+                        ),
                         key,
-                        skip,
                     )
                     for key in self.model_meta_info["action"]["keys"]
                 ],
