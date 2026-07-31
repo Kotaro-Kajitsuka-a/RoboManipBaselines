@@ -6,6 +6,7 @@ from robo_manip_baselines.common import (
     DatasetBase,
     DpStyleDatasetMixin,
     RmbData,
+    convert_data_to_policy,
     get_skipped_data_seq,
     normalize_data,
 )
@@ -55,7 +56,12 @@ class DiffusionWorldModelDataset(DatasetBase, DpStyleDatasetMixin):
             else:
                 state = np.concatenate(
                     [
-                        get_skipped_data_seq(rmb_data[key][:], key, skip)[time_idxes]
+                        convert_data_to_policy(
+                            get_skipped_data_seq(rmb_data[key][:], key, skip)[
+                                time_idxes
+                            ],
+                            key,
+                        )
                         for key in self.model_meta_info["state"]["keys"]
                     ],
                     axis=1,
@@ -64,7 +70,10 @@ class DiffusionWorldModelDataset(DatasetBase, DpStyleDatasetMixin):
             # Load action
             action = np.concatenate(
                 [
-                    get_skipped_data_seq(rmb_data[key][:], key, skip)[time_idxes]
+                    convert_data_to_policy(
+                        get_skipped_data_seq(rmb_data[key][:], key, skip)[time_idxes],
+                        key,
+                    )
                     for key in self.model_meta_info["action"]["keys"]
                 ],
                 axis=1,

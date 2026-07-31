@@ -20,6 +20,7 @@ sys.path.append(
 from robo_manip_baselines.common import (
     DataKey,
     RmbData,
+    convert_data_to_policy,
     find_rmb_files,
     get_skipped_data_seq,
 )
@@ -115,7 +116,12 @@ class EvalDiffusionWorldModelDataset(DiffusionWorldModelDataset):
             else:
                 state = np.concatenate(
                     [
-                        get_skipped_data_seq(rmb_data[key][:], key, skip)[time_idxes]
+                        convert_data_to_policy(
+                            get_skipped_data_seq(rmb_data[key][:], key, skip)[
+                                time_idxes
+                            ],
+                            key,
+                        )
                         for key in self.model_meta_info["state"]["keys"]
                     ],
                     axis=1,
@@ -123,7 +129,10 @@ class EvalDiffusionWorldModelDataset(DiffusionWorldModelDataset):
 
             action = np.concatenate(
                 [
-                    get_skipped_data_seq(rmb_data[key][:], key, skip)[time_idxes]
+                    convert_data_to_policy(
+                        get_skipped_data_seq(rmb_data[key][:], key, skip)[time_idxes],
+                        key,
+                    )
                     for key in self.model_meta_info["action"]["keys"]
                 ],
                 axis=1,

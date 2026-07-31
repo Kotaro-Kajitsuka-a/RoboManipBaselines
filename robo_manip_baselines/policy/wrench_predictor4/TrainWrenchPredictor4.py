@@ -1,8 +1,12 @@
 import copy
+import os
 
+import numpy as np
 import torch
+from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
+from robo_manip_baselines.common import RmbData, find_rmb_files
 from robo_manip_baselines.policy.diffusion_world_model.TrainDiffusionWorldModel import (
     TrainDiffusionWorldModel,
 )
@@ -75,6 +79,82 @@ class TrainWrenchPredictor4(TrainDiffusionWorldModel):
             choices=["decoder", "mlp", "mlp_only"],
             help="output head type",
         )
+        parser.add_argument(
+            "--val_dataset_dir",
+            type=str,
+            default=None,
+            help="separate validation dataset directory",
+        )
+        parser.add_argument(
+            "--wrench_loss_weight",
+            type=float,
+            default=1.0,
+            help="weight of the auxiliary wrench prediction loss",
+        )
+
+    def setup_rmb_files(self):
+        super().setup_rmb_files()
+        if self.args.val_dataset_dir is None:
+            return
+
+        self.val_filenames = find_rmb_files(self.args.val_dataset_dir)
+        train_filenames = {os.path.realpath(path) for path in self.all_filenames}
+        val_filenames = {os.path.realpath(path) for path in self.val_filenames}
+        assert train_filenames.isdisjoint(val_filenames)
+
+    def setup_model_meta_info(self):
+        super().setup_model_meta_info()
+        if self.args.val_dataset_dir is not None:
+            self.model_meta_info["data"]["val_dataset_dir"] = self.args.val_dataset_dir
+
+    def setup_dataset(self):
+        if self.args.val_dataset_dir is None:
+            super().setup_dataset()
+            return
+
+        if self.args.enable_rmb_cache and self.args.use_cached_dataset:
+            raise ValueError(
+                f"[{self.__class__.__name__}] Both 'enable_rmb_cache' and "
+                "'use_cached_dataset' options cannot be True at the same time."
+            )
+
+        self.set_data_stats()
+        self.add_clipped_wrench_to_validation_data()
+        self.train_dataloader = self.make_dataloader(
+            self.all_filenames,
+            shuffle=True,
+        )
+        self.val_dataloader = self.make_dataloader(
+            self.val_filenames,
+            shuffle=False,
+        )
+        self.writer = SummaryWriter(self.args.checkpoint_dir)
+        self.print_dataset_info()
+
+    def add_clipped_wrench_to_validation_data(self):
+        clip_info = self.model_meta_info["wrench"]["percentile_clip"]
+        dst_key = clip_info["key"]
+        source_key = clip_info["source_key"]
+        clip_min = clip_info["min"]
+        clip_max = clip_info["max"]
+
+        print(
+            f"[{self.__class__.__name__}] Add training-clipped wrench "
+            f"'{dst_key}' to validation data."
+        )
+        for filename in self.val_filenames:
+            with RmbData(filename, mode="r+") as rmb_data:
+                if dst_key in rmb_data.keys():
+                    del rmb_data.h5file[dst_key]
+                wrench = np.asarray(rmb_data[source_key][:])
+                rmb_data.h5file[dst_key] = np.clip(
+                    wrench,
+                    clip_min,
+                    clip_max,
+                ).astype(wrench.dtype, copy=False)
+                rmb_data.attrs[dst_key + "_source_key"] = source_key
+                rmb_data.attrs[dst_key + "_clip_min"] = clip_min
+                rmb_data.attrs[dst_key + "_clip_max"] = clip_max
 
     def setup_policy(self):
         self.model_meta_info["policy"]["args"] = {
@@ -94,6 +174,7 @@ class TrainWrenchPredictor4(TrainDiffusionWorldModel):
             "dim_feedforward": self.args.dim_feedforward,
             "dropout": self.args.dropout,
             "output_head": self.args.output_head,
+            "wrench_loss_weight": self.args.wrench_loss_weight,
         }
 
         self.policy = WrenchPredictor4Model(**self.model_meta_info["policy"]["args"])

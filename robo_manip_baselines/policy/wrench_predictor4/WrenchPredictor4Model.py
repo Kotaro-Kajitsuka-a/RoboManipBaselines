@@ -24,6 +24,7 @@ class WrenchPredictor4Model(nn.Module):
         dropout=0.1,
         image_feature_target_mode="absolute",
         output_head="decoder",
+        wrench_loss_weight=1.0,
     ):
         super().__init__()
 
@@ -37,8 +38,10 @@ class WrenchPredictor4Model(nn.Module):
         self.n_obs_steps = n_obs_steps
         self.image_feature_target_mode = image_feature_target_mode
         self.output_head = output_head
+        self.wrench_loss_weight = wrench_loss_weight
         self.n_action_condition_steps = horizon - n_obs_steps
         assert self.n_action_condition_steps > 0, (horizon, n_obs_steps)
+        assert self.wrench_loss_weight >= 0.0, self.wrench_loss_weight
         assert self.image_feature_target_mode in (
             "absolute",
             "delta_from_last_obs",
@@ -164,7 +167,7 @@ class WrenchPredictor4Model(nn.Module):
             image_feature_target[:, start:],
         )
         return {
-            "loss": wrench_loss + image_feature_loss,
+            "loss": self.wrench_loss_weight * wrench_loss + image_feature_loss,
             "wrench_loss": wrench_loss,
             "image_feature_loss": image_feature_loss,
         }
