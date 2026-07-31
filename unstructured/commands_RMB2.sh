@@ -104,7 +104,7 @@ uv run python robo_manip_baselines/misc/AddAprilTagPoseToRmbData.py \
 
 
 7月30日
- uv run python robo_manip_baselines/bin/Train.py DiffusionPolicy \
+python robo_manip_baselines/bin/Train.py DiffusionPolicy \
     --dataset_dir robo_manip_baselines/dataset/MujocoUR5eLiftingi_I1_20260730_171251 \
     --camera_names \
     --state_keys \
@@ -118,13 +118,12 @@ uv run python robo_manip_baselines/misc/AddAprilTagPoseToRmbData.py \
     --horizon 16 \
     --n_obs_steps 2 \
     --n_action_steps 8 \
-    --skip 3 \
     --batch_size 16 \
     --num_workers 2 \
     --num_epochs 500 \
     --train_ratio 1.0 --val_ratio 0.01
 
-uv run python robo_manip_baselines/bin/Rollout.py \
+python robo_manip_baselines/bin/Rollout.py \
     DiffusionPolicy \
     MujocoUR5eLiftingi_I1 \
     --checkpoint /path/to/policy_best.ckpt \
