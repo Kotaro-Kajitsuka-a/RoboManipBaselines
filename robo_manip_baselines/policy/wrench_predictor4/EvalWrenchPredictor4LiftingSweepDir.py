@@ -39,7 +39,9 @@ class EvalWrenchPredictor4LiftingSweepDir(EvalDiffusionWorldModelMaterialSweepDi
         return [
             ("I-shape block position [m]", "tblock position [m]"),
             ("I-shape block rotation [deg]", "tblock rotation [deg]"),
-            ("auxiliary wrench", "wrench mean"),
+            ("auxiliary force MAE [N]", "force mean"),
+            ("auxiliary torque MAE [N m]", "torque mean"),
+            ("normalized total error", "normalized total mean"),
         ]
 
     def setup_policy(self, checkpoint):
@@ -115,6 +117,8 @@ class EvalWrenchPredictor4LiftingSweepDir(EvalDiffusionWorldModelMaterialSweepDi
             "Nx": wrench_mae[3],
             "Ny": wrench_mae[4],
             "Nz": wrench_mae[5],
+            "force mean": wrench_mae[:3].mean(),
+            "torque mean": wrench_mae[3:].mean(),
             "wrench mean": wrench_mae.mean(),
             "normalized total mean": total_abs_error.mean(),
         }
@@ -162,7 +166,8 @@ class EvalWrenchPredictor4LiftingSweepDir(EvalDiffusionWorldModelMaterialSweepDi
             f"correct={row['is_correct_material']}, "
             f"position={row['tblock position [m]']:.6f} m, "
             f"rotation={row['tblock rotation [deg]']:.3f} deg, "
-            f"wrench={row['wrench mean']:.6f}"
+            f"force={row['force mean']:.6f} N, "
+            f"torque={row['torque mean']:.6f} N m"
         )
 
     def save_csv(self, rows):
@@ -181,6 +186,8 @@ class EvalWrenchPredictor4LiftingSweepDir(EvalDiffusionWorldModelMaterialSweepDi
             "Nx",
             "Ny",
             "Nz",
+            "force mean",
+            "torque mean",
             "wrench mean",
             "normalized total mean",
         ]
