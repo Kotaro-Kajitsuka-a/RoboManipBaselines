@@ -43,11 +43,12 @@ class WrenchPredictor4Model(nn.Module):
         assert self.output_head in ("decoder", "mlp", "mlp_only"), self.output_head
 
         self.material_property = nn.Embedding(num_objects, pb_dim)
-        self.obs_proj = nn.Linear(image_feature_dim + state_dim, hidden_dim)
+        self.image_feature_proj = nn.Linear(image_feature_dim, hidden_dim)
+        self.state_proj = nn.Linear(state_dim, hidden_dim)
         self.action_proj = nn.Linear(action_dim, hidden_dim)
         self.pb_proj = nn.Linear(pb_dim, hidden_dim)
 
-        num_condition_tokens = n_obs_steps + self.n_action_condition_steps + 1
+        num_condition_tokens = 2 * n_obs_steps + self.n_action_condition_steps + 1
         self.condition_pos_embed = nn.Parameter(
             torch.zeros(num_condition_tokens, hidden_dim)
         )
@@ -100,20 +101,25 @@ class WrenchPredictor4Model(nn.Module):
             % sum(p.numel() for p in self.material_property.parameters())
         )
 
-    def get_condition_tokens(self, batch):
+    def get_condition_tokens(self, batch, material_property=None):
         image_feature = batch["image_feature"][:, : self.n_obs_steps]
         state = batch["state"][:, : self.n_obs_steps]
         action = batch["action"][:, self.n_obs_steps - 1 : self.horizon - 1]
-        material_property = self.material_property(batch["object_id"])
+        if material_property is None:
+            material_property = self.material_property(batch["object_id"])
 
-        obs_tokens = self.obs_proj(torch.cat([image_feature, state], dim=-1))
+        image_feature_tokens = self.image_feature_proj(image_feature)
+        state_tokens = self.state_proj(state)
         action_tokens = self.action_proj(action)
         pb_token = self.pb_proj(material_property).unsqueeze(1)
-        tokens = torch.cat([obs_tokens, action_tokens, pb_token], dim=1)
+        tokens = torch.cat(
+            [image_feature_tokens, state_tokens, action_tokens, pb_token],
+            dim=1,
+        )
         return tokens + self.condition_pos_embed.unsqueeze(0)
 
-    def forward(self, batch):
-        condition_tokens = self.get_condition_tokens(batch)
+    def forward(self, batch, material_property=None):
+        condition_tokens = self.get_condition_tokens(batch, material_property)
         if self.output_head == "decoder":
             memory = self.encoder(condition_tokens)
             query = self.query_embed.unsqueeze(0).expand(
@@ -136,8 +142,8 @@ class WrenchPredictor4Model(nn.Module):
             "image_feature": image_feature,
         }
 
-    def compute_loss(self, batch):
-        pred = self.forward(batch)
+    def compute_loss(self, batch, material_property=None):
+        pred = self.forward(batch, material_property)
         start = self.n_obs_steps
         wrench_loss = F.mse_loss(pred["wrench"][:, start:], batch["wrench"][:, start:])
         image_feature_loss = F.mse_loss(

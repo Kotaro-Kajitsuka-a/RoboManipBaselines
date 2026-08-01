@@ -133,4 +133,18 @@ python robo_manip_baselines/bin/Rollout.py \
     --no_plot
 
 # Train WrenchPredictor4 on disjoint I0/I1/I2 world indices (absolute 9D pose, 1D PB, MLP-only)
-uv run python robo_manip_baselines/bin/Train.py WrenchPredictor4 --dataset_dir robo_manip_baselines/dataset/LiftingDisjointWorldIdx/training --val_dataset_dir robo_manip_baselines/dataset/LiftingDisjointWorldIdx/validation --checkpoint_dir robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingDisjointWorldIdx_I0w0-39_I1w100-139_I2w200-239_pb1_mlp_only_absolute_pose9_120train_30val_500epoch_20260731 --camera_names --state_keys measured_eef_pose measured_gripper_joint_pos --action_keys command_eef_pose command_gripper_joint_pos --image_feature_key measured_tblock_pose --wrench_source_key measured_eef_wrench --pb_dim 1 --output_head mlp_only --wrench_loss_weight 0.1 --scheduler ddpm --horizon 16 --n_obs_steps 2 --skip 3 --norm_type limits --batch_size 64 --num_epochs 500 --lr 1e-4
+uv run python robo_manip_baselines/bin/Train.py WrenchPredictor4 \
+  --dataset_dir robo_manip_baselines/dataset/LiftingDisjointWorldIdx/training \
+  --val_dataset_dir robo_manip_baselines/dataset/LiftingDisjointWorldIdx/validation \
+  --checkpoint_dir robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingDisjointWorldIdx_I0w0-39_I1w100-139_I2w200-239_pb1_mlp_only_absolute_pose9_separate_image_state_tokens_120train_30val_500epoch_20260801 \
+  --camera_names --state_keys measured_eef_pose measured_gripper_joint_pos --action_keys command_eef_pose command_gripper_joint_pos \
+  --image_feature_key measured_tblock_pose --wrench_source_key measured_eef_wrench --pb_dim 1 \
+  --output_head mlp_only --wrench_loss_weight 0.1 --scheduler ddpm --horizon 16 --n_obs_steps 2 \
+  --skip 3 --batch_size 64 --num_epochs 500 --lr 1e-4
+
+
+# Adapt only the 1D PB online from one world50 episode
+uv run python robo_manip_baselines/bin/Train.py WrenchPredictor4Online \
+  --dataset_dir robo_manip_baselines/dataset/LiftingPolicyLastWorld50-69/WrenchPredObject0/MujocoUR5eLiftingi_I0_DP1000_I0last_world50-69_world50_000.rmb \
+  --pretrained_checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingDisjointWorldIdx_I0w0-39_I1w100-139_I2w200-239_pb1_mlp_only_absolute_pose9_separate_image_state_tokens_120train_30val_500epoch_20260801/policy_best.ckpt \
+  --lr 1e-2
