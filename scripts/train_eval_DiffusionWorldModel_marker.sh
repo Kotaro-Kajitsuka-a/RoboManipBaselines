@@ -4,7 +4,7 @@ set -eu
 
 cd "$(dirname "$0")/.."
 
-CHECKPOINT_DIR=${CHECKPOINT_DIR:-robo_manip_baselines/checkpoint/DiffusionWorldModel/pinch_marker_delta_dwm_h16}
+CHECKPOINT_DIR=${CHECKPOINT_DIR:-robo_manip_baselines/checkpoint/DiffusionWorldModel/pinch_marker_dwm_h16}
 TRAIN_DIR=${TRAIN_DIR:-robo_manip_baselines/dataset/ピンチテスト_marker/training}
 VAL_DIR=${VAL_DIR:-robo_manip_baselines/dataset/ピンチテスト_marker/validation}
 
@@ -14,7 +14,6 @@ uv run python robo_manip_baselines/bin/Train.py DiffusionWorldModel \
   --state_keys measured_eef_pose measured_gripper_joint_pos \
   --action_keys command_eef_pose command_gripper_joint_pos \
   --image_feature_key front_apriltag_pose_xy_axis \
-  --image_feature_target_mode delta_from_last_obs \
   --wrench_source_key measured_eef_wrench \
   --scheduler ddim \
   --horizon 16 \

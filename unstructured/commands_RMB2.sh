@@ -61,14 +61,13 @@ uv run python robo_manip_baselines/bin/Train.py DiffusionWorldModel \
   --train_ratio 0.99 \
   --val_ratio 0.01 
 
-# Train DiffusionWorldModel with AprilTag pose delta target instead of frozen visual features
+# Train DiffusionWorldModel with AprilTag pose as the image feature
 uv run python robo_manip_baselines/bin/Train.py DiffusionWorldModel \
   --dataset_dir robo_manip_baselines/dataset/ピンチテスト_marker/training \
-  --checkpoint_dir robo_manip_baselines/checkpoint/DiffusionWorldModel/pinch_marker_delta_dwm_h16 \
+  --checkpoint_dir robo_manip_baselines/checkpoint/DiffusionWorldModel/pinch_marker_dwm_h16 \
   --state_keys measured_eef_pose measured_gripper_joint_pos \
   --action_keys command_eef_pose command_gripper_joint_pos \
   --image_feature_key front_apriltag_pose_xy_axis \
-  --image_feature_target_mode delta_from_last_obs \
   --wrench_source_key measured_eef_wrench \
   --scheduler ddim \
   --horizon 16 \
@@ -132,3 +131,6 @@ python robo_manip_baselines/bin/Rollout.py \
     --max_duration 8 \
     --save_rollout \
     --no_plot
+
+# Train WrenchPredictor4 on disjoint I0/I1/I2 world indices (absolute 9D pose, 1D PB, MLP-only)
+uv run python robo_manip_baselines/bin/Train.py WrenchPredictor4 --dataset_dir robo_manip_baselines/dataset/LiftingDisjointWorldIdx/training --val_dataset_dir robo_manip_baselines/dataset/LiftingDisjointWorldIdx/validation --checkpoint_dir robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingDisjointWorldIdx_I0w0-39_I1w100-139_I2w200-239_pb1_mlp_only_absolute_pose9_120train_30val_500epoch_20260731 --camera_names --state_keys measured_eef_pose measured_gripper_joint_pos --action_keys command_eef_pose command_gripper_joint_pos --image_feature_key measured_tblock_pose --wrench_source_key measured_eef_wrench --pb_dim 1 --output_head mlp_only --wrench_loss_weight 0.1 --scheduler ddpm --horizon 16 --n_obs_steps 2 --skip 3 --norm_type limits --batch_size 64 --num_epochs 500 --lr 1e-4

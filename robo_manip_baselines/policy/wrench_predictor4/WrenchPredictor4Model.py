@@ -4,7 +4,7 @@ import torch.nn.functional as F
 
 
 class WrenchPredictor4Model(nn.Module):
-    """Transformer regressor for future wrench and marker/image feature."""
+    """Transformer regressor for future wrench and absolute image feature."""
 
     def __init__(
         self,
@@ -22,7 +22,6 @@ class WrenchPredictor4Model(nn.Module):
         num_decoder_layers=2,
         dim_feedforward=1024,
         dropout=0.1,
-        image_feature_target_mode="absolute",
         output_head="decoder",
         wrench_loss_weight=1.0,
     ):
@@ -36,16 +35,11 @@ class WrenchPredictor4Model(nn.Module):
         self.pb_dim = pb_dim
         self.horizon = horizon
         self.n_obs_steps = n_obs_steps
-        self.image_feature_target_mode = image_feature_target_mode
         self.output_head = output_head
         self.wrench_loss_weight = wrench_loss_weight
         self.n_action_condition_steps = horizon - n_obs_steps
         assert self.n_action_condition_steps > 0, (horizon, n_obs_steps)
         assert self.wrench_loss_weight >= 0.0, self.wrench_loss_weight
-        assert self.image_feature_target_mode in (
-            "absolute",
-            "delta_from_last_obs",
-        ), self.image_feature_target_mode
         assert self.output_head in ("decoder", "mlp", "mlp_only"), self.output_head
 
         self.material_property = nn.Embedding(num_objects, pb_dim)
@@ -136,35 +130,19 @@ class WrenchPredictor4Model(nn.Module):
                 self.trajectory_dim,
             )
         wrench = trajectory[..., : self.wrench_dim]
-        image_feature_target = trajectory[..., self.wrench_dim :]
-        image_feature = self.restore_image_feature(batch, image_feature_target)
+        image_feature = trajectory[..., self.wrench_dim :]
         return {
             "wrench": wrench,
             "image_feature": image_feature,
-            "image_feature_target": image_feature_target,
         }
-
-    def get_image_feature_ref(self, batch):
-        return batch["image_feature"][:, self.n_obs_steps - 1 : self.n_obs_steps]
-
-    def get_image_feature_target(self, batch):
-        if self.image_feature_target_mode == "absolute":
-            return batch["image_feature"]
-        return batch["image_feature"] - self.get_image_feature_ref(batch)
-
-    def restore_image_feature(self, batch, image_feature_target):
-        if self.image_feature_target_mode == "absolute":
-            return image_feature_target
-        return self.get_image_feature_ref(batch) + image_feature_target
 
     def compute_loss(self, batch):
         pred = self.forward(batch)
         start = self.n_obs_steps
         wrench_loss = F.mse_loss(pred["wrench"][:, start:], batch["wrench"][:, start:])
-        image_feature_target = self.get_image_feature_target(batch)
         image_feature_loss = F.mse_loss(
-            pred["image_feature_target"][:, start:],
-            image_feature_target[:, start:],
+            pred["image_feature"][:, start:],
+            batch["image_feature"][:, start:],
         )
         return {
             "loss": self.wrench_loss_weight * wrench_loss + image_feature_loss,

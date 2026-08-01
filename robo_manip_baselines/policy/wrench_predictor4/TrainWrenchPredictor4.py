@@ -166,7 +166,6 @@ class TrainWrenchPredictor4(TrainDiffusionWorldModel):
             "pb_dim": self.args.pb_dim,
             "horizon": self.args.horizon,
             "n_obs_steps": self.args.n_obs_steps,
-            "image_feature_target_mode": self.args.image_feature_target_mode,
             "hidden_dim": self.args.hidden_dim,
             "nhead": self.args.nhead,
             "num_encoder_layers": self.args.num_encoder_layers,

@@ -17,6 +17,7 @@ from robo_manip_baselines.common import (
     DataKey,
     RmbData,
     TrainBase,
+    convert_data_to_policy,
     get_skipped_data_seq,
 )
 from robo_manip_baselines.misc.AddPercentileClippedWrenchToRmbData import (
@@ -105,13 +106,6 @@ class TrainDiffusionWorldModel(TrainBase):
             help="RMB key used as image feature target and condition",
         )
         parser.add_argument(
-            "--image_feature_target_mode",
-            type=str,
-            default="absolute",
-            choices=["absolute", "delta_from_last_obs"],
-            help="image feature prediction target representation",
-        )
-        parser.add_argument(
             "--wrench_source_key",
             type=str,
             required=True,
@@ -176,10 +170,13 @@ class TrainDiffusionWorldModel(TrainBase):
         source_key = self.model_meta_info["wrench"]["source_key"]
         for filename in self.all_filenames:
             with RmbData(filename) as rmb_data:
-                image_feature = get_skipped_data_seq(
-                    rmb_data[image_feature_key][:],
+                image_feature = convert_data_to_policy(
+                    get_skipped_data_seq(
+                        rmb_data[image_feature_key][:],
+                        image_feature_key,
+                        self.args.skip,
+                    ),
                     image_feature_key,
-                    self.args.skip,
                 )
                 wrench = get_skipped_data_seq(
                     rmb_data[wrench_key][:],
@@ -234,7 +231,6 @@ class TrainDiffusionWorldModel(TrainBase):
             "pb_dim": self.args.pb_dim,
             "horizon": self.args.horizon,
             "n_obs_steps": self.args.n_obs_steps,
-            "image_feature_target_mode": self.args.image_feature_target_mode,
         }
         if self.args.backbone == "cnn":
             self.model_meta_info["policy"]["args"].update(

@@ -107,9 +107,14 @@ class EvalDiffusionWorldModelDataset(DiffusionWorldModelDataset):
             )
 
             image_feature_key = self.model_meta_info["data"]["image_feature_key"]
-            image_feature = get_skipped_data_seq(
-                rmb_data[image_feature_key][:], image_feature_key, skip
-            )[time_idxes]
+            image_feature = convert_data_to_policy(
+                get_skipped_data_seq(
+                    rmb_data[image_feature_key][:],
+                    image_feature_key,
+                    skip,
+                )[time_idxes],
+                image_feature_key,
+            )
 
             if len(self.model_meta_info["state"]["keys"]) == 0:
                 state = np.zeros((horizon, 0), dtype=np.float64)

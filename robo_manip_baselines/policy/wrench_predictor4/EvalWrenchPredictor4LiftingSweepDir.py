@@ -5,7 +5,7 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
-from robo_manip_baselines.common import denormalize_data
+from robo_manip_baselines.common import denormalize_data, get_pose7_from_pose9
 from robo_manip_baselines.policy.diffusion_world_model.EvalDiffusionWorldModelMaterialSweepDir import (
     EvalDiffusionWorldModelMaterialSweepDir,
 )
@@ -135,7 +135,9 @@ class EvalWrenchPredictor4LiftingSweepDir(EvalDiffusionWorldModelMaterialSweepDi
             pred_pose_normalized,
             self.model_meta_info["image_feature"],
         )
-        assert gt_pose.shape[-1] == 7, gt_pose.shape
+        assert gt_pose.shape[-1] == 9, gt_pose.shape
+        gt_pose = get_pose7_from_pose9(gt_pose)
+        pred_pose = get_pose7_from_pose9(pred_pose)
 
         position_error = np.linalg.norm(
             pred_pose[..., :3] - gt_pose[..., :3],

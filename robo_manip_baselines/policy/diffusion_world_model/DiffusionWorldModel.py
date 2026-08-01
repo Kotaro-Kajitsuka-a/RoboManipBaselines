@@ -14,7 +14,7 @@ from diffusion_policy.model.diffusion.conditional_unet1d import ConditionalUnet1
 class DiffusionWorldModel(nn.Module):
     """CNN-DiffusionPolicy style world model.
 
-    The denoising trajectory is [wrench, image_feature].
+    The denoising trajectory is [wrench, absolute image_feature].
     The global condition is [observed image_feature/state, planned action, material PB].
     """
 
@@ -35,7 +35,6 @@ class DiffusionWorldModel(nn.Module):
         kernel_size=5,
         n_groups=8,
         cond_predict_scale=True,
-        image_feature_target_mode="absolute",
     ):
         super().__init__()
 
@@ -50,13 +49,8 @@ class DiffusionWorldModel(nn.Module):
         self.pb_dim = pb_dim
         self.horizon = horizon
         self.n_obs_steps = n_obs_steps
-        self.image_feature_target_mode = image_feature_target_mode
         self.n_action_condition_steps = horizon - n_obs_steps
         assert self.n_action_condition_steps > 0, (horizon, n_obs_steps)
-        assert self.image_feature_target_mode in (
-            "absolute",
-            "delta_from_last_obs",
-        ), self.image_feature_target_mode
 
         global_cond_dim = (
             n_obs_steps * (image_feature_dim + state_dim)
@@ -95,22 +89,9 @@ class DiffusionWorldModel(nn.Module):
 
     def get_trajectory(self, batch):
         return torch.cat(
-            [batch["wrench"], self.get_image_feature_target(batch)],
+            [batch["wrench"], batch["image_feature"]],
             dim=-1,
         )
-
-    def get_image_feature_ref(self, batch):
-        return batch["image_feature"][:, self.n_obs_steps - 1 : self.n_obs_steps]
-
-    def get_image_feature_target(self, batch):
-        if self.image_feature_target_mode == "absolute":
-            return batch["image_feature"]
-        return batch["image_feature"] - self.get_image_feature_ref(batch)
-
-    def restore_image_feature(self, batch, image_feature_target):
-        if self.image_feature_target_mode == "absolute":
-            return image_feature_target
-        return self.get_image_feature_ref(batch) + image_feature_target
 
     # ========= training  ============
     def get_global_cond(self, batch):
@@ -179,6 +160,5 @@ class DiffusionWorldModel(nn.Module):
             ).prev_sample
 
         wrench = sample[..., : self.wrench_dim]
-        image_feature_target = sample[..., self.wrench_dim :]
-        image_feature = self.restore_image_feature(batch, image_feature_target)
+        image_feature = sample[..., self.wrench_dim :]
         return {"wrench": wrench, "image_feature": image_feature}
