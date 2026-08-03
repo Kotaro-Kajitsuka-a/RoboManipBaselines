@@ -10,6 +10,9 @@ class DataKey:
     # Reward
     REWARD = "reward"
 
+    # Learned internal material-property representation stored per timestep
+    MATERIAL_PROPERTY = "material_property"
+
     # Measured joint position (including both arm and gripper)
     MEASURED_JOINT_POS = "measured_joint_pos"
     # Command joint position (including both arm and gripper)
@@ -99,6 +102,7 @@ class DataKey:
         MEASURED_EEF_WRENCH_MOVING_AVERAGE,
         MEASURED_EEF_WRENCH_MOVING_AVERAGE_PERCENTILE_CLIP,
         MEASURED_MOBILE_OMNI_VEL,
+        MATERIAL_PROPERTY,
     ]
 
     # All keys of command data
@@ -135,6 +139,8 @@ class DataKey:
         from ..body.ArmManager import ArmConfig
 
         if key == DataKey.TIME:
+            return 1
+        elif key == DataKey.MATERIAL_PROPERTY:
             return 1
         elif key == DataKey.MEASURED_TBLOCK_POSE:
             return 7
