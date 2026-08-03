@@ -132,6 +132,9 @@ python robo_manip_baselines/bin/Rollout.py \
     --save_rollout \
     --no_plot
 
+
+
+##Proposed Method#####################################################################
 # Train WrenchPredictor4 on disjoint I0/I1/I2 world indices (absolute 9D pose, 1D PB, MLP-only)
 uv run python robo_manip_baselines/bin/Train.py WrenchPredictor4 \
   --dataset_dir robo_manip_baselines/dataset/LiftingDisjointWorldIdx/training \
@@ -177,10 +180,43 @@ uv run python robo_manip_baselines/bin/Train.py DiffusionPolicy \
   --train_ratio 1.0 \
   --val_ratio 0.01
 
-# Baseline: train the same state-based Diffusion Policy without PB
+# Train MLP-only WrenchPredictor4 on the 75 disjoint unknown-to-operator B episodes
+uv run python robo_manip_baselines/bin/Train.py WrenchPredictor4 \
+  --dataset_dir robo_manip_baselines/dataset/LiftingAB_B_only_WP4 \
+  --checkpoint_dir robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_I0I1I2_B_75train_disjoint_pb1_mlp_only_absolute_pose9_separate_tokens_500epoch_20260803 \
+  --camera_names \
+  --state_keys measured_eef_pose measured_gripper_joint_pos \
+  --action_keys command_eef_pose command_gripper_joint_pos \
+  --image_feature_key measured_tblock_pose \
+  --wrench_source_key measured_eef_wrench \
+  --pb_dim 1 \
+  --output_head mlp_only \
+  --wrench_loss_weight 0.1 \
+  --scheduler ddpm \
+  --horizon 16 \
+  --n_obs_steps 2 \
+  --skip 3 \
+  --batch_size 64 \
+  --num_epochs 500 \
+  --lr 1e-4 \
+  --train_ratio 1.0 \
+  --val_ratio 0.01
+
+
+#####################################################################################
+
+
+
+
+
+
+
+
+# Baseline: ######################################################################################
+# train state-based Diffusion Policy on the 75 unknown-to-operator B episodes without PB
 uv run python robo_manip_baselines/bin/Train.py DiffusionPolicy \
-  --dataset_dir robo_manip_baselines/dataset/LiftingAB \
-  --checkpoint_dir robo_manip_baselines/checkpoint/DiffusionPolicy/LiftingAB_AB_150_state_tblock_no_pb_cnn_ddim_h16_e1000_20260803 \
+  --dataset_dir robo_manip_baselines/dataset/LiftingAB_B_only \
+  --checkpoint_dir robo_manip_baselines/checkpoint/DiffusionPolicy/LiftingAB_B_75_state_tblock_no_pb_cnn_ddim_h16_e500_20260803 \
   --camera_names \
   --state_keys measured_eef_pose measured_gripper_joint_pos measured_tblock_pose \
   --action_keys command_eef_pose command_gripper_joint_pos \
@@ -189,7 +225,25 @@ uv run python robo_manip_baselines/bin/Train.py DiffusionPolicy \
   --skip 3 \
   --batch_size 64 \
   --num_workers 2 \
-  --num_epochs 1000 \
+  --num_epochs 500 \
   --lr 1e-4 \
   --train_ratio 1.0 \
   --val_ratio 0.01
+
+
+# Rollout for evaluation #
+
+uv run python robo_manip_baselines/bin/Rollout.py DiffusionPolicy \
+ MujocoUR5eLiftingi_I0 \
+ --checkpoint robo_manip_baselines/checkpoint/DiffusionPolicy/LiftingAB_B_75_state_tblock_no_pb_cnn_ddim_h16_e500_20260803/policy_last.ckpt \
+ --world_idx_list {70..79} --auto_exit --max_duration 13 --save_rollout --no_plot
+
+
+uv run python robo_manip_baselines/bin/Rollout.py DiffusionPolicy MujocoUR5eLiftingi_I1 \
+  --checkpoint robo_manip_baselines/checkpoint/DiffusionPolicy/LiftingAB_B_75_state_tblock_no_pb_cnn_ddim_h16_e500_20260803/policy_last.ckpt \
+  --world_idx_list {170..179} --auto_exit --max_duration 13 --save_rollout --no_plot ; 
+  uv run python robo_manip_baselines/bin/Rollout.py DiffusionPolicy MujocoUR5eLiftingi_I2\
+ --checkpoint robo_manip_baselines/checkpoint/DiffusionPolicy/LiftingAB_B_75_state_tblock_no_pb_cnn_ddim_h16_e500_20260803/policy_last.ckpt \
+ --world_idx_list {270..279} --auto_exit --max_duration 13 --save_rollout --no_plot
+
+##############################################################################################################
