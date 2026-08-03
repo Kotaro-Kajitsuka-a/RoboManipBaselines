@@ -202,6 +202,14 @@ uv run python robo_manip_baselines/bin/Train.py WrenchPredictor4 \
   --train_ratio 1.0 \
   --val_ratio 0.01
 
+# Roll out Diffusion Policy while adapting PB online with WrenchPredictor4
+uv run python robo_manip_baselines/bin/Rollout.py \
+  DiffusionPolicyOnlinePb MujocoUR5eLiftingi_I1 \
+  --checkpoint path/to/diffusion_policy.ckpt \
+  --wp4_checkpoint path/to/wrench_predictor4.ckpt \
+  --initial_object_id 0 \
+  --online_pb_lr 6e-3
+
 
 #####################################################################################
 
@@ -236,10 +244,8 @@ uv run python robo_manip_baselines/bin/Train.py DiffusionPolicy \
 uv run python robo_manip_baselines/bin/Rollout.py DiffusionPolicy \
  MujocoUR5eLiftingi_I0 \
  --checkpoint robo_manip_baselines/checkpoint/DiffusionPolicy/LiftingAB_B_75_state_tblock_no_pb_cnn_ddim_h16_e500_20260803/policy_last.ckpt \
- --world_idx_list {70..79} --auto_exit --max_duration 13 --save_rollout --no_plot
-
-
-uv run python robo_manip_baselines/bin/Rollout.py DiffusionPolicy MujocoUR5eLiftingi_I1 \
+ --world_idx_list {70..79} --auto_exit --max_duration 13 --save_rollout --no_plot ;
+ uv run python robo_manip_baselines/bin/Rollout.py DiffusionPolicy MujocoUR5eLiftingi_I1 \
   --checkpoint robo_manip_baselines/checkpoint/DiffusionPolicy/LiftingAB_B_75_state_tblock_no_pb_cnn_ddim_h16_e500_20260803/policy_last.ckpt \
   --world_idx_list {170..179} --auto_exit --max_duration 13 --save_rollout --no_plot ; 
   uv run python robo_manip_baselines/bin/Rollout.py DiffusionPolicy MujocoUR5eLiftingi_I2\
