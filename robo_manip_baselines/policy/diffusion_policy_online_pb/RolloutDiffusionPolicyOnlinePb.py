@@ -1,0 +1,223 @@
+from collections import deque
+from pathlib import Path
+
+import numpy as np
+import torch
+import torch.nn.functional as F
+
+from robo_manip_baselines.common import (
+    DataKey,
+    convert_data_to_policy,
+    normalize_data,
+)
+from robo_manip_baselines.policy.diffusion_policy import RolloutDiffusionPolicy
+from robo_manip_baselines.policy.wrench_predictor4_online.AddConstantPbToDataset import (
+    NUM_LIFTING_OBJECTS,
+    load_pb,
+)
+from robo_manip_baselines.policy.wrench_predictor4_online.AddOnlinePbToDataset import (
+    load_model_meta_info,
+    load_policy,
+)
+
+
+class RolloutDiffusionPolicyOnlinePb(RolloutDiffusionPolicy):
+    """Roll out Diffusion Policy while adapting a standalone WP4 PB online."""
+
+    def set_additional_args(self, parser):
+        super().set_additional_args(parser)
+        parser.add_argument(
+            "--wp4_checkpoint",
+            type=Path,
+            required=True,
+            help="WrenchPredictor4 checkpoint used for online PB adaptation",
+        )
+        parser.add_argument(
+            "--initial_object_id",
+            type=int,
+            choices=range(NUM_LIFTING_OBJECTS),
+            default=0,
+            help="trained WP4 object PB used at the start of every episode",
+        )
+        parser.add_argument(
+            "--online_pb_lr",
+            type=float,
+            default=6e-3,
+            help="learning rate applied only to the online PB",
+        )
+
+    def setup_policy(self):
+        super().setup_policy()
+
+        assert self.state_keys.count(DataKey.MATERIAL_PROPERTY) == 1, self.state_keys
+        assert self.args.online_pb_lr > 0.0, self.args.online_pb_lr
+        self.wp4_checkpoint = self.args.wp4_checkpoint.resolve()
+        self.wp4_model_meta_info = load_model_meta_info(self.wp4_checkpoint)
+        self.wp4_policy = load_policy(
+            self.wp4_checkpoint,
+            self.wp4_model_meta_info,
+            self.device,
+        )
+        self.initial_pb, self.initial_object_key = load_pb(
+            self.wp4_checkpoint,
+            self.args.initial_object_id,
+        )
+
+        wp4_data_info = self.wp4_model_meta_info["data"]
+        print(
+            f"[{self.__class__.__name__}] Construct online PB adapter.\n"
+            f"  - WP4 checkpoint: {self.wp4_checkpoint}\n"
+            f"  - initial object: {self.initial_object_key} "
+            f"(id={self.args.initial_object_id}, PB={self.initial_pb.tolist()})\n"
+            f"  - learning rate: {self.args.online_pb_lr}\n"
+            f"  - horizon: {wp4_data_info['horizon']}, "
+            f"obs steps: {wp4_data_info['n_obs_steps']}, "
+            f"skip: {wp4_data_info['skip']}"
+        )
+
+    def setup_variables(self):
+        super().setup_variables()
+        self.data_manager.meta_data["online_pb_wp4_checkpoint"] = str(
+            self.wp4_checkpoint
+        )
+        self.data_manager.meta_data["online_pb_initial_object_id"] = (
+            self.args.initial_object_id
+        )
+        self.data_manager.meta_data["online_pb_learning_rate"] = self.args.online_pb_lr
+
+    def reset_variables(self):
+        super().reset_variables()
+
+        horizon = self.wp4_model_meta_info["data"]["horizon"]
+        self.online_observation_window = deque(maxlen=horizon)
+        self.online_pb = torch.nn.Parameter(
+            torch.tensor(
+                self.initial_pb,
+                dtype=torch.float32,
+                device=self.device,
+            )
+        )
+        self.online_pb_optimizer = torch.optim.Adam(
+            [self.online_pb],
+            lr=self.args.online_pb_lr,
+        )
+        self.online_pb_update_count = 0
+
+    def infer_policy(self):
+        self.append_online_observation()
+        assert len(self.online_observation_window) <= self.online_observation_window.maxlen
+        if len(self.online_observation_window) == self.online_observation_window.maxlen:
+            # RolloutPhase calls infer_policy() under torch.inference_mode().
+            # Re-enable autograd locally and create all WP4 tensors in this scope.
+            with torch.inference_mode(False), torch.enable_grad():
+                self.update_online_pb()
+
+        # The updated PB is inserted into the DP state by update_state_buf().
+        # Keep the existing DP action buffer; the latest PB takes effect at the
+        # next normal Diffusion Policy inference.
+        super().infer_policy()
+
+    def append_online_observation(self):
+        state = np.concatenate(
+            [
+                convert_data_to_policy(
+                    self.motion_manager.get_data(state_key, self.obs),
+                    state_key,
+                )
+                for state_key in self.wp4_model_meta_info["state"]["keys"]
+            ]
+        )
+        image_feature_key = self.wp4_model_meta_info["data"]["image_feature_key"]
+        image_feature = convert_data_to_policy(
+            self.motion_manager.get_data(image_feature_key, self.obs),
+            image_feature_key,
+        )
+        self.online_observation_window.append(
+            {
+                "state": state.copy(),
+                "image_feature": image_feature.copy(),
+            }
+        )
+
+    def update_online_pb(self):
+        horizon = self.wp4_model_meta_info["data"]["horizon"]
+        assert len(self.policy_action_list) >= horizon - 1, (  #if horizon = 16, we need at least excuted 15 actions.
+            len(self.policy_action_list),
+            horizon,
+        )
+
+        state = np.stack([sample["state"] for sample in self.online_observation_window])
+        image_feature = np.stack(
+            [sample["image_feature"] for sample in self.online_observation_window]
+        )
+
+        # At observation t, actions through t - 1 have already been executed.
+        # WP4 consumes action indices [n_obs_steps - 1, horizon - 1), so the
+        # final action slot is unused and can safely hold the latest past action.
+        past_action = self.policy_action_list[-(horizon - 1) :].copy()
+        dummy_action = np.zeros_like(past_action[-1:])
+        action = np.concatenate([past_action, dummy_action], axis=0)
+
+        batch = {
+            "state": torch.tensor(
+                normalize_data(state, self.wp4_model_meta_info["state"]),
+                dtype=torch.float32,
+                device=self.device,
+            ).unsqueeze(0),
+            "action": torch.tensor(
+                normalize_data(action, self.wp4_model_meta_info["action"]),
+                dtype=torch.float32,
+                device=self.device,
+            ).unsqueeze(0),
+            "image_feature": torch.tensor(
+                normalize_data(
+                    image_feature,
+                    self.wp4_model_meta_info["image_feature"],
+                ),
+                dtype=torch.float32,
+                device=self.device,
+            ).unsqueeze(0),
+        }
+
+        self.online_pb_optimizer.zero_grad()
+        prediction = self.wp4_policy(batch, self.online_pb.unsqueeze(0))
+        start = self.wp4_policy.n_obs_steps
+        # Match offline adaptation: identify PB only from future object-pose error.
+        pose_loss = F.mse_loss(
+            prediction["image_feature"][:, start:],
+            batch["image_feature"][:, start:],
+        )
+        pose_loss.backward()
+        self.online_pb_optimizer.step()
+
+        self.online_pb_update_count += 1
+
+    def update_state_buf(self):
+        state = np.concatenate(
+            [self.get_dp_state_data(state_key) for state_key in self.state_keys]
+        )
+        state = normalize_data(state, self.model_meta_info["state"])
+        state = torch.tensor(state, dtype=torch.float32)
+
+        if self.state_buf is None:
+            self.state_buf = [
+                state for _ in range(self.model_meta_info["data"]["n_obs_steps"])
+            ]
+        else:
+            self.state_buf.pop(0)
+            self.state_buf.append(state)
+
+    def get_dp_state_data(self, state_key):
+        if state_key == DataKey.MATERIAL_PROPERTY:
+            return self.online_pb.detach().cpu().numpy().copy()
+        return convert_data_to_policy(
+            self.motion_manager.get_data(state_key, self.obs),
+            state_key,
+        )
+
+    def record_data(self):
+        super().record_data()
+        self.data_manager.append_single_data(
+            DataKey.MATERIAL_PROPERTY,
+            self.online_pb.detach().cpu().numpy().copy(),
+        )

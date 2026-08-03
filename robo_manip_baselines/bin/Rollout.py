@@ -16,6 +16,7 @@ class RolloutMain:
         "Act",
         "MtAct",
         "DiffusionPolicy",
+        "DiffusionPolicyOnlinePb",
         "DiffusionPolicy3d",
         "FlowPolicy",
         "ManiFlowPolicy",
