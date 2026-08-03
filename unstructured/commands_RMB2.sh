@@ -163,9 +163,26 @@ uv run python robo_manip_baselines/policy/wrench_predictor4_online/AddOnlinePbTo
 # Train state-based Diffusion Policy on all 150 LiftingAB A/B episodes with PB
 uv run python robo_manip_baselines/bin/Train.py DiffusionPolicy \
   --dataset_dir robo_manip_baselines/dataset/LiftingAB \
-  --checkpoint_dir robo_manip_baselines/checkpoint/DiffusionPolicy/LiftingAB_AB_150_state_tblock_pb1_cnn_ddim_h16_e500_20260803 \
+  --checkpoint_dir robo_manip_baselines/checkpoint/DiffusionPolicy/LiftingAB_AB_150_state_tblock_pb1_cnn_ddim_h16_e1000_20260803 \
   --camera_names \
   --state_keys measured_eef_pose measured_gripper_joint_pos measured_tblock_pose material_property \
+  --action_keys command_eef_pose command_gripper_joint_pos \
+  --backbone cnn \
+  --scheduler ddim \
+  --skip 3 \
+  --batch_size 64 \
+  --num_workers 2 \
+  --num_epochs 1000 \
+  --lr 1e-4 \
+  --train_ratio 1.0 \
+  --val_ratio 0.01
+
+# Baseline: train the same state-based Diffusion Policy without PB
+uv run python robo_manip_baselines/bin/Train.py DiffusionPolicy \
+  --dataset_dir robo_manip_baselines/dataset/LiftingAB \
+  --checkpoint_dir robo_manip_baselines/checkpoint/DiffusionPolicy/LiftingAB_AB_150_state_tblock_no_pb_cnn_ddim_h16_e1000_20260803 \
+  --camera_names \
+  --state_keys measured_eef_pose measured_gripper_joint_pos measured_tblock_pose \
   --action_keys command_eef_pose command_gripper_joint_pos \
   --backbone cnn \
   --scheduler ddim \
