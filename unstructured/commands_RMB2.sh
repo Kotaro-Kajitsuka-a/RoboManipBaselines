@@ -153,3 +153,9 @@ uv run python robo_manip_baselines/bin/Train.py WrenchPredictor4Online \
 uv run python robo_manip_baselines/policy/wrench_predictor4_online/AddConstantPbToDataset.py \
   robo_manip_baselines/dataset/LiftingAB/WrenchPredObject0/A_known_to_operator 0 \
   --checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_I0I1I2_AB_150train_pb1_mlp_only_absolute_pose9_separate_tokens_500epoch_20260802/policy_epoch0400.ckpt
+
+# Estimate PB online from each unknown-to-operator B episode, starting from Object0 PB
+uv run python robo_manip_baselines/policy/wrench_predictor4_online/AddOnlinePbToDataset.py \
+  robo_manip_baselines/dataset/LiftingAB/WrenchPredObject0/B_unknown_to_operator 0 \
+  --checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_I0I1I2_AB_150train_pb1_mlp_only_absolute_pose9_separate_tokens_500epoch_20260802/policy_epoch0400.ckpt \
+  --lr 6e-3
