@@ -148,3 +148,8 @@ uv run python robo_manip_baselines/bin/Train.py WrenchPredictor4Online \
   --dataset_dir robo_manip_baselines/dataset/LiftingPolicyLastWorld50-69/WrenchPredObject0/MujocoUR5eLiftingi_I0_DP1000_I0last_world50-69_world50_000.rmb \
   --pretrained_checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingDisjointWorldIdx_I0w0-39_I1w100-139_I2w200-239_pb1_mlp_only_absolute_pose9_separate_image_state_tokens_120train_30val_500epoch_20260801/policy_best.ckpt \
   --lr 1e-2
+
+# Add the trained Object0 PB to every timestep of the known-to-operator A dataset
+uv run python robo_manip_baselines/policy/wrench_predictor4_online/AddConstantPbToDataset.py \
+  robo_manip_baselines/dataset/LiftingAB/WrenchPredObject0/A_known_to_operator 0 \
+  --checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_I0I1I2_AB_150train_pb1_mlp_only_absolute_pose9_separate_tokens_500epoch_20260802/policy_epoch0400.ckpt
