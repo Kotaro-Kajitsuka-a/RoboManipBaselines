@@ -54,6 +54,7 @@ def load_result(result_dir):
         "steps": np.asarray([int(row["adaptation_step"]) for row in rows]),
         "pb": np.asarray([float(row["pb"]) for row in rows]),
         "reference_pb": reference_pb[:, 0],
+        "lr": result.get("lr"),
     }
 
 
@@ -92,7 +93,11 @@ def main():
 
     axis.set_xlabel("adaptation step")
     axis.set_ylabel("PB")
-    axis.set_title("Online PB adaptation from the center of trained PBs")
+    learning_rates = {result["lr"] for result in results}
+    title = "Online PB adaptation from the center of trained PBs"
+    if len(learning_rates) == 1 and None not in learning_rates:
+        title += f" (lr={learning_rates.pop():g})"
+    axis.set_title(title)
     axis.grid(alpha=0.3)
     axis.legend(loc="best")
     figure.tight_layout()
