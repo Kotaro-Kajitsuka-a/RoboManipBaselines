@@ -3,7 +3,6 @@ import csv
 import glob
 import os
 import pickle
-import sys
 
 import numpy as np
 import torch
@@ -14,21 +13,19 @@ import matplotlib
 matplotlib.use("agg")
 import matplotlib.pyplot as plt
 
-sys.path.append(
-    os.path.join(os.path.dirname(__file__), "../../../third_party/diffusion_policy")
-)
 from robo_manip_baselines.common import (
     DataKey,
     RmbData,
     convert_data_to_policy,
+    denormalize_data,
     find_rmb_files,
     get_skipped_data_seq,
 )
-from robo_manip_baselines.policy.diffusion_world_model.DiffusionWorldModel import (
-    DiffusionWorldModel,
+from robo_manip_baselines.policy.wrench_predictor4.WrenchPredictor4Dataset import (
+    WrenchPredictor4Dataset,
 )
-from robo_manip_baselines.policy.diffusion_world_model.DiffusionWorldModelDataset import (
-    DiffusionWorldModelDataset,
+from robo_manip_baselines.policy.wrench_predictor4.WrenchPredictor4Model import (
+    WrenchPredictor4Model,
 )
 
 
@@ -62,19 +59,11 @@ def parse_sweep_argument():
         action="store_true",
         help="disable episode-wise PNG plots",
     )
-    parser.add_argument("--seed", type=int, default=42, help="random seed")
     parser.add_argument(
         "--max_material_object_id",
         type=int,
         default=DEFAULT_MAX_MATERIAL_OBJECT_ID,
         help="maximum WrenchPredObject id used as material PB sweep targets",
-    )
-    parser.add_argument(
-        "--plot_time_offsets",
-        type=int,
-        nargs="*",
-        default=None,
-        help="target offsets used for episode plots and videos; default is horizon - 1",
     )
     parser.add_argument(
         "--checkpoint_names",
@@ -92,7 +81,7 @@ def parse_sweep_argument():
     return parser.parse_args()
 
 
-class EvalDiffusionWorldModelDataset(DiffusionWorldModelDataset):
+class EvalWrenchPredictor4Dataset(WrenchPredictor4Dataset):
     def __getitem__(self, chunk_idx):
         skip = self.model_meta_info["data"]["skip"]
         horizon = self.model_meta_info["data"]["horizon"]
@@ -171,7 +160,7 @@ class EvalDiffusionWorldModelDataset(DiffusionWorldModelDataset):
         return get_skipped_data_seq(clipped_wrench, clip_info["key"], skip)
 
 
-class EvalDiffusionWorldModelSweepBase:
+class EvalWrenchPredictor4SweepBase:
     def __init__(
         self,
         checkpoint_dir,
@@ -179,9 +168,7 @@ class EvalDiffusionWorldModelSweepBase:
         batch_size=64,
         num_files=None,
         no_plot=False,
-        seed=42,
         max_material_object_id=DEFAULT_MAX_MATERIAL_OBJECT_ID,
-        plot_time_offsets=None,
         checkpoint_names=None,
         output_suffix="",
     ):
@@ -190,8 +177,6 @@ class EvalDiffusionWorldModelSweepBase:
         self.batch_size = batch_size
         self.num_files = num_files
         self.no_plot = no_plot
-        self.seed = seed
-        self.plot_time_offsets = plot_time_offsets
         self.checkpoint_names = checkpoint_names
         self.output_suffix = output_suffix
         assert max_material_object_id >= 0, max_material_object_id
@@ -241,7 +226,7 @@ class EvalDiffusionWorldModelSweepBase:
             raise KeyError(
                 f"[{self.__class__.__name__}] "
                 "model_meta_info['wrench']['percentile_clip'] is missing. "
-                "Please train DiffusionWorldModel with --wrench_source_key."
+                "Please train WrenchPredictor4 with --wrench_source_key."
             )
         print(
             f"[{self.__class__.__name__}] Load model meta info: {model_meta_info_path}"
@@ -262,9 +247,7 @@ class EvalDiffusionWorldModelSweepBase:
 
         rmb_path_list = find_rmb_files(self.rmb_dir, num_files=self.num_files)
         assert len(rmb_path_list) > 0, self.rmb_dir
-        self.object_key_to_filenames = self.group_filenames_by_object_key(
-            rmb_path_list
-        )
+        self.object_key_to_filenames = self.group_filenames_by_object_key(rmb_path_list)
         self.target_object_keys = sorted(
             self.object_key_to_filenames,
             key=lambda key: self.object_key_to_id[key],
@@ -333,36 +316,15 @@ class EvalDiffusionWorldModelSweepBase:
         return matched_object_keys[0]
 
     def setup_policy(self, checkpoint):
-        noise_scheduler = self.construct_noise_scheduler()
-        self.policy = DiffusionWorldModel(
-            noise_scheduler=noise_scheduler,
-            **self.model_meta_info["policy"]["args"],
-        )
+        self.policy = WrenchPredictor4Model(**self.model_meta_info["policy"]["args"])
         self.policy.load_state_dict(
             torch.load(checkpoint, map_location=self.device, weights_only=True)
         )
         self.policy.to(self.device)
         self.policy.eval()
 
-    def construct_noise_scheduler(self):
-        scheduler = self.model_meta_info["policy"]["scheduler"]
-        if scheduler == "ddpm":
-            from diffusers.schedulers.scheduling_ddpm import DDPMScheduler
-
-            return DDPMScheduler(
-                **self.model_meta_info["policy"]["noise_scheduler_args"]
-            )
-        elif scheduler == "ddim":
-            from diffusers.schedulers.scheduling_ddim import DDIMScheduler
-
-            return DDIMScheduler(
-                **self.model_meta_info["policy"]["noise_scheduler_args"]
-            )
-        else:
-            raise ValueError(f"Invalid scheduler: {scheduler}")
-
     def make_dataloader(self, filenames):
-        dataset = EvalDiffusionWorldModelDataset(
+        dataset = EvalWrenchPredictor4Dataset(
             filenames,
             self.model_meta_info,
             enable_rmb_cache=False,
@@ -383,10 +345,57 @@ class EvalDiffusionWorldModelSweepBase:
         batch["object_id"] = torch.full_like(batch["object_id"], material_object_id)
         return batch
 
-    def reset_sampling_seed(self):
-        torch.manual_seed(self.seed)
-        if self.device.type == "cuda":
-            torch.cuda.manual_seed_all(self.seed)
+    def compute_abs_error(self, batch, pred):
+        start = self.model_meta_info["data"]["n_obs_steps"]
+        gt_wrench_normalized = batch["wrench"][:, start:].detach().cpu().numpy()
+        pred_wrench_normalized = pred["wrench"][:, start:].detach().cpu().numpy()
+        gt_image_feature_normalized = (
+            batch["image_feature"][:, start:].detach().cpu().numpy()
+        )
+        pred_image_feature_normalized = (
+            pred["image_feature"][:, start:].detach().cpu().numpy()
+        )
+
+        total_abs_error = np.concatenate(
+            [
+                np.abs(pred_wrench_normalized - gt_wrench_normalized).reshape(
+                    -1,
+                    self.model_meta_info["policy"]["args"]["wrench_dim"],
+                ),
+                np.abs(
+                    pred_image_feature_normalized - gt_image_feature_normalized
+                ).reshape(
+                    -1,
+                    self.model_meta_info["policy"]["args"]["image_feature_dim"],
+                ),
+            ],
+            axis=1,
+        )
+
+        gt_wrench = denormalize_data(
+            gt_wrench_normalized,
+            self.model_meta_info["wrench"],
+        )
+        pred_wrench = denormalize_data(
+            pred_wrench_normalized,
+            self.model_meta_info["wrench"],
+        )
+        gt_image_feature = denormalize_data(
+            gt_image_feature_normalized,
+            self.model_meta_info["image_feature"],
+        )
+        pred_image_feature = denormalize_data(
+            pred_image_feature_normalized,
+            self.model_meta_info["image_feature"],
+        )
+
+        wrench_abs_error = np.abs(pred_wrench - gt_wrench).reshape(
+            -1, self.model_meta_info["policy"]["args"]["wrench_dim"]
+        )
+        image_feature_abs_error = np.abs(pred_image_feature - gt_image_feature).reshape(
+            -1, self.model_meta_info["policy"]["args"]["image_feature_dim"]
+        )
+        return wrench_abs_error, image_feature_abs_error, total_abs_error
 
     def get_final_time_idx(self, filename, dataset):
         skip = self.model_meta_info["data"]["skip"]
@@ -415,9 +424,7 @@ class EvalDiffusionWorldModelSweepBase:
         ]
         summary_rows = []
         for checkpoint in sorted({row["checkpoint"] for row in rows}):
-            checkpoint_rows = [
-                row for row in rows if row["checkpoint"] == checkpoint
-            ]
+            checkpoint_rows = [row for row in rows if row["checkpoint"] == checkpoint]
             for metric_name, row_metric_key in self.get_heatmap_metrics():
                 matrix = self.build_error_matrix(checkpoint_rows, row_metric_key)
                 for actual_idx, actual_object_key in enumerate(self.target_object_keys):
@@ -468,9 +475,7 @@ class EvalDiffusionWorldModelSweepBase:
         ]
         accuracy_rows = []
         for checkpoint in sorted({row["checkpoint"] for row in rows}):
-            checkpoint_rows = [
-                row for row in rows if row["checkpoint"] == checkpoint
-            ]
+            checkpoint_rows = [row for row in rows if row["checkpoint"] == checkpoint]
             for metric_name, row_metric_key in self.get_heatmap_metrics():
                 matrix = self.build_error_matrix(checkpoint_rows, row_metric_key)
                 num_correct = 0
@@ -485,8 +490,7 @@ class EvalDiffusionWorldModelSweepBase:
                     {
                         "checkpoint": checkpoint,
                         "metric": metric_name,
-                        "diagonal_accuracy": num_correct
-                        / len(self.target_object_keys),
+                        "diagonal_accuracy": num_correct / len(self.target_object_keys),
                         "num_correct": num_correct,
                         "num_objects": len(self.target_object_keys),
                     }
@@ -503,9 +507,7 @@ class EvalDiffusionWorldModelSweepBase:
 
     def save_heatmaps(self, rows):
         for checkpoint in sorted({row["checkpoint"] for row in rows}):
-            checkpoint_rows = [
-                row for row in rows if row["checkpoint"] == checkpoint
-            ]
+            checkpoint_rows = [row for row in rows if row["checkpoint"] == checkpoint]
             checkpoint_stem = os.path.splitext(checkpoint)[0]
             output_png = os.path.join(
                 self.heatmap_dir,
@@ -541,8 +543,7 @@ class EvalDiffusionWorldModelSweepBase:
 
     def build_error_matrix(self, rows, metric_key):
         row_by_object_pair = {
-            (row["actual_object_key"], row["material_object_key"]): row
-            for row in rows
+            (row["actual_object_key"], row["material_object_key"]): row for row in rows
         }
         matrix = np.full(
             (len(self.target_object_keys), len(self.material_object_keys)),

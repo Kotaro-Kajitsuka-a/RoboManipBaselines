@@ -1,4 +1,6 @@
+import argparse
 import copy
+import math
 import os
 
 import numpy as np
@@ -6,19 +8,44 @@ import torch
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
-from robo_manip_baselines.common import RmbData, find_rmb_files
-from robo_manip_baselines.policy.diffusion_world_model.TrainDiffusionWorldModel import (
-    TrainDiffusionWorldModel,
+from robo_manip_baselines.common import (
+    DataKey,
+    RmbData,
+    TrainBase,
+    convert_data_to_policy,
+    find_rmb_files,
+    get_skipped_data_seq,
 )
-
-from diffusion_policy.common.pytorch_util import dict_apply, optimizer_to
-from diffusion_policy.model.common.lr_scheduler import get_scheduler
+from robo_manip_baselines.misc.AddPercentileClippedWrenchToRmbData import (
+    AddPercentileClippedWrenchToRmbData,
+    get_percentile_clip_wrench_key,
+)
 
 from .WrenchPredictor4Dataset import WrenchPredictor4Dataset
 from .WrenchPredictor4Model import WrenchPredictor4Model
 
 
-class TrainWrenchPredictor4(TrainDiffusionWorldModel):
+def get_cosine_schedule_with_warmup(
+    optimizer,
+    num_warmup_steps,
+    num_training_steps,
+):
+    assert num_warmup_steps >= 0, num_warmup_steps
+    assert num_training_steps > 0, num_training_steps
+
+    def lr_lambda(current_step):
+        if current_step < num_warmup_steps:
+            return float(current_step) / max(1, num_warmup_steps)
+        progress = float(current_step - num_warmup_steps) / max(
+            1,
+            num_training_steps - num_warmup_steps,
+        )
+        return max(0.0, 0.5 * (1.0 + math.cos(math.pi * progress)))
+
+    return torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
+
+
+class TrainWrenchPredictor4(TrainBase):
     DatasetClass = WrenchPredictor4Dataset
 
     def setup_args(self):
@@ -27,15 +54,78 @@ class TrainWrenchPredictor4(TrainDiffusionWorldModel):
             raise ValueError(
                 f"[{self.__class__.__name__}] WrenchPredictor4 uses only transformer backbone."
             )
+        if self.args.scheduler != "ddpm":
+            raise ValueError(
+                f"[{self.__class__.__name__}] WrenchPredictor4 accepts only the "
+                "legacy --scheduler ddpm setting."
+            )
+        if self.args.use_ema:
+            raise ValueError(
+                f"[{self.__class__.__name__}] WrenchPredictor4 does not use EMA."
+            )
 
     def set_additional_args(self, parser):
-        super().set_additional_args(parser)
-        parser.set_defaults(backbone="transformer")
-        parser.set_defaults(scheduler="ddpm")
-        parser.set_defaults(horizon=16)
-        parser.set_defaults(num_epochs=200)
-        parser.set_defaults(lr=1e-4)
-        parser.set_defaults(use_ema=False)
+        parser.set_defaults(
+            enable_rmb_cache=True,
+            norm_type="limits",
+            batch_size=64,
+            num_epochs=200,
+            lr=1e-4,
+        )
+        parser.add_argument(
+            "--weight_decay", type=float, default=1e-6, help="weight decay"
+        )
+        parser.add_argument(
+            "--use_ema",
+            action=argparse.BooleanOptionalAction,
+            default=False,
+            help="legacy compatibility option; WrenchPredictor4 does not use EMA",
+        )
+        parser.add_argument(
+            "--backbone",
+            type=str,
+            default="transformer",
+            choices=["transformer"],
+            help="legacy compatibility option; WrenchPredictor4 uses a Transformer",
+        )
+        parser.add_argument(
+            "--scheduler",
+            type=str,
+            default="ddpm",
+            choices=["ddpm"],
+            help="legacy compatibility option retained for existing commands",
+        )
+        parser.add_argument(
+            "--horizon", type=int, default=16, help="prediction horizon"
+        )
+        parser.add_argument(
+            "--n_obs_steps",
+            type=int,
+            default=2,
+            help="number of image_feature/state steps used as condition",
+        )
+        parser.add_argument(
+            "--image_feature_key",
+            type=str,
+            required=True,
+            help="RMB key used as image feature target and condition",
+        )
+        parser.add_argument(
+            "--wrench_source_key",
+            type=str,
+            required=True,
+            choices=[
+                DataKey.MEASURED_EEF_WRENCH,
+                DataKey.MEASURED_EEF_WRENCH_MOVING_AVERAGE,
+            ],
+            help="RMB source wrench key to percentile-clip and use as prediction target",
+        )
+        parser.add_argument(
+            "--pb_dim",
+            type=int,
+            default=9,
+            help="dimension of object-wise material property vector",
+        )
         parser.add_argument(
             "--hidden_dim",
             type=int,
@@ -104,8 +194,108 @@ class TrainWrenchPredictor4(TrainDiffusionWorldModel):
 
     def setup_model_meta_info(self):
         super().setup_model_meta_info()
+        self.model_meta_info["data"].update(
+            {
+                "horizon": self.args.horizon,
+                "n_obs_steps": self.args.n_obs_steps,
+                "n_action_steps": 1,
+                "image_feature_key": self.args.image_feature_key,
+            }
+        )
+        self.model_meta_info["wrench"] = {
+            "key": get_percentile_clip_wrench_key(self.args.wrench_source_key),
+            "source_key": self.args.wrench_source_key,
+        }
+        self.model_meta_info["material_property"] = {
+            "pb_dim": self.args.pb_dim,
+            "object_key_to_id": WrenchPredictor4Dataset.OBJECT_KEY_TO_ID,
+        }
+        self.model_meta_info["policy"].update(
+            {
+                "use_ema": self.args.use_ema,
+                "backbone": self.args.backbone,
+                "scheduler": self.args.scheduler,
+            }
+        )
         if self.args.val_dataset_dir is not None:
             self.model_meta_info["data"]["val_dataset_dir"] = self.args.val_dataset_dir
+
+    def get_extra_norm_config(self):
+        if self.args.norm_type == "limits":
+            return {
+                "out_min": -1.0,
+                "out_max": 1.0,
+            }
+        return super().get_extra_norm_config()
+
+    def set_data_stats(self):
+        AddPercentileClippedWrenchToRmbData(
+            self.args.dataset_dir,
+            overwrite=True,
+            src_key=self.args.wrench_source_key,
+            dst_key=self.model_meta_info["wrench"]["key"],
+        ).run()
+
+        super().set_data_stats()
+
+        all_image_feature = []
+        all_wrench = []
+        clip_min = None
+        clip_max = None
+        image_feature_key = self.model_meta_info["data"]["image_feature_key"]
+        wrench_key = self.model_meta_info["wrench"]["key"]
+        source_key = self.model_meta_info["wrench"]["source_key"]
+        for filename in self.all_filenames:
+            with RmbData(filename) as rmb_data:
+                image_feature = convert_data_to_policy(
+                    get_skipped_data_seq(
+                        rmb_data[image_feature_key][:],
+                        image_feature_key,
+                        self.args.skip,
+                    ),
+                    image_feature_key,
+                )
+                wrench = get_skipped_data_seq(
+                    rmb_data[wrench_key][:],
+                    wrench_key,
+                    self.args.skip,
+                )
+                try:
+                    file_clip_min = np.asarray(
+                        rmb_data.attrs[wrench_key + "_clip_min"],
+                        dtype=np.float64,
+                    )
+                    file_clip_max = np.asarray(
+                        rmb_data.attrs[wrench_key + "_clip_max"],
+                        dtype=np.float64,
+                    )
+                    file_source_key = rmb_data.attrs[wrench_key + "_source_key"]
+                except KeyError as e:
+                    raise KeyError(f"{e}: {filename}") from e
+                if isinstance(file_source_key, bytes):
+                    file_source_key = file_source_key.decode()
+                assert file_source_key == source_key, filename
+                if clip_min is None:
+                    clip_min = file_clip_min
+                    clip_max = file_clip_max
+                else:
+                    assert np.allclose(clip_min, file_clip_min), filename
+                    assert np.allclose(clip_max, file_clip_max), filename
+            all_image_feature.append(image_feature)
+            all_wrench.append(wrench)
+
+        all_image_feature = np.concatenate(all_image_feature, dtype=np.float64)
+        all_wrench = np.concatenate(all_wrench, dtype=np.float64)
+        self.model_meta_info["image_feature"] = self.calc_stats_from_seq(
+            all_image_feature
+        )
+        self.model_meta_info["wrench"].update(self.calc_stats_from_seq(all_wrench))
+        self.model_meta_info["wrench"]["percentile_clip"] = {
+            "key": wrench_key,
+            "source_key": source_key,
+            "min": clip_min,
+            "max": clip_max,
+        }
 
     def setup_dataset(self):
         if self.args.val_dataset_dir is None:
@@ -186,18 +376,14 @@ class TrainWrenchPredictor4(TrainDiffusionWorldModel):
             betas=(0.95, 0.999),
             eps=1e-8,
         )
-        self.lr_scheduler = get_scheduler(
-            name="cosine",
-            optimizer=self.optimizer,
+        self.lr_scheduler = get_cosine_schedule_with_warmup(
+            self.optimizer,
             num_warmup_steps=100,
             num_training_steps=(len(self.train_dataloader) * self.args.num_epochs),
         )
-        optimizer_to(self.optimizer, "cuda")
 
         self.print_policy_info()
-        print(
-            f"  - horizon: {self.args.horizon}, obs steps: {self.args.n_obs_steps}"
-        )
+        print(f"  - horizon: {self.args.horizon}, obs steps: {self.args.n_obs_steps}")
         print(
             f"  - trajectory dim: {self.policy.trajectory_dim}, image feature dim: {self.policy.image_feature_dim}, wrench dim: {self.policy.wrench_dim}"
         )
@@ -207,9 +393,8 @@ class TrainWrenchPredictor4(TrainDiffusionWorldModel):
             self.policy.train()
             batch_result_list = []
             for data in self.train_dataloader:
-                batch_result = self.policy.compute_loss(
-                    dict_apply(data, lambda x: x.cuda())
-                )
+                batch = {key: value.cuda() for key, value in data.items()}
+                batch_result = self.policy.compute_loss(batch)
                 loss = batch_result["loss"]
                 loss.backward()
                 self.optimizer.step()
@@ -223,9 +408,8 @@ class TrainWrenchPredictor4(TrainDiffusionWorldModel):
                 self.policy.eval()
                 batch_result_list = []
                 for data in self.val_dataloader:
-                    batch_result = self.policy.compute_loss(
-                        dict_apply(data, lambda x: x.cuda())
-                    )
+                    batch = {key: value.cuda() for key, value in data.items()}
+                    batch_result = self.policy.compute_loss(batch)
                     batch_result_list.append(self.detach_batch_result(batch_result))
                 epoch_summary = self.log_epoch_summary(batch_result_list, "val", epoch)
                 self.update_best_ckpt(epoch_summary, policy=self.policy)

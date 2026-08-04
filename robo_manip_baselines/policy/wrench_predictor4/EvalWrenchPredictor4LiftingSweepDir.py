@@ -6,20 +6,15 @@ import torch
 from tqdm import tqdm
 
 from robo_manip_baselines.common import denormalize_data, get_pose7_from_pose9
-from robo_manip_baselines.policy.diffusion_world_model.EvalDiffusionWorldModelMaterialSweepDir import (
-    EvalDiffusionWorldModelMaterialSweepDir,
-)
-from robo_manip_baselines.policy.diffusion_world_model.EvalDiffusionWorldModelSweepCommon import (
+from robo_manip_baselines.policy.wrench_predictor4.EvalWrenchPredictor4SweepCommon import (
     WRENCH_LABELS,
+    EvalWrenchPredictor4SweepBase,
     parse_sweep_argument,
     plt,
 )
-from robo_manip_baselines.policy.wrench_predictor4.WrenchPredictor4Model import (
-    WrenchPredictor4Model,
-)
 
 
-class EvalWrenchPredictor4LiftingSweepDir(EvalDiffusionWorldModelMaterialSweepDir):
+class EvalWrenchPredictor4LiftingSweepDir(EvalWrenchPredictor4SweepBase):
     def get_output_name(self, rmb_dir_name):
         return f"{rmb_dir_name}_wrench_predictor4_lifting_sweep"
 
@@ -43,14 +38,6 @@ class EvalWrenchPredictor4LiftingSweepDir(EvalDiffusionWorldModelMaterialSweepDi
             ("auxiliary torque MAE [N m]", "torque mean"),
             ("normalized total error", "normalized total mean"),
         ]
-
-    def setup_policy(self, checkpoint):
-        self.policy = WrenchPredictor4Model(**self.model_meta_info["policy"]["args"])
-        self.policy.load_state_dict(
-            torch.load(checkpoint, map_location=self.device, weights_only=True)
-        )
-        self.policy.to(self.device)
-        self.policy.eval()
 
     def evaluate_object_pair(
         self,

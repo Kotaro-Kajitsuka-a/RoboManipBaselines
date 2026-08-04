@@ -12,7 +12,6 @@ class TrainMain:
         "MtAct",
         "DiffusionPolicy",
         "DiffusionPolicy3d",
-        "DiffusionWorldModel",
         "FlowPolicy",
         "ManiFlowPolicy",
         "WrenchPredictor2",
