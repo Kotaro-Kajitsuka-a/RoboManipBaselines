@@ -20,6 +20,11 @@ from .xarm7.MujocoXarm7PushtEnv import MujocoXarm7PushtEnv
 from .xarm7.MujocoXarm7Pusht1Env import MujocoXarm7Pusht1Env
 from .xarm7.MujocoXarm7Pusht2Env import MujocoXarm7Pusht2Env
 from .xarm7.MujocoXarm7Pusht3Env import MujocoXarm7Pusht3Env
+from .xarm7.MujocoXarm7Pusht_T0Env import MujocoXarm7Pusht_T0Env
+from .xarm7.MujocoXarm7Pusht_T1Env import MujocoXarm7Pusht_T1Env
+from .xarm7.MujocoXarm7Pusht_T2Env import MujocoXarm7Pusht_T2Env
+from .xarm7.MujocoXarm7Pusht_T3Env import MujocoXarm7Pusht_T3Env
+from .xarm7.MujocoXarm7Pusht_T4Env import MujocoXarm7Pusht_T4Env
 from .xarm7.MujocoXarm7AdmittancePushtEnv import MujocoXarm7AdmittancePushtEnv
 from .xarm7.MujocoXarm7AdmittancePusht1Env import MujocoXarm7AdmittancePusht1Env
 from .xarm7.MujocoXarm7AdmittancePusht2Env import MujocoXarm7AdmittancePusht2Env

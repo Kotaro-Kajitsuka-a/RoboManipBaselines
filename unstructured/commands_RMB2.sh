@@ -253,3 +253,6 @@ uv run python robo_manip_baselines/bin/Rollout.py DiffusionPolicy \
  --world_idx_list {270..279} --auto_exit --max_duration 13 --save_rollout --no_plot
 
 ##############################################################################################################
+
+# Blind teleoperation collection (20 episodes per object, 100 episodes total)
+uv run python unstructured/collect_blind_teleop.py

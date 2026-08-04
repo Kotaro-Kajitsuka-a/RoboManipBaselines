@@ -89,6 +89,26 @@ register(
     entry_point="robo_manip_baselines.envs.mujoco:MujocoXarm7Pusht3Env",
 )
 register(
+    id="robo_manip_baselines/MujocoXarm7Pusht_T0Env-v0",
+    entry_point="robo_manip_baselines.envs.mujoco:MujocoXarm7Pusht_T0Env",
+)
+register(
+    id="robo_manip_baselines/MujocoXarm7Pusht_T1Env-v0",
+    entry_point="robo_manip_baselines.envs.mujoco:MujocoXarm7Pusht_T1Env",
+)
+register(
+    id="robo_manip_baselines/MujocoXarm7Pusht_T2Env-v0",
+    entry_point="robo_manip_baselines.envs.mujoco:MujocoXarm7Pusht_T2Env",
+)
+register(
+    id="robo_manip_baselines/MujocoXarm7Pusht_T3Env-v0",
+    entry_point="robo_manip_baselines.envs.mujoco:MujocoXarm7Pusht_T3Env",
+)
+register(
+    id="robo_manip_baselines/MujocoXarm7Pusht_T4Env-v0",
+    entry_point="robo_manip_baselines.envs.mujoco:MujocoXarm7Pusht_T4Env",
+)
+register(
     id="robo_manip_baselines/MujocoXarm7AdmittancePushtEnv-v0",
     entry_point="robo_manip_baselines.envs.mujoco:MujocoXarm7AdmittancePushtEnv",
 )
