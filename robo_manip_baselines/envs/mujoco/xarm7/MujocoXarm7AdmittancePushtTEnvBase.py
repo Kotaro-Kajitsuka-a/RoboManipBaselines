@@ -2,6 +2,9 @@ from os import path
 
 import mujoco
 import numpy as np
+from gymnasium.spaces import Box, Dict
+
+from robo_manip_baselines.common import DataKey
 
 from .MujocoXarm7AdmittanceEnvBase import MujocoXarm7AdmittanceEnvBase
 from .MujocoXarm7PushtEnv import MujocoXarm7PushtEnv
@@ -11,6 +14,12 @@ class MujocoXarm7AdmittancePushtTEnvBase(
     MujocoXarm7AdmittanceEnvBase, MujocoXarm7PushtEnv
 ):
     metadata = MujocoXarm7AdmittanceEnvBase.metadata.copy()
+    observation_space = Dict(
+        {
+            **MujocoXarm7AdmittanceEnvBase.observation_space.spaces,
+            "tblock_pose": Box(low=-np.inf, high=np.inf, shape=(7,), dtype=np.float64),
+        }
+    )
     xml_filename = None
     world_idx_range = None
 
@@ -29,6 +38,21 @@ class MujocoXarm7AdmittancePushtTEnvBase(
             **kwargs,
         )
         self.original_tblock_pos = self.model.body("tblock").pos.copy()
+
+    @property
+    def measured_keys_to_save(self):
+        return [
+            *super().measured_keys_to_save,
+            DataKey.MEASURED_TBLOCK_POSE,
+        ]
+
+    def _get_obs(self):
+        obs = super()._get_obs()
+        obs["tblock_pose"] = self.get_body_pose("tblock")
+        return obs
+
+    def get_tblock_pose_from_obs(self, obs):
+        return obs["tblock_pose"]
 
     def modify_world(self, world_idx=None, cumulative_idx=None):
         assert world_idx is not None

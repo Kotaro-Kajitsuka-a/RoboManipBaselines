@@ -192,9 +192,10 @@ class RolloutDiffusionPolicyOnlinePb(RolloutDiffusionPolicy):
 
         self.online_pb_update_count += 1
 
+    # Override methods in normal Diffusion Policy to use the online PB in the DP state buffer.
     def update_state_buf(self):
         state = np.concatenate(
-            [self.get_dp_state_data(state_key) for state_key in self.state_keys]
+            [self.get_dp_state_data_including_pb(state_key) for state_key in self.state_keys]
         )
         state = normalize_data(state, self.model_meta_info["state"])
         state = torch.tensor(state, dtype=torch.float32)
@@ -207,7 +208,7 @@ class RolloutDiffusionPolicyOnlinePb(RolloutDiffusionPolicy):
             self.state_buf.pop(0)
             self.state_buf.append(state)
 
-    def get_dp_state_data(self, state_key):
+    def get_dp_state_data_including_pb(self, state_key):
         if state_key == DataKey.MATERIAL_PROPERTY:
             return self.online_pb.detach().cpu().numpy().copy()
         return convert_data_to_policy(

@@ -50,7 +50,7 @@ class DataKey:
     # Note: This is the target end-effector pose for IK, not the end-effector pose corresponding to the command joint position.
     COMMAND_EEF_POSE = "command_eef_pose"
 
-    # Measured I-shape block pose (tx, ty, tz, qw, qx, qy, qz)
+    # Measured task block pose (tx, ty, tz, qw, qx, qy, qz)
     # Note: The block is named "tblock" in the MuJoCo model.
     MEASURED_TBLOCK_POSE = "measured_tblock_pose"
 
