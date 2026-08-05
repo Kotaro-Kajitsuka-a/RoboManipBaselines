@@ -82,12 +82,6 @@ class WrenchPredictor4Model(nn.Module):
             % sum(p.numel() for p in self.material_property.parameters())
         )
 
-    @classmethod
-    def from_policy_args(cls, policy_args):
-        policy_args = dict(policy_args)
-        policy_args.pop("num_decoder_layers", None)
-        return cls(**policy_args)
-
     def get_condition_tokens(self, batch, material_property=None):
         image_feature = batch["image_feature"][:, : self.n_obs_steps]
         state = batch["state"][:, : self.n_obs_steps]

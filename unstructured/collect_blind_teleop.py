@@ -2,6 +2,7 @@ import datetime
 import glob
 import os
 import random
+import re
 import shutil
 import subprocess
 
@@ -10,6 +11,11 @@ import subprocess
 
 TRIALS_PER_OBJECT_FOR_TRAINING = 20
 # TODO: Add validation data collection.
+
+EPISODE_NAME_PATTERN = re.compile(
+    r"^WrenchPredObject(?P<object_idx>\d+)_world(?P<world_idx>\d+)_"
+    r"(?P<episode_idx>\d+)\.rmb$"
+)
 
 repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 os.chdir(repo_root)
@@ -56,6 +62,72 @@ def world_idx_exists(object_dataset_dir, world_idx):
         f"*_world{world_idx}_*.rmb",
     )
     return len(glob.glob(pattern)) > 0
+
+
+def delete_duplicate_world_episodes(object_dataset_dirs, log_file):
+    """Keep episode 000 and delete later episodes for each object/world."""
+    episodes_by_world = {}
+    episode_count = 0
+
+    for expected_object_idx, object_dataset_dir in object_dataset_dirs.items():
+        for entry in os.scandir(object_dataset_dir):
+            if not entry.name.endswith(".rmb"):
+                continue
+            if not entry.is_dir(follow_symlinks=False):
+                raise RuntimeError(f"Expected an RMB directory: {entry.path}")
+
+            match = EPISODE_NAME_PATTERN.fullmatch(entry.name)
+            if match is None:
+                raise RuntimeError(f"Unexpected RMB name: {entry.path}")
+
+            object_idx = int(match.group("object_idx"))
+            world_idx = int(match.group("world_idx"))
+            episode_idx = int(match.group("episode_idx"))
+            if object_idx != expected_object_idx:
+                raise RuntimeError(
+                    f"Object directory and RMB name disagree: {entry.path}"
+                )
+
+            episodes_by_world.setdefault((object_idx, world_idx), []).append(
+                (episode_idx, entry.path)
+            )
+            episode_count += 1
+
+    deleted_count = 0
+    for (object_idx, world_idx), episodes in sorted(episodes_by_world.items()):
+        if len(episodes) == 1:
+            continue
+
+        episodes.sort()
+        episode_zero_paths = [
+            path for episode_idx, path in episodes if episode_idx == 0
+        ]
+        if len(episode_zero_paths) != 1:
+            raise RuntimeError(
+                f"Duplicate world has no unique episode 000: "
+                f"object_idx={object_idx}, world_idx={world_idx}, "
+                f"episodes={episodes}"
+            )
+
+        for episode_idx, path in episodes:
+            if episode_idx == 0:
+                continue
+            shutil.rmtree(path)
+            deleted_count += 1
+            msg = (
+                f"Delete duplicate episode: object_idx={object_idx}, "
+                f"world_idx={world_idx}, episode_idx={episode_idx}, path={path}"
+            )
+            print(msg)
+            print(msg, file=log_file, flush=True)
+
+    msg = (
+        f"Checked {episode_count} episode(s) across "
+        f"{len(episodes_by_world)} world(s); "
+        f"deleted {deleted_count} duplicate episode(s)."
+    )
+    print(msg)
+    print(msg, file=log_file, flush=True)
 
 
 # ---------------------------------------------------------------------
@@ -182,10 +254,12 @@ with open(log_path, "w") as log_file:
         os.rmdir(teleop_output_dir)
 
         print(
-            f"Moved {moved_count} data item(s) to " f"{object_dataset_dir}",
+            f"Moved {moved_count} data item(s) to {object_dataset_dir}",
             file=log_file,
             flush=True,
         )
+
+    delete_duplicate_world_episodes(object_dataset_dirs, log_file)
 
 print(f"Finished. Dataset: {session_dataset_dir}")
 print(f"Log: {log_path}")
