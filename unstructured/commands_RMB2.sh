@@ -83,6 +83,14 @@ uv run python robo_manip_baselines/bin/Train.py WrenchPredictor4 \
   --output_head mlp_only --wrench_loss_weight 0.1 --scheduler ddpm --horizon 16 --n_obs_steps 2 \
   --skip 3 --batch_size 64 --num_epochs 500 --lr 1e-4
 
+# Evaluate policy_best.ckpt by sweeping the Object0/Object1/Object2 material PBs
+uv run python robo_manip_baselines/policy/wrench_predictor4/EvalWrenchPredictor4LiftingSweepDir.py \
+  robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingDisjointWorldIdx_I0w0-39_I1w100-139_I2w200-239_pb1_mlp_only_absolute_pose9_separate_image_state_tokens_120train_30val_500epoch_20260801 \
+  robo_manip_baselines/dataset/LiftingDisjointWorldIdx/validation \
+  --checkpoint_names policy_best.ckpt \
+  --max_material_object_id 2 \
+  --no_plot
+
 
 # Adapt only the 1D PB online from one world50 episode
 uv run python robo_manip_baselines/bin/Train.py WrenchPredictor4Online \
@@ -100,6 +108,10 @@ uv run python robo_manip_baselines/policy/wrench_predictor4_online/AddOnlinePbTo
   robo_manip_baselines/dataset/LiftingAB_B_only/ 0 \
   --checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_I0I1I2_AB_B_only/policy_last.ckpt \
   --lr 6e-3
+
+# Plot the online PB trajectories stored in the Object1 B episodes
+uv run python robo_manip_baselines/misc/futureimagination/PlotOnlinePbDataset.py \
+  robo_manip_baselines/dataset/LiftingAB_B_only/WrenchPredObject1
 
 # Train state-based Diffusion Policy on all 150 LiftingAB A/B episodes with PB
 uv run python robo_manip_baselines/bin/Train.py DiffusionPolicy \

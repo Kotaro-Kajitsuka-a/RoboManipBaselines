@@ -114,10 +114,7 @@ def get_mean_trajectory(episodes: list[dict]) -> tuple[np.ndarray, np.ndarray]:
 
 
 def get_default_output_path(dataset_path: Path) -> Path:
-    dataset_path = dataset_path.resolve()
-    return Path("outputs_to_user") / (
-        f"{dataset_path.parent.name}_{dataset_path.name}_online_pb_trajectories.png"
-    )
+    return dataset_path.resolve() / "online_pb_trajectories.png"
 
 
 def save_plot(
