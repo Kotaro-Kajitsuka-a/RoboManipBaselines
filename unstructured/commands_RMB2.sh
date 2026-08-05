@@ -159,6 +159,14 @@ uv run python robo_manip_baselines/bin/Rollout.py \
   --initial_object_id 0 \
   --online_pb_lr 6e-3
 
+# Judge all 60 Lifting test episodes: final lift >= 10 cm and tilt < 7.5 deg
+uv run python robo_manip_baselines/misc/futureimagination/AnalyzeLiftingSuccess.py \
+  robo_manip_baselines/dataset/tests/FutureImagination/LiftingAB_DP \
+  --output_prefix validation_success \
+  --lift_threshold_m 0.10 \
+  --tilt_threshold_deg 7.5 \
+  --expected_episode_count 60
+
 
 #####################################################################################
 
