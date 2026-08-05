@@ -4,7 +4,7 @@ import torch.nn.functional as F
 
 
 class WrenchPredictor4Model(nn.Module):
-    """Transformer regressor for future wrench and absolute image feature."""
+    """Regressor for future wrench and absolute image feature."""
 
     def __init__(
         self,
@@ -19,10 +19,9 @@ class WrenchPredictor4Model(nn.Module):
         hidden_dim=256,
         nhead=8,
         num_encoder_layers=4,
-        num_decoder_layers=2,
         dim_feedforward=1024,
         dropout=0.1,
-        output_head="decoder",
+        output_head="mlp_only",
         wrench_loss_weight=1.0,
     ):
         super().__init__()
@@ -40,7 +39,7 @@ class WrenchPredictor4Model(nn.Module):
         self.n_action_condition_steps = horizon - n_obs_steps
         assert self.n_action_condition_steps > 0, (horizon, n_obs_steps)
         assert self.wrench_loss_weight >= 0.0, self.wrench_loss_weight
-        assert self.output_head in ("decoder", "mlp", "mlp_only"), self.output_head
+        assert self.output_head in ("mlp", "mlp_only"), self.output_head
 
         self.material_property = nn.Embedding(num_objects, pb_dim)
         self.image_feature_proj = nn.Linear(image_feature_dim, hidden_dim)
@@ -53,7 +52,7 @@ class WrenchPredictor4Model(nn.Module):
             torch.zeros(num_condition_tokens, hidden_dim)
         )
 
-        if self.output_head != "mlp_only":
+        if self.output_head == "mlp":
             encoder_layer = nn.TransformerEncoderLayer(
                 d_model=hidden_dim,
                 nhead=nhead,
@@ -66,40 +65,28 @@ class WrenchPredictor4Model(nn.Module):
                 encoder_layer,
                 num_layers=num_encoder_layers,
             )
-        if self.output_head == "decoder":
-            self.query_embed = nn.Parameter(torch.zeros(horizon, hidden_dim))
-            decoder_layer = nn.TransformerDecoderLayer(
-                d_model=hidden_dim,
-                nhead=nhead,
-                dim_feedforward=dim_feedforward,
-                dropout=dropout,
-                batch_first=True,
-                norm_first=True,
-            )
-            self.decoder = nn.TransformerDecoder(
-                decoder_layer,
-                num_layers=num_decoder_layers,
-            )
-            self.output_proj = nn.Linear(hidden_dim, self.trajectory_dim)
-        else:
-            self.output_mlp = nn.Sequential(
-                nn.Flatten(start_dim=1),
-                nn.Linear(num_condition_tokens * hidden_dim, dim_feedforward),
-                nn.LayerNorm(dim_feedforward),
-                nn.ReLU(),
-                nn.Dropout(dropout),
-                nn.Linear(dim_feedforward, horizon * self.trajectory_dim),
-            )
+        self.output_mlp = nn.Sequential(
+            nn.Flatten(start_dim=1),
+            nn.Linear(num_condition_tokens * hidden_dim, dim_feedforward),
+            nn.LayerNorm(dim_feedforward),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(dim_feedforward, horizon * self.trajectory_dim),
+        )
 
         nn.init.normal_(self.condition_pos_embed, std=0.02)
-        if self.output_head == "decoder":
-            nn.init.normal_(self.query_embed, std=0.02)
 
-        print("Transformer params: %e" % sum(p.numel() for p in self.parameters()))
+        print("WrenchPredictor4 params: %e" % sum(p.numel() for p in self.parameters()))
         print(
             "Material PB params: %e"
             % sum(p.numel() for p in self.material_property.parameters())
         )
+
+    @classmethod
+    def from_policy_args(cls, policy_args):
+        policy_args = dict(policy_args)
+        policy_args.pop("num_decoder_layers", None)
+        return cls(**policy_args)
 
     def get_condition_tokens(self, batch, material_property=None):
         image_feature = batch["image_feature"][:, : self.n_obs_steps]
@@ -120,21 +107,13 @@ class WrenchPredictor4Model(nn.Module):
 
     def forward(self, batch, material_property=None):
         condition_tokens = self.get_condition_tokens(batch, material_property)
-        if self.output_head == "decoder":
-            memory = self.encoder(condition_tokens)
-            query = self.query_embed.unsqueeze(0).expand(
-                condition_tokens.shape[0], -1, -1
-            )
-            decoded = self.decoder(query, memory)
-            trajectory = self.output_proj(decoded)
-        else:
-            if self.output_head == "mlp":
-                condition_tokens = self.encoder(condition_tokens)
-            trajectory = self.output_mlp(condition_tokens).reshape(
-                condition_tokens.shape[0],
-                self.horizon,
-                self.trajectory_dim,
-            )
+        if self.output_head == "mlp":
+            condition_tokens = self.encoder(condition_tokens)
+        trajectory = self.output_mlp(condition_tokens).reshape(
+            condition_tokens.shape[0],
+            self.horizon,
+            self.trajectory_dim,
+        )
         wrench = trajectory[..., : self.wrench_dim]
         image_feature = trajectory[..., self.wrench_dim :]
         return {

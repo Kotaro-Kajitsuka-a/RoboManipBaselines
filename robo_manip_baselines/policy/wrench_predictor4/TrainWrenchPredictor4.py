@@ -145,12 +145,6 @@ class TrainWrenchPredictor4(TrainBase):
             help="number of Transformer encoder layers",
         )
         parser.add_argument(
-            "--num_decoder_layers",
-            type=int,
-            default=2,
-            help="number of Transformer decoder layers",
-        )
-        parser.add_argument(
             "--dim_feedforward",
             type=int,
             default=1024,
@@ -165,8 +159,8 @@ class TrainWrenchPredictor4(TrainBase):
         parser.add_argument(
             "--output_head",
             type=str,
-            default="decoder",
-            choices=["decoder", "mlp", "mlp_only"],
+            default="mlp_only",
+            choices=["mlp", "mlp_only"],
             help="output head type",
         )
         parser.add_argument(
@@ -359,7 +353,6 @@ class TrainWrenchPredictor4(TrainBase):
             "hidden_dim": self.args.hidden_dim,
             "nhead": self.args.nhead,
             "num_encoder_layers": self.args.num_encoder_layers,
-            "num_decoder_layers": self.args.num_decoder_layers,
             "dim_feedforward": self.args.dim_feedforward,
             "dropout": self.args.dropout,
             "output_head": self.args.output_head,

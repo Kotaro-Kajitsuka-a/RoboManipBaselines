@@ -120,7 +120,9 @@ class TrainWrenchPredictor4Online:
 
     def setup_policy(self):
         policy_args = self.model_meta_info["policy"]["args"]
-        self.policy = WrenchPredictor4Model(**policy_args).to(self.device)
+        self.policy = WrenchPredictor4Model.from_policy_args(policy_args).to(
+            self.device
+        )
         self.policy.load_state_dict(
             torch.load(
                 self.args.pretrained_checkpoint,
