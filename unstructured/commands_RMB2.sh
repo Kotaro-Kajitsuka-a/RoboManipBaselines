@@ -77,30 +77,35 @@ python robo_manip_baselines/bin/Rollout.py \
 uv run python robo_manip_baselines/bin/Train.py WrenchPredictor4 \
   --dataset_dir robo_manip_baselines/dataset/LiftingDisjointWorldIdx/training \
   --val_dataset_dir robo_manip_baselines/dataset/LiftingDisjointWorldIdx/validation \
-  --checkpoint_dir robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingDisjointWorldIdx_I0w0-39_I1w100-139_I2w200-239_pb1_mlp_only_absolute_pose9_separate_image_state_tokens_120train_30val_500epoch_20260801 \
+  --checkpoint_dir robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only/ \
   --camera_names --state_keys measured_eef_pose measured_gripper_joint_pos --action_keys command_eef_pose command_gripper_joint_pos \
   --image_feature_key measured_tblock_pose --wrench_source_key measured_eef_wrench --pb_dim 1 \
   --output_head mlp_only --wrench_loss_weight 0.1 --scheduler ddpm --horizon 16 --n_obs_steps 2 \
   --skip 3 --batch_size 64 --num_epochs 500 --lr 1e-4
 
 # Evaluate policy_best.ckpt by sweeping the Object0/Object1/Object2 material PBs
+<<<<<<< HEAD
 python robo_manip_baselines/policy/wrench_predictor4/EvalWrenchPredictor4SweepDir.py \
   robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingDisjointWorldIdx_I0w0-39_I1w100-139_I2w200-239_pb1_mlp_only_absolute_pose9_separate_image_state_tokens_120train_30val_500epoch_20260801 \
   robo_manip_baselines/dataset/LiftingDisjointWorldIdx/validation \
+=======
+uv run python robo_manip_baselines/policy/wrench_predictor4/EvalWrenchPredictor4LiftingSweepDir.py \
+  robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only/ \
+  robo_manip_baselines/dataset/LiftingAB_B_only_Validation \
+>>>>>>> 69b5a1ef (Remove assertions from WrenchPredictor4Model initialization and update checkpoint paths in commands_RMB2)
   --checkpoint_names policy_best.ckpt \
-  --max_material_object_id 2 \
-  --no_plot
+  --max_material_object_id 2
 
 
 # Add the trained Object0 PB to every timestep of the known-to-operator A dataset
 python robo_manip_baselines/policy/wrench_predictor4_online/AddConstantPbToDataset.py \
-  robo_manip_baselines/dataset/LiftingAB/WrenchPredObject0/A_known_to_operator \
-  --checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_I0I1I2_AB_150train_pb1_mlp_only_absolute_pose9_separate_tokens_500epoch_20260802/policy_epoch0400.ckpt
+  robo_manip_baselines/dataset/LiftingAB_B_only_ConstantPb \
+  --checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only/policy_last.ckpt
 
 # Estimate PB online from each unknown-to-operator B episode, starting from Object0 PB
 uv run python robo_manip_baselines/policy/wrench_predictor4_online/AddOnlinePbToDataset.py \
   robo_manip_baselines/dataset/LiftingAB_B_only/ 0 \
-  --checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_I0I1I2_AB_B_only/policy_last.ckpt \
+  --checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only/policy_last.ckpt \
   --lr 6e-3
 
 # Plot the online PB trajectories stored in the Object1 B episodes
@@ -109,7 +114,7 @@ uv run python robo_manip_baselines/misc/futureimagination/PlotOnlinePbDataset.py
 
 # Train state-based Diffusion Policy on all 150 LiftingAB A/B episodes with PB
 uv run python robo_manip_baselines/bin/Train.py DiffusionPolicy \
-  --dataset_dir robo_manip_baselines/dataset/LiftingAB \
+  --dataset_dir robo_manip_baselines/dataset/LiftingAB_B_only \
   --camera_names \
   --state_keys measured_eef_pose measured_gripper_joint_pos measured_tblock_pose material_property \
   --action_keys command_eef_pose command_gripper_joint_pos \
@@ -192,16 +197,15 @@ uv run python robo_manip_baselines/bin/Train.py DiffusionPolicy \
 
 # Rollout for evaluation #
 
-uv run python robo_manip_baselines/bin/Rollout.py DiffusionPolicy \
- MujocoUR5eLiftingi_I0 \
- --checkpoint robo_manip_baselines/checkpoint/DiffusionPolicy/LiftingAB_B_75_state_tblock_no_pb_cnn_ddim_h16_e500_20260803/policy_last.ckpt \
- --world_idx_list {70..79} --auto_exit --max_duration 13 --save_rollout --no_plot ;
+uv run python robo_manip_baselines/bin/Rollout.py DiffusionPolicy MujocoUR5eLiftingi_I0 \
+ --checkpoint robo_manip_baselines/checkpoint/DiffusionPolicy/LiftingAB_B75_policy_last_seed42_52_62/baselines/seed42/policy_last.ckpt \
+ --world_idx_list {70..79} --auto_exit --max_duration 10 --save_rollout --no_plot ;
  uv run python robo_manip_baselines/bin/Rollout.py DiffusionPolicy MujocoUR5eLiftingi_I1 \
-  --checkpoint robo_manip_baselines/checkpoint/DiffusionPolicy/LiftingAB_B_75_state_tblock_no_pb_cnn_ddim_h16_e500_20260803/policy_last.ckpt \
-  --world_idx_list {170..179} --auto_exit --max_duration 13 --save_rollout --no_plot ;
+  --checkpoint robo_manip_baselines/checkpoint/DiffusionPolicy/LiftingAB_B75_policy_last_seed42_52_62/baselines/seed42/policy_last.ckpt \
+  --world_idx_list {170..179} --auto_exit --max_duration 10 --save_rollout --no_plot ;
   uv run python robo_manip_baselines/bin/Rollout.py DiffusionPolicy MujocoUR5eLiftingi_I2\
- --checkpoint robo_manip_baselines/checkpoint/DiffusionPolicy/LiftingAB_B_75_state_tblock_no_pb_cnn_ddim_h16_e500_20260803/policy_last.ckpt \
- --world_idx_list {270..279} --auto_exit --max_duration 13 --save_rollout --no_plot
+ --checkpoint robo_manip_baselines/checkpoint/DiffusionPolicy/LiftingAB_B75_policy_last_seed42_52_62/baselines/seed42/policy_last.ckpt \
+ --world_idx_list {270..279} --auto_exit --max_duration 10 --save_rollout --no_plot
 
 ##############################################################################################################
 

@@ -37,8 +37,6 @@ class WrenchPredictor4Model(nn.Module):
         self.output_head = output_head
         self.wrench_loss_weight = wrench_loss_weight
         self.n_action_condition_steps = horizon - n_obs_steps
-        assert self.n_action_condition_steps > 0, (horizon, n_obs_steps)
-        assert self.wrench_loss_weight >= 0.0, self.wrench_loss_weight
         assert self.output_head in ("mlp", "mlp_only"), self.output_head
 
         self.material_property = nn.Embedding(num_objects, pb_dim)
