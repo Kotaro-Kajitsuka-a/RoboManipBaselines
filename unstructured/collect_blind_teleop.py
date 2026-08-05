@@ -10,7 +10,8 @@ import subprocess
 # uv run python unstructured/collect_blind_teleop.py
 
 TRIALS_PER_OBJECT_FOR_TRAINING = 20
-# TODO: Add validation data collection.
+TRIALS_PER_OBJECT_FOR_VALIDATION = 0
+VALIDATION_WORLD_SUFFIX_START = 50
 
 EPISODE_NAME_PATTERN = re.compile(
     r"^WrenchPredObject(?P<object_idx>\d+)_world(?P<world_idx>\d+)_"
@@ -133,12 +134,28 @@ def delete_duplicate_world_episodes(object_dataset_dirs, log_file):
 # ---------------------------------------------------------------------
 # Create all trials.
 # ---------------------------------------------------------------------
-trials = []
-for object_idx in range(5):
-    for world_suffix in range(TRIALS_PER_OBJECT_FOR_TRAINING):
+def create_trials():
+    assert 0 <= TRIALS_PER_OBJECT_FOR_TRAINING <= VALIDATION_WORLD_SUFFIX_START
+    assert (
+        0 <= TRIALS_PER_OBJECT_FOR_VALIDATION <= (100 - VALIDATION_WORLD_SUFFIX_START)
+    )
+
+    trials = []
+    for object_idx in range(5):
         env_name = f"MujocoXarm7Pusht_T{object_idx}"
-        world_idx = object_idx * 100 + world_suffix
-        trials.append((env_name, world_idx))
+        world_idx_base = object_idx * 100
+
+        for world_suffix in range(TRIALS_PER_OBJECT_FOR_TRAINING):
+            trials.append(("training", env_name, world_idx_base + world_suffix))
+
+        for validation_idx in range(TRIALS_PER_OBJECT_FOR_VALIDATION):
+            world_suffix = VALIDATION_WORLD_SUFFIX_START + validation_idx
+            trials.append(("validation", env_name, world_idx_base + world_suffix))
+
+    return trials
+
+
+trials = create_trials()
 
 # Hide object order from the operator.
 random.shuffle(trials)
@@ -164,8 +181,18 @@ with open(log_path, "w") as log_file:
         file=log_file,
         flush=True,
     )
+    print(
+        f"training_trials_per_object={TRIALS_PER_OBJECT_FOR_TRAINING}, "
+        f"validation_trials_per_object={TRIALS_PER_OBJECT_FOR_VALIDATION}, "
+        f"validation_world_suffix_start={VALIDATION_WORLD_SUFFIX_START}",
+        file=log_file,
+        flush=True,
+    )
 
-    for trial_idx, (env_name, world_idx) in enumerate(trials):
+    # Clean existing data before deciding which worlds can be skipped.
+    delete_duplicate_world_episodes(object_dataset_dirs, log_file)
+
+    for trial_idx, (split_name, env_name, world_idx) in enumerate(trials):
         object_idx = world_idx // 100
         demo_name = f"WrenchPredObject{object_idx}"
         object_dataset_dir = object_dataset_dirs[object_idx]
@@ -176,7 +203,8 @@ with open(log_path, "w") as log_file:
         if world_idx_exists(object_dataset_dir, world_idx):
             msg = (
                 f"[{trial_idx + 1}/{len(trials)}] "
-                f"Skip world_idx={world_idx} "
+                f"Skip split={split_name}, "
+                f"world_idx={world_idx} "
                 f"(already exists)"
             )
             print(msg)
@@ -185,7 +213,7 @@ with open(log_path, "w") as log_file:
 
         print(
             f"Trial {trial_idx + 1}/{len(trials)}: "
-            f"env={env_name}, world_idx={world_idx}",
+            f"split={split_name}, env={env_name}, world_idx={world_idx}",
             file=log_file,
             flush=True,
         )

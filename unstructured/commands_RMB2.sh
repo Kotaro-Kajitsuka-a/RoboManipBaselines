@@ -205,5 +205,5 @@ uv run python robo_manip_baselines/bin/Rollout.py DiffusionPolicy \
 
 ##############################################################################################################
 
-# Blind teleoperation collection (20 episodes per object, 100 episodes total)
+# Blind teleoperation collection (trial counts are configured in the script)
 uv run python unstructured/collect_blind_teleop.py
