@@ -93,8 +93,8 @@ uv run python robo_manip_baselines/policy/wrench_predictor4/EvalWrenchPredictor4
 
 
 # Add the trained Object0 PB to every timestep of the known-to-operator A dataset
-uv run python robo_manip_baselines/policy/wrench_predictor4_online/AddConstantPbToDataset.py \
-  robo_manip_baselines/dataset/LiftingAB/WrenchPredObject0/A_known_to_operator 0 \
+python robo_manip_baselines/policy/wrench_predictor4_online/AddConstantPbToDataset.py \
+  robo_manip_baselines/dataset/LiftingAB/WrenchPredObject0/A_known_to_operator \
   --checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_I0I1I2_AB_150train_pb1_mlp_only_absolute_pose9_separate_tokens_500epoch_20260802/policy_epoch0400.ckpt
 
 # Estimate PB online from each unknown-to-operator B episode, starting from Object0 PB

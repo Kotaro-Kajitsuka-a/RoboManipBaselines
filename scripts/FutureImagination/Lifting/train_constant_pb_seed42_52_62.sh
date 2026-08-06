@@ -12,20 +12,7 @@ cp -a \
   robo_manip_baselines/dataset/LiftingAB_B_only_ConstantPB/
 
 python robo_manip_baselines/policy/wrench_predictor4_online/AddConstantPbToDataset.py \
-  robo_manip_baselines/dataset/LiftingAB_B_only_ConstantPB/WrenchPredObject0 \
-  0 \
-  --checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only/policy_best.ckpt \
-  --overwrite
-
-python robo_manip_baselines/policy/wrench_predictor4_online/AddConstantPbToDataset.py \
-  robo_manip_baselines/dataset/LiftingAB_B_only_ConstantPB/WrenchPredObject1 \
-  1 \
-  --checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only/policy_best.ckpt \
-  --overwrite
-
-python robo_manip_baselines/policy/wrench_predictor4_online/AddConstantPbToDataset.py \
-  robo_manip_baselines/dataset/LiftingAB_B_only_ConstantPB/WrenchPredObject2 \
-  2 \
+  robo_manip_baselines/dataset/LiftingAB_B_only_ConstantPB \
   --checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only/policy_best.ckpt \
   --overwrite
 
