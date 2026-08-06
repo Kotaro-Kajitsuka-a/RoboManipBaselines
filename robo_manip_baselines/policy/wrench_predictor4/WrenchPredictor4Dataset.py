@@ -108,10 +108,11 @@ class WrenchPredictor4Dataset(DatasetBase, DpStyleDatasetMixin):
         wrench = normalize_data(wrench, self.model_meta_info["wrench"])
         return state, action, image_feature, wrench
 
-    def get_object_id(self, filename):
+    @classmethod
+    def get_object_id(cls, filename):
         matched_object_ids = [
             object_id
-            for object_key, object_id in self.OBJECT_KEY_TO_ID.items()
+            for object_key, object_id in cls.OBJECT_KEY_TO_ID.items()
             if object_key in filename
         ]
         assert len(matched_object_ids) == 1, (filename, matched_object_ids)

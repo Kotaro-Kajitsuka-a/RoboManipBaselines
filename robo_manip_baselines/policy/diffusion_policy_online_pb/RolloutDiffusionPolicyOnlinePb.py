@@ -11,12 +11,10 @@ from robo_manip_baselines.common import (
     normalize_data,
 )
 from robo_manip_baselines.policy.diffusion_policy import RolloutDiffusionPolicy
-from robo_manip_baselines.policy.wrench_predictor4_online.AddConstantPbToDataset import (
+from robo_manip_baselines.policy.wrench_predictor4_online.WrenchPredictor4OnlineUtils import (
     NUM_LIFTING_OBJECTS,
-    load_pb,
-)
-from robo_manip_baselines.policy.wrench_predictor4_online.AddOnlinePbToDataset import (
     load_model_meta_info,
+    load_pb,
     load_policy,
 )
 
@@ -61,6 +59,7 @@ class RolloutDiffusionPolicyOnlinePb(RolloutDiffusionPolicy):
         self.initial_pb, self.initial_object_key = load_pb(
             self.wp4_checkpoint,
             self.args.initial_object_id,
+            self.wp4_model_meta_info,
         )
 
         wp4_data_info = self.wp4_model_meta_info["data"]

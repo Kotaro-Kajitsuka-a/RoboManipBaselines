@@ -8,9 +8,7 @@ from robo_manip_baselines.policy.wrench_predictor4.WrenchPredictor4Dataset impor
     WrenchPredictor4Dataset,
 )
 from robo_manip_baselines.policy.wrench_predictor4_online.WrenchPredictor4OnlineUtils import (
-    get_wp4_provenance,
     load_pb_table,
-    write_wp4_provenance_attrs,
 )
 
 
@@ -48,7 +46,7 @@ def write_constant_pb(
     pb: np.ndarray,
     object_id: int,
     object_key: str,
-    wp4_provenance: dict[str, str],
+    checkpoint_path: Path,
     overwrite: bool,
 ) -> str:
     with RmbData(rmb_path, mode="r+") as rmb_data:
@@ -76,7 +74,7 @@ def write_constant_pb(
         dataset = h5file[DataKey.MATERIAL_PROPERTY]
         dataset.attrs["object_id"] = object_id
         dataset.attrs["object_key"] = object_key
-        write_wp4_provenance_attrs(dataset, wp4_provenance)
+        dataset.attrs["source_checkpoint"] = str(checkpoint_path.resolve())
 
     return status
 
@@ -87,7 +85,6 @@ def main() -> None:
     assert len(filenames) > 0, args.dataset_path
 
     pb_table, object_key_to_id = load_pb_table(args.checkpoint)
-    wp4_provenance = get_wp4_provenance(args.checkpoint)
     object_id_to_key = {
         object_id: object_key for object_key, object_id in object_key_to_id.items()
     }
@@ -106,7 +103,7 @@ def main() -> None:
             pb_table[object_id],
             object_id,
             object_id_to_key[object_id],
-            wp4_provenance,
+            args.checkpoint,
             args.overwrite,
         )
         counts[object_id][status] += 1
