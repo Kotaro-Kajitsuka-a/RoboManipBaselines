@@ -46,7 +46,9 @@ python ./bin/Rollout.py PpoCus RealXarm7Demo --wait_before_start --skip_draw 50 
 
 
 visualize
-python ./bin/ViewModelMetaInfo.py ./checkpoint/Mlp/RealXarm7Demo_20250911_162223_Mlp_20250922_162104/model_meta_info.pkl --save-json meta_info_info.json
+uv run python robo_manip_baselines/misc/ViewModelMetaInfo.py \
+  robo_manip_baselines/checkpoint/Mlp/RealXarm7Demo_20250911_162223_Mlp_20250922_162104/model_meta_info.pkl \
+  --save-json
 
 
 make pickle file of meta_info
@@ -231,6 +233,4 @@ python robo_manip_baselines/misc/CreateBoxPoseEvalHdf5.py /path/to/dataset_dir ~
 
 
 python robo_manip_baselines/misc/EvalBoxRotation.py /path/to/dataset_dir
-
-
 
