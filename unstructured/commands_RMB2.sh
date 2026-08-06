@@ -123,10 +123,11 @@ uv run python robo_manip_baselines/bin/Train.py DiffusionPolicy \
   --skip 3 \
   --batch_size 64 \
   --num_workers 2 \
-  --num_epochs 1000 \
+  --num_epochs 500 \
   --lr 1e-4 \
   --train_ratio 1.0 \
-  --val_ratio 0.01
+  --val_ratio 0.01 \
+  --seed 42
 
 # Train MLP-only WrenchPredictor4 on the 75 disjoint unknown-to-operator B episodes
 uv run python robo_manip_baselines/bin/Train.py WrenchPredictor4 \
@@ -157,6 +158,42 @@ uv run python robo_manip_baselines/bin/Rollout.py \
   --wp4_checkpoint path/to/wrench_predictor4.ckpt \
   --initial_object_id 0 \
   --online_pb_lr 6e-3
+
+
+#Rollout for evaluation of Diffusion Policy with online PB adaptation
+
+python robo_manip_baselines/bin/Rollout.py \
+  DiffusionPolicyOnlinePb MujocoUR5eLiftingi_I0 \
+  --checkpoint path/to/diffusion_policy.ckpt \
+  --wp4_checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only/policy_last.ckpt \
+  --initial_object_id 0 \
+  --online_pb_lr 6e-3 \
+  --world_idx_list {70..79} --auto_exit --max_duration 10 --save_rollout --no_plot ;
+
+python robo_manip_baselines/bin/Rollout.py \
+  DiffusionPolicyOnlinePb MujocoUR5eLiftingi_I0 \
+  --checkpoint path/to/diffusion_policy.ckpt \
+  --wp4_checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only/policy_last.ckpt \
+  --initial_object_id 0 \
+  --online_pb_lr 6e-3 \
+  --world_idx_list {70..79} --auto_exit --max_duration 10 --save_rollout --no_plot ;
+
+python robo_manip_baselines/bin/Rollout.py \
+  DiffusionPolicyOnlinePb MujocoUR5eLiftingi_I1 \
+  --checkpoint path/to/diffusion_policy.ckpt \
+  --wp4_checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only/policy_last.ckpt \
+  --initial_object_id 0 \
+  --online_pb_lr 6e-3 \
+  --world_idx_list {170..179} --auto_exit --max_duration 10 --save_rollout --no_plot ;
+
+python robo_manip_baselines/bin/Rollout.py \
+  DiffusionPolicyOnlinePb MujocoUR5eLiftingi_I2 \
+  --checkpoint path/to/diffusion_policy.ckpt \
+  --wp4_checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only/policy_last.ckpt \
+  --initial_object_id 0 \
+  --online_pb_lr 6e-3 \
+  --world_idx_list {270..279} --auto_exit --max_duration 10 --save_rollout --no_plot ;
+
 
 # Judge all 60 Lifting test episodes: final lift >= 10 cm and tilt < 7.5 deg
 uv run python robo_manip_baselines/misc/futureimagination/AnalyzeLiftingSuccess.py \
@@ -192,7 +229,8 @@ uv run python robo_manip_baselines/bin/Train.py DiffusionPolicy \
   --num_epochs 500 \
   --lr 1e-4 \
   --train_ratio 1.0 \
-  --val_ratio 0.01
+  --val_ratio 0.01 \
+  --seed 42
 
 
 # Rollout for evaluation #
