@@ -2,6 +2,7 @@ import argparse
 import copy
 import math
 import os
+import pickle
 
 import numpy as np
 import torch
@@ -412,6 +413,39 @@ class TrainWrenchPredictor4(TrainBase):
 
         self.save_current_ckpt("last", policy=self.policy)
         self.save_best_ckpt()
+        self.save_learned_pb_to_model_meta_info()
+
+    def get_pb_by_object(self, state_dict):
+        material_property = state_dict["material_property.weight"]
+        object_key_to_id = self.model_meta_info["material_property"]["object_key_to_id"]
+        return {
+            object_key: material_property[object_id].detach().cpu().tolist()
+            for object_key, object_id in sorted(
+                object_key_to_id.items(),
+                key=lambda item: item[1],
+            )
+        }
+
+    def save_learned_pb_to_model_meta_info(self):
+        material_property_info = self.model_meta_info["material_property"]
+        material_property_info["policy_best"] = {
+            "checkpoint": "policy_best.ckpt",
+            "epoch": self.best_ckpt_info["epoch"],
+            "pb_by_object": self.get_pb_by_object(self.best_ckpt_info["state_dict"]),
+        }
+        material_property_info["policy_last"] = {
+            "checkpoint": "policy_last.ckpt",
+            "epoch": self.args.num_epochs - 1,
+            "pb_by_object": self.get_pb_by_object(self.policy.state_dict()),
+        }
+
+        model_meta_info_path = os.path.join(
+            self.args.checkpoint_dir,
+            "model_meta_info.pkl",
+        )
+        with open(model_meta_info_path, "wb") as file:
+            pickle.dump(self.model_meta_info, file)
+        print(f"[{self.__class__.__name__}] Save learned PBs: {model_meta_info_path}")
 
     def update_best_ckpt(self, epoch_summary, policy=None):
         if epoch_summary["loss"] < self.best_ckpt_info["loss"]:

@@ -2,7 +2,6 @@ import argparse
 import re
 from pathlib import Path
 
-import h5py
 import matplotlib
 
 matplotlib.use("Agg")
@@ -11,11 +10,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
-from robo_manip_baselines.common import find_rmb_files
-from robo_manip_baselines.policy.wrench_predictor4_online.AddConstantPbToDataset import (
-    DATA_KEY,
-    get_hdf5_path,
-)
+from robo_manip_baselines.common import DataKey, RmbData, find_rmb_files
 
 
 def parse_args() -> argparse.Namespace:
@@ -49,27 +44,22 @@ def get_actual_object_id(dataset_path: Path) -> int:
 
 
 def load_episode(filename: str) -> dict:
-    hdf5_path = get_hdf5_path(filename)
-    with h5py.File(hdf5_path, "r") as h5file:
-        assert "time" in h5file, hdf5_path
-        assert DATA_KEY in h5file, hdf5_path
+    with RmbData(filename) as rmb_data:
+        assert DataKey.TIME in rmb_data, filename
+        assert DataKey.MATERIAL_PROPERTY in rmb_data, filename
 
-        time = h5file["time"][:]
-        pb = h5file[DATA_KEY][:]
-        attrs = dict(h5file[DATA_KEY].attrs)
+        time = rmb_data[DataKey.TIME][:]
+        pb = rmb_data[DataKey.MATERIAL_PROPERTY][:]
+        attrs = dict(rmb_data[DataKey.MATERIAL_PROPERTY].attrs)
 
-    assert time.ndim == 1, (hdf5_path, time.shape)
-    assert pb.shape == (len(time), 1), (hdf5_path, pb.shape)
+    assert time.ndim == 1, (filename, time.shape)
+    assert pb.shape == (len(time), 1), (filename, pb.shape)
     skip = int(attrs["online_skip"])
     horizon = int(attrs["online_horizon"])
     num_updates = int(attrs["online_num_updates"])
     first_update_idx = (horizon - 1) * skip
     update_idxes = first_update_idx + np.arange(num_updates) * skip
-    assert update_idxes[-1] < len(time), (
-        hdf5_path,
-        update_idxes[-1],
-        len(time),
-    )
+    assert update_idxes[-1] < len(time), (filename, update_idxes[-1], len(time))
     plot_idxes = np.concatenate([np.asarray([0, first_update_idx - 1]), update_idxes])
     elapsed_time = time - time[0]
     return {
