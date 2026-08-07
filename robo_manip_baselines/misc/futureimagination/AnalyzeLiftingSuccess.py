@@ -16,6 +16,10 @@ OBJECT_PATTERNS = {
     "I0": ("WrenchPredObject0", "MujocoUR5eLiftingi_I0"),
     "I1": ("WrenchPredObject1", "MujocoUR5eLiftingi_I1"),
     "I2": ("WrenchPredObject2", "MujocoUR5eLiftingi_I2"),
+    "I4": ("WrenchPredObject4", "MujocoUR5eLiftingi_I4"),
+    "I5": ("WrenchPredObject5", "MujocoUR5eLiftingi_I5"),
+    "I6": ("WrenchPredObject6", "MujocoUR5eLiftingi_I6"),
+    "I7": ("WrenchPredObject7", "MujocoUR5eLiftingi_I7"),
 }
 
 
