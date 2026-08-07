@@ -54,6 +54,22 @@ register(
     id="robo_manip_baselines/MujocoUR5eLiftingi_I3Env-v0",
     entry_point="robo_manip_baselines.envs.mujoco:MujocoUR5eLiftingi_I3Env",
 )
+register(
+    id="robo_manip_baselines/MujocoUR5eLiftingi_I4Env-v0",
+    entry_point="robo_manip_baselines.envs.mujoco:MujocoUR5eLiftingi_I4Env",
+)
+register(
+    id="robo_manip_baselines/MujocoUR5eLiftingi_I5Env-v0",
+    entry_point="robo_manip_baselines.envs.mujoco:MujocoUR5eLiftingi_I5Env",
+)
+register(
+    id="robo_manip_baselines/MujocoUR5eLiftingi_I6Env-v0",
+    entry_point="robo_manip_baselines.envs.mujoco:MujocoUR5eLiftingi_I6Env",
+)
+register(
+    id="robo_manip_baselines/MujocoUR5eLiftingi_I7Env-v0",
+    entry_point="robo_manip_baselines.envs.mujoco:MujocoUR5eLiftingi_I7Env",
+)
 
 ## UR5e-Dual
 register(

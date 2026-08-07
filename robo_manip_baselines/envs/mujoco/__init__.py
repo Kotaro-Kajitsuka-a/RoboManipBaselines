@@ -11,6 +11,10 @@ from .ur5e.MujocoUR5eLiftingi_I0Env import MujocoUR5eLiftingi_I0Env
 from .ur5e.MujocoUR5eLiftingi_I1Env import MujocoUR5eLiftingi_I1Env
 from .ur5e.MujocoUR5eLiftingi_I2Env import MujocoUR5eLiftingi_I2Env
 from .ur5e.MujocoUR5eLiftingi_I3Env import MujocoUR5eLiftingi_I3Env
+from .ur5e.MujocoUR5eLiftingi_I4Env import MujocoUR5eLiftingi_I4Env
+from .ur5e.MujocoUR5eLiftingi_I5Env import MujocoUR5eLiftingi_I5Env
+from .ur5e.MujocoUR5eLiftingi_I6Env import MujocoUR5eLiftingi_I6Env
+from .ur5e.MujocoUR5eLiftingi_I7Env import MujocoUR5eLiftingi_I7Env
 
 from .ur5e_dual.MujocoUR5eDualCableEnv import MujocoUR5eDualCableEnv
 
