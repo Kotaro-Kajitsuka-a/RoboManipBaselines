@@ -4,7 +4,8 @@ set -e
 # Run from the repository root after train_DP_online_pb_seed42_52_62.sh.
 # The DP was trained with causal online-PB trajectories, and evaluation adapts
 # PB online with the same WrenchPredictor4 checkpoint and initial PB.
-eval_dir=robo_manip_baselines/dataset/tests/FutureImagination/LiftingAB_DP_online_pb_training_seed_eval_20260807
+eval_timestamp=$(date +%Y%m%d_%H%M%S)
+eval_dir="robo_manip_baselines/dataset/tests/FutureImagination/LiftingAB_B_only/DP_online_pb_eval_${eval_timestamp}"
 rmb_dir="$eval_dir/rmb"
 mkdir -p "$rmb_dir"
 

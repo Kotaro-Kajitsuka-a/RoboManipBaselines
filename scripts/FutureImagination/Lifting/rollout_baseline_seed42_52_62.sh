@@ -3,7 +3,8 @@ set -e
 
 # Run from the repository root after train_baseline_seed42_52_62.sh.
 # Evaluate ordinary Diffusion Policy without online PB adaptation.
-eval_dir=robo_manip_baselines/dataset/tests/FutureImagination/LiftingAB_DP_baseline_seed_eval_20260807
+eval_timestamp=$(date +%Y%m%d_%H%M%S)
+eval_dir="robo_manip_baselines/dataset/tests/FutureImagination/LiftingAB_B_only/DP_baseline_eval_${eval_timestamp}"
 rmb_dir="$eval_dir/rmb"
 mkdir -p "$rmb_dir"
 

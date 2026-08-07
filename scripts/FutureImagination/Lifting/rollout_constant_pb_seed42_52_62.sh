@@ -4,7 +4,8 @@ set -e
 # Run from the repository root after train_constant_pb_seed42_52_62.sh.
 # The DP was trained with oracle constant PB, but evaluation identifies PB
 # online in exactly the same way as the proposed method.
-eval_dir=robo_manip_baselines/dataset/tests/FutureImagination/LiftingAB_DP_constant_pb_training_seed_eval_20260806
+eval_timestamp=$(date +%Y%m%d_%H%M%S)
+eval_dir="robo_manip_baselines/dataset/tests/FutureImagination/LiftingAB_B_only/DP_constant_pb_eval_${eval_timestamp}"
 rmb_dir="$eval_dir/rmb"
 mkdir -p "$rmb_dir"
 
