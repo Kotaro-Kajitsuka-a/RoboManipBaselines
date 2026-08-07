@@ -84,7 +84,7 @@ uv run python robo_manip_baselines/bin/Train.py WrenchPredictor4 \
   --skip 3 --batch_size 64 --num_epochs 500 --lr 1e-4
 
 # Evaluate policy_best.ckpt by sweeping the Object0/Object1/Object2 material PBs
-uv run python robo_manip_baselines/policy/wrench_predictor4/EvalWrenchPredictor4LiftingSweepDir.py \
+python robo_manip_baselines/policy/wrench_predictor4/EvalWrenchPredictor4SweepDir.py \
   robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingDisjointWorldIdx_I0w0-39_I1w100-139_I2w200-239_pb1_mlp_only_absolute_pose9_separate_image_state_tokens_120train_30val_500epoch_20260801 \
   robo_manip_baselines/dataset/LiftingDisjointWorldIdx/validation \
   --checkpoint_names policy_best.ckpt \

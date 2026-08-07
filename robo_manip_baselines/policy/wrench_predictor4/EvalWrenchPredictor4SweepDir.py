@@ -14,26 +14,26 @@ from robo_manip_baselines.policy.wrench_predictor4.EvalWrenchPredictor4SweepComm
 )
 
 
-class EvalWrenchPredictor4LiftingSweepDir(EvalWrenchPredictor4SweepBase):
+class EvalWrenchPredictor4SweepDir(EvalWrenchPredictor4SweepBase):
     def get_output_name(self, rmb_dir_name):
-        return f"{rmb_dir_name}_wrench_predictor4_lifting_sweep"
+        return f"{rmb_dir_name}_wrench_predictor4_sweep"
 
     def get_output_csv_name(self):
-        return "lifting_sweep_eval.csv"
+        return "sweep_eval.csv"
 
     def get_summary_csv_name(self):
-        return "lifting_sweep_matrix_summary.csv"
+        return "sweep_matrix_summary.csv"
 
     def get_diagonal_accuracy_csv_name(self):
-        return "lifting_sweep_diagonal_accuracy.csv"
+        return "sweep_diagonal_accuracy.csv"
 
     def get_heatmap_png_name(self, checkpoint_stem):
-        return f"{checkpoint_stem}_wrench_predictor4_lifting_sweep_heatmap.png"
+        return f"{checkpoint_stem}_wrench_predictor4_sweep_heatmap.png"
 
     def get_heatmap_metrics(self):
         return [
-            ("I-shape block position [m]", "tblock position [m]"),
-            ("I-shape block rotation [deg]", "tblock rotation [deg]"),
+            ("object position [m]", "tblock position [m]"),
+            ("object rotation [deg]", "tblock rotation [deg]"),
             ("auxiliary force MAE [N]", "force mean"),
             ("auxiliary torque MAE [N m]", "torque mean"),
             ("normalized total error", "normalized total mean"),
@@ -354,5 +354,5 @@ class EvalWrenchPredictor4LiftingSweepDir(EvalWrenchPredictor4SweepBase):
 
 
 if __name__ == "__main__":
-    evaluator = EvalWrenchPredictor4LiftingSweepDir(**vars(parse_sweep_argument()))
+    evaluator = EvalWrenchPredictor4SweepDir(**vars(parse_sweep_argument()))
     evaluator.run()
