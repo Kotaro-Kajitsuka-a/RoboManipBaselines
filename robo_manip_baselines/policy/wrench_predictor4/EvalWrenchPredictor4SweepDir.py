@@ -36,6 +36,8 @@ class EvalWrenchPredictor4SweepDir(EvalWrenchPredictor4SweepBase):
             ("object rotation [deg]", "tblock rotation [deg]"),
             ("auxiliary force MAE [N]", "force mean"),
             ("auxiliary torque MAE [N m]", "torque mean"),
+            ("normalized image feature error", "normalized image feature mean"),
+            ("normalized wrench error", "normalized wrench mean"),
             ("normalized total error", "normalized total mean"),
         ]
 
@@ -88,6 +90,12 @@ class EvalWrenchPredictor4SweepDir(EvalWrenchPredictor4SweepBase):
             axis=0,
         )
         total_abs_error = np.concatenate(total_abs_error_list, axis=0)
+        wrench_dim = self.model_meta_info["policy"]["args"]["wrench_dim"]
+        image_feature_dim = self.model_meta_info["policy"]["args"]["image_feature_dim"]
+        normalized_wrench_abs_error = total_abs_error[:, :wrench_dim]
+        normalized_image_feature_abs_error = total_abs_error[:, wrench_dim:]
+        assert normalized_wrench_abs_error.shape[1] == wrench_dim
+        assert normalized_image_feature_abs_error.shape[1] == image_feature_dim
 
         return {
             "checkpoint": os.path.basename(checkpoint),
@@ -107,6 +115,8 @@ class EvalWrenchPredictor4SweepDir(EvalWrenchPredictor4SweepBase):
             "force mean": wrench_mae[:3].mean(),
             "torque mean": wrench_mae[3:].mean(),
             "wrench mean": wrench_mae.mean(),
+            "normalized image feature mean": normalized_image_feature_abs_error.mean(),
+            "normalized wrench mean": normalized_wrench_abs_error.mean(),
             "normalized total mean": total_abs_error.mean(),
         }
 
@@ -176,6 +186,8 @@ class EvalWrenchPredictor4SweepDir(EvalWrenchPredictor4SweepBase):
             "force mean",
             "torque mean",
             "wrench mean",
+            "normalized image feature mean",
+            "normalized wrench mean",
             "normalized total mean",
         ]
         with open(self.output_csv, "w", newline="") as f:
