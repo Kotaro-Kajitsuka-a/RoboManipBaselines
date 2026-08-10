@@ -44,12 +44,19 @@ class RolloutDiffusionPolicyOnlinePb(RolloutDiffusionPolicy):
             default=6e-3,
             help="learning rate applied only to the online PB",
         )
+        parser.add_argument(
+            "--wrench_loss_weight",
+            type=float,
+            default=0.0,
+            help="weight of the normalized wrench prediction loss used to adapt PB",
+        )
 
     def setup_policy(self):
         super().setup_policy()
 
         assert self.state_keys.count(DataKey.MATERIAL_PROPERTY) == 1, self.state_keys
         assert self.args.online_pb_lr > 0.0, self.args.online_pb_lr
+        assert self.args.wrench_loss_weight >= 0.0, self.args.wrench_loss_weight
         self.wp4_checkpoint = self.args.wp4_checkpoint.resolve()
         self.wp4_model_meta_info = load_model_meta_info(self.wp4_checkpoint)
         self.wp4_policy = load_policy(
@@ -72,6 +79,11 @@ class RolloutDiffusionPolicyOnlinePb(RolloutDiffusionPolicy):
         wp4_pb_dim = self.wp4_model_meta_info["material_property"]["pb_dim"]
         assert dp_pb_dim == wp4_pb_dim, (dp_pb_dim, wp4_pb_dim)
 
+        wrench_clip_info = self.wp4_model_meta_info["wrench"]["percentile_clip"]
+        self.wp4_wrench_source_key = wrench_clip_info["source_key"]
+        self.wp4_wrench_clip_min = np.asarray(wrench_clip_info["min"])
+        self.wp4_wrench_clip_max = np.asarray(wrench_clip_info["max"])
+
         wp4_data_info = self.wp4_model_meta_info["data"]
         print(
             f"[{self.__class__.__name__}] Construct online PB adapter.\n"
@@ -80,6 +92,7 @@ class RolloutDiffusionPolicyOnlinePb(RolloutDiffusionPolicy):
             f"(id={self.args.initial_object_id}, PB={self.initial_pb.tolist()})\n"
             f"  - PB dimension: {wp4_pb_dim}\n"
             f"  - learning rate: {self.args.online_pb_lr}\n"
+            f"  - wrench loss weight: {self.args.wrench_loss_weight}\n"
             f"  - horizon: {wp4_data_info['horizon']}, "
             f"obs steps: {wp4_data_info['n_obs_steps']}, "
             f"skip: {wp4_data_info['skip']}"
@@ -94,6 +107,9 @@ class RolloutDiffusionPolicyOnlinePb(RolloutDiffusionPolicy):
             self.args.initial_object_id
         )
         self.data_manager.meta_data["online_pb_learning_rate"] = self.args.online_pb_lr
+        self.data_manager.meta_data["online_pb_wrench_loss_weight"] = (
+            self.args.wrench_loss_weight
+        )
 
     def reset_variables(self):
         super().reset_variables()
@@ -140,10 +156,16 @@ class RolloutDiffusionPolicyOnlinePb(RolloutDiffusionPolicy):
             self.motion_manager.get_data(image_feature_key, self.obs),
             image_feature_key,
         )
+        wrench = np.clip(
+            self.motion_manager.get_data(self.wp4_wrench_source_key, self.obs),
+            self.wp4_wrench_clip_min,
+            self.wp4_wrench_clip_max,
+        )
         self.online_observation_window.append(
             {
                 "state": state.copy(),
                 "image_feature": image_feature.copy(),
+                "wrench": wrench.copy(),
             }
         )
 
@@ -159,6 +181,9 @@ class RolloutDiffusionPolicyOnlinePb(RolloutDiffusionPolicy):
         state = np.stack([sample["state"] for sample in self.online_observation_window])
         image_feature = np.stack(
             [sample["image_feature"] for sample in self.online_observation_window]
+        )
+        wrench = np.stack(
+            [sample["wrench"] for sample in self.online_observation_window]
         )
 
         # At observation t, actions through t - 1 have already been executed.
@@ -187,17 +212,26 @@ class RolloutDiffusionPolicyOnlinePb(RolloutDiffusionPolicy):
                 dtype=torch.float32,
                 device=self.device,
             ).unsqueeze(0),
+            "wrench": torch.tensor(
+                normalize_data(wrench, self.wp4_model_meta_info["wrench"]),
+                dtype=torch.float32,
+                device=self.device,
+            ).unsqueeze(0),
         }
 
         self.online_pb_optimizer.zero_grad()
         prediction = self.wp4_policy(batch, self.online_pb.unsqueeze(0))
         start = self.wp4_policy.n_obs_steps
-        # Match offline adaptation: identify PB only from future object-pose error.
         pose_loss = F.mse_loss(
             prediction["image_feature"][:, start:],
             batch["image_feature"][:, start:],
         )
-        pose_loss.backward()
+        wrench_loss = F.mse_loss(
+            prediction["wrench"][:, start:],
+            batch["wrench"][:, start:],
+        )
+        loss = pose_loss + self.args.wrench_loss_weight * wrench_loss
+        loss.backward()
         self.online_pb_optimizer.step()
 
     # Override methods in normal Diffusion Policy to use the online PB in the DP state buffer.
