@@ -12,9 +12,6 @@ from robo_manip_baselines.policy.wrench_predictor4.WrenchPredictor4Model import 
 )
 
 
-NUM_LIFTING_OBJECTS = 3
-
-
 def load_model_meta_info(checkpoint_path: Path) -> dict:
     checkpoint_path = checkpoint_path.resolve()
     assert checkpoint_path.is_file(), checkpoint_path
@@ -26,10 +23,16 @@ def load_model_meta_info(checkpoint_path: Path) -> dict:
 
     assert model_meta_info["policy"]["name"] == "WrenchPredictor4"
     policy_args = model_meta_info["policy"]["args"]
-    assert policy_args["pb_dim"] == 1, policy_args["pb_dim"]
-    assert policy_args["num_objects"] >= NUM_LIFTING_OBJECTS, policy_args
-    assert model_meta_info["data"]["horizon"] > 0
-    assert model_meta_info["data"]["skip"] > 0
+    pb_dim = policy_args["pb_dim"]
+    assert model_meta_info["material_property"]["pb_dim"] == pb_dim, (
+        model_meta_info["material_property"]["pb_dim"],
+        pb_dim,
+    )
+    object_key_to_id = model_meta_info["material_property"]["object_key_to_id"]
+    assert policy_args["num_objects"] == len(object_key_to_id), (
+        policy_args["num_objects"],
+        len(object_key_to_id),
+    )
     return model_meta_info
 
 
@@ -87,4 +90,5 @@ def load_pb(
     object_id_to_key = {
         mapped_id: object_key for object_key, mapped_id in object_key_to_id.items()
     }
+    assert object_id in object_id_to_key, (object_id, sorted(object_id_to_key))
     return pb_table[object_id], object_id_to_key[object_id]

@@ -33,10 +33,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--overwrite",
         action="store_true",
-        help=(
-            f"replace an existing {DataKey.MATERIAL_PROPERTY} dataset if its "
-            "value differs"
-        ),
+        help=f"replace an existing {DataKey.MATERIAL_PROPERTY} dataset",
     )
     return parser.parse_args()
 
@@ -56,22 +53,19 @@ def write_constant_pb(
         data = np.broadcast_to(pb, (num_steps, pb.shape[0])).copy()
 
         if DataKey.MATERIAL_PROPERTY in h5file:
-            existing = h5file[DataKey.MATERIAL_PROPERTY][:]
-            if existing.shape == data.shape and np.array_equal(existing, data):
-                status = "unchanged"
-            else:
-                assert overwrite, (
+            if not overwrite:
+                raise FileExistsError(
                     f"{rmb_path}: {DataKey.MATERIAL_PROPERTY} already exists "
-                    "with a different value; pass --overwrite to replace it"
+                    "and --overwrite was not specified"
                 )
-                del h5file[DataKey.MATERIAL_PROPERTY]
-                h5file.create_dataset(DataKey.MATERIAL_PROPERTY, data=data)
-                status = "overwritten"
+            del h5file[DataKey.MATERIAL_PROPERTY]
+            status = "overwritten"
         else:
-            h5file.create_dataset(DataKey.MATERIAL_PROPERTY, data=data)
             status = "added"
+        h5file.create_dataset(DataKey.MATERIAL_PROPERTY, data=data)
 
         dataset = h5file[DataKey.MATERIAL_PROPERTY]
+        dataset.attrs["pb_dim"] = pb.shape[0]
         dataset.attrs["object_id"] = object_id
         dataset.attrs["object_key"] = object_key
         dataset.attrs["source_checkpoint"] = str(checkpoint_path.resolve())
@@ -93,7 +87,7 @@ def main() -> None:
         for filename in filenames
     ]
     counts = {
-        object_id: {"added": 0, "overwritten": 0, "unchanged": 0}
+        object_id: {"added": 0, "overwritten": 0}
         for object_id in {object_id for _, object_id in episodes}
     }
 
@@ -123,8 +117,7 @@ def main() -> None:
             "episodes: "
             f"{sum(object_counts.values())} "
             f"(added={object_counts['added']}, "
-            f"overwritten={object_counts['overwritten']}, "
-            f"unchanged={object_counts['unchanged']})"
+            f"overwritten={object_counts['overwritten']})"
         )
 
     print(f"total: {len(counts)} objects, {len(episodes)} episodes")

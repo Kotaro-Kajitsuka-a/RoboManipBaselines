@@ -12,7 +12,6 @@ from robo_manip_baselines.common import (
 )
 from robo_manip_baselines.policy.diffusion_policy import RolloutDiffusionPolicy
 from robo_manip_baselines.policy.wrench_predictor4_online.WrenchPredictor4OnlineUtils import (
-    NUM_LIFTING_OBJECTS,
     load_model_meta_info,
     load_pb,
     load_policy,
@@ -33,9 +32,11 @@ class RolloutDiffusionPolicyOnlinePb(RolloutDiffusionPolicy):
         parser.add_argument(
             "--initial_object_id",
             type=int,
-            choices=range(NUM_LIFTING_OBJECTS),
             default=0,
-            help="trained WP4 object PB used at the start of every episode",
+            help=(
+                "trained WP4 object PB used at the start of every episode; "
+                "valid IDs are read from the WP4 checkpoint"
+            ),
         )
         parser.add_argument(
             "--online_pb_lr",
@@ -62,12 +63,22 @@ class RolloutDiffusionPolicyOnlinePb(RolloutDiffusionPolicy):
             self.wp4_model_meta_info,
         )
 
+        non_pb_state_dim = sum(
+            DataKey.get_dim_for_policy(state_key, self.env)
+            for state_key in self.state_keys
+            if state_key != DataKey.MATERIAL_PROPERTY
+        )
+        dp_pb_dim = self.state_dim - non_pb_state_dim
+        wp4_pb_dim = self.wp4_model_meta_info["material_property"]["pb_dim"]
+        assert dp_pb_dim == wp4_pb_dim, (dp_pb_dim, wp4_pb_dim)
+
         wp4_data_info = self.wp4_model_meta_info["data"]
         print(
             f"[{self.__class__.__name__}] Construct online PB adapter.\n"
             f"  - WP4 checkpoint: {self.wp4_checkpoint}\n"
             f"  - initial object: {self.initial_object_key} "
             f"(id={self.args.initial_object_id}, PB={self.initial_pb.tolist()})\n"
+            f"  - PB dimension: {wp4_pb_dim}\n"
             f"  - learning rate: {self.args.online_pb_lr}\n"
             f"  - horizon: {wp4_data_info['horizon']}, "
             f"obs steps: {wp4_data_info['n_obs_steps']}, "
@@ -100,11 +111,9 @@ class RolloutDiffusionPolicyOnlinePb(RolloutDiffusionPolicy):
             [self.online_pb],
             lr=self.args.online_pb_lr,
         )
-        self.online_pb_update_count = 0
 
     def infer_policy(self):
         self.append_online_observation()
-        assert len(self.online_observation_window) <= self.online_observation_window.maxlen
         if len(self.online_observation_window) == self.online_observation_window.maxlen:
             # RolloutPhase calls infer_policy() under torch.inference_mode().
             # Re-enable autograd locally and create all WP4 tensors in this scope.
@@ -140,7 +149,9 @@ class RolloutDiffusionPolicyOnlinePb(RolloutDiffusionPolicy):
 
     def update_online_pb(self):
         horizon = self.wp4_model_meta_info["data"]["horizon"]
-        assert len(self.policy_action_list) >= horizon - 1, (  #if horizon = 16, we need at least excuted 15 actions.
+        assert (
+            len(self.policy_action_list) >= horizon - 1
+        ), (  # if horizon = 16, we need at least excuted 15 actions.
             len(self.policy_action_list),
             horizon,
         )
@@ -189,12 +200,13 @@ class RolloutDiffusionPolicyOnlinePb(RolloutDiffusionPolicy):
         pose_loss.backward()
         self.online_pb_optimizer.step()
 
-        self.online_pb_update_count += 1
-
     # Override methods in normal Diffusion Policy to use the online PB in the DP state buffer.
     def update_state_buf(self):
         state = np.concatenate(
-            [self.get_dp_state_data_including_pb(state_key) for state_key in self.state_keys]
+            [
+                self.get_dp_state_data_including_pb(state_key)
+                for state_key in self.state_keys
+            ]
         )
         state = normalize_data(state, self.model_meta_info["state"])
         state = torch.tensor(state, dtype=torch.float32)

@@ -16,7 +16,6 @@ from robo_manip_baselines.policy.wrench_predictor4.WrenchPredictor4Model import 
     WrenchPredictor4Model,
 )
 from robo_manip_baselines.policy.wrench_predictor4_online.WrenchPredictor4OnlineUtils import (
-    NUM_LIFTING_OBJECTS,
     load_model_meta_info,
     load_pb,
     load_policy,
@@ -41,8 +40,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "initial_object_id",
         type=int,
-        choices=range(NUM_LIFTING_OBJECTS),
-        help="trained PB ID used before and at the start of online adaptation",
+        help=(
+            "trained PB ID used before and at the start of online adaptation; "
+            "valid IDs are read from the checkpoint"
+        ),
     )
     parser.add_argument(
         "--checkpoint",
@@ -65,10 +66,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--overwrite",
         action="store_true",
-        help=(
-            f"replace an existing {DataKey.MATERIAL_PROPERTY} dataset if its "
-            "value differs"
-        ),
+        help=f"replace an existing {DataKey.MATERIAL_PROPERTY} dataset",
     )
     return parser.parse_args()
 
@@ -80,7 +78,7 @@ def adapt_pb_trajectory(
     model_meta_info: dict,
     device: torch.device,
     learning_rate: float,
-) -> tuple[np.ndarray, int, float]:
+) -> tuple[np.ndarray, int, np.ndarray]:
     dataset = WrenchPredictor4OnlineDataset(
         [filename],
         model_meta_info,
@@ -133,7 +131,7 @@ def adapt_pb_trajectory(
         next_raw_idx = min(end_raw_idx + skip, num_steps)
         pb_trajectory[end_raw_idx:next_raw_idx] = online_pb.detach().cpu().numpy()
 
-    return pb_trajectory, len(dataset), online_pb.detach().item()
+    return pb_trajectory, len(dataset), online_pb.detach().cpu().numpy().copy()
 
 
 def write_online_pb(
@@ -146,9 +144,10 @@ def write_online_pb(
     model_meta_info: dict,
     learning_rate: float,
     num_updates: int,
-    final_pb: float,
+    final_pb: np.ndarray,
     overwrite: bool,
 ) -> str:
+    pb_dim = pb_trajectory.shape[1]
     with RmbData(rmb_path, mode="r+") as rmb_data:
         h5file = rmb_data.h5file
         assert pb_trajectory.shape[0] == h5file[DataKey.TIME].shape[0], (
@@ -157,25 +156,19 @@ def write_online_pb(
         )
 
         if DataKey.MATERIAL_PROPERTY in h5file:
-            existing = h5file[DataKey.MATERIAL_PROPERTY][:]
-            if existing.shape == pb_trajectory.shape and np.array_equal(
-                existing,
-                pb_trajectory,
-            ):
-                status = "unchanged"
-            else:
-                assert overwrite, (
+            if not overwrite:
+                raise FileExistsError(
                     f"{rmb_path}: {DataKey.MATERIAL_PROPERTY} already exists "
-                    "with a different value; pass --overwrite to replace it"
+                    "and --overwrite was not specified"
                 )
-                del h5file[DataKey.MATERIAL_PROPERTY]
-                h5file.create_dataset(DataKey.MATERIAL_PROPERTY, data=pb_trajectory)
-                status = "overwritten"
+            del h5file[DataKey.MATERIAL_PROPERTY]
+            status = "overwritten"
         else:
-            h5file.create_dataset(DataKey.MATERIAL_PROPERTY, data=pb_trajectory)
             status = "added"
+        h5file.create_dataset(DataKey.MATERIAL_PROPERTY, data=pb_trajectory)
 
         dataset = h5file[DataKey.MATERIAL_PROPERTY]
+        dataset.attrs["pb_dim"] = pb_dim
         dataset.attrs["initial_object_id"] = initial_object_id
         dataset.attrs["initial_object_key"] = initial_object_key
         dataset.attrs["initial_pb"] = initial_pb
@@ -210,7 +203,7 @@ def main() -> None:
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     policy = load_policy(checkpoint_path, model_meta_info, device)
-    counts = {"added": 0, "overwritten": 0, "unchanged": 0}
+    counts = {"added": 0, "overwritten": 0}
 
     for episode_idx, filename in enumerate(filenames, start=1):
         pb_trajectory, num_updates, final_pb = adapt_pb_trajectory(
@@ -237,7 +230,7 @@ def main() -> None:
         counts[status] += 1
         print(
             f"[{episode_idx}/{len(filenames)}] [{status}] {filename} | "
-            f"updates={num_updates}, PB={initial_pb.tolist()} -> {final_pb:.6f}"
+            f"updates={num_updates}, PB={initial_pb.tolist()} -> {final_pb.tolist()}"
         )
 
     print(f"device: {device}")
@@ -249,8 +242,7 @@ def main() -> None:
     print(
         "episodes: "
         f"{len(filenames)} "
-        f"(added={counts['added']}, overwritten={counts['overwritten']}, "
-        f"unchanged={counts['unchanged']})"
+        f"(added={counts['added']}, overwritten={counts['overwritten']})"
     )
 
 
