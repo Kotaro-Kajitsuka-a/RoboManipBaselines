@@ -84,15 +84,9 @@ uv run python robo_manip_baselines/bin/Train.py WrenchPredictor4 \
   --skip 3 --batch_size 64 --num_epochs 500 --lr 1e-4
 
 # Evaluate policy_best.ckpt by sweeping the Object0/Object1/Object2 material PBs
-<<<<<<< HEAD
-python robo_manip_baselines/policy/wrench_predictor4/EvalWrenchPredictor4SweepDir.py \
-  robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingDisjointWorldIdx_I0w0-39_I1w100-139_I2w200-239_pb1_mlp_only_absolute_pose9_separate_image_state_tokens_120train_30val_500epoch_20260801 \
-  robo_manip_baselines/dataset/LiftingDisjointWorldIdx/validation \
-=======
-uv run python robo_manip_baselines/policy/wrench_predictor4/EvalWrenchPredictor4LiftingSweepDir.py \
+python robo_manip_baselines/policy/wrench_predictor4/EvalWrenchPredictor4LiftingSweepDir.py \
   robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only/ \
   robo_manip_baselines/dataset/LiftingAB_B_only_Validation \
->>>>>>> 69b5a1ef (Remove assertions from WrenchPredictor4Model initialization and update checkpoint paths in commands_RMB2)
   --checkpoint_names policy_best.ckpt \
   --max_material_object_id 2
 
@@ -111,6 +105,11 @@ uv run python robo_manip_baselines/policy/wrench_predictor4_online/AddOnlinePbTo
 # Plot the online PB trajectories stored in the Object1 B episodes
 uv run python robo_manip_baselines/misc/futureimagination/PlotOnlinePbDataset.py \
   robo_manip_baselines/dataset/LiftingAB_B_only/WrenchPredObject1
+
+# Add deterministic SD3 VAE features from every left-camera frame
+python robo_manip_baselines/misc/futureimagination/AddImageFeature.py \
+  robo_manip_baselines/dataset/LiftingAB_B_only \
+  --overwrite
 
 # Train state-based Diffusion Policy on all 150 LiftingAB A/B episodes with PB
 uv run python robo_manip_baselines/bin/Train.py DiffusionPolicy \
