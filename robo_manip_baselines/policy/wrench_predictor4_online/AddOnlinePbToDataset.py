@@ -58,6 +58,12 @@ def parse_args() -> argparse.Namespace:
         help="learning rate applied only to the online PB",
     )
     parser.add_argument(
+        "--wrench_loss_weight",
+        type=float,
+        default=0.0,
+        help="weight of the normalized wrench prediction loss used to adapt PB",
+    )
+    parser.add_argument(
         "--seed",
         type=int,
         default=42,
@@ -78,6 +84,7 @@ def adapt_pb_trajectory(
     model_meta_info: dict,
     device: torch.device,
     learning_rate: float,
+    wrench_loss_weight: float,
 ) -> tuple[np.ndarray, int, np.ndarray]:
     dataset = WrenchPredictor4OnlineDataset(
         [filename],
@@ -111,13 +118,17 @@ def adapt_pb_trajectory(
         optimizer.zero_grad()
         prediction = policy(batch, online_pb.unsqueeze(0))
         start = policy.n_obs_steps
-        # Online PB is identified only from the future object-pose prediction
-        # error. Wrench prediction is intentionally excluded from this loss.
+        # Use the same weighted pose and wrench prediction objective as WP4 training.
         pose_loss = F.mse_loss(
             prediction["image_feature"][:, start:],
             batch["image_feature"][:, start:],
         )
-        pose_loss.backward()
+        wrench_loss = F.mse_loss(
+            prediction["wrench"][:, start:],
+            batch["wrench"][:, start:],
+        )
+        loss = pose_loss + wrench_loss_weight * wrench_loss
+        loss.backward()
         assert online_pb.grad is not None
         optimizer.step()
 
@@ -143,6 +154,7 @@ def write_online_pb(
     checkpoint_path: Path,
     model_meta_info: dict,
     learning_rate: float,
+    wrench_loss_weight: float,
     num_updates: int,
     final_pb: np.ndarray,
     overwrite: bool,
@@ -175,6 +187,7 @@ def write_online_pb(
         dataset.attrs["final_pb"] = final_pb
         dataset.attrs["source_checkpoint"] = str(checkpoint_path.resolve())
         dataset.attrs["online_learning_rate"] = learning_rate
+        dataset.attrs["online_wrench_loss_weight"] = wrench_loss_weight
         dataset.attrs["online_num_updates"] = num_updates
         dataset.attrs["online_skip"] = model_meta_info["data"]["skip"]
         dataset.attrs["online_horizon"] = model_meta_info["data"]["horizon"]
@@ -213,6 +226,7 @@ def main() -> None:
             model_meta_info,
             device,
             args.lr,
+            args.wrench_loss_weight,
         )
         status = write_online_pb(
             filename,
@@ -223,6 +237,7 @@ def main() -> None:
             checkpoint_path,
             model_meta_info,
             args.lr,
+            args.wrench_loss_weight,
             num_updates,
             final_pb,
             args.overwrite,
@@ -239,6 +254,7 @@ def main() -> None:
         f"(id={args.initial_object_id}, PB={initial_pb.tolist()})"
     )
     print(f"HDF5 key: {DataKey.MATERIAL_PROPERTY}")
+    print(f"online wrench loss weight: {args.wrench_loss_weight}")
     print(
         "episodes: "
         f"{len(filenames)} "

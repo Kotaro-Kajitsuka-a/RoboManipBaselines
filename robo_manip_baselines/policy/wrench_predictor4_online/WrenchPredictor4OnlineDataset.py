@@ -75,16 +75,25 @@ class WrenchPredictor4OnlineDataset(DatasetBase):
                 axis=1,
             )
 
+            wrench_key = self.model_meta_info["wrench"]["key"]
+            wrench = get_skipped_data_seq(
+                rmb_data[wrench_key][:],
+                wrench_key,
+                skip,
+            )[time_idxes]
+
         state, action, _ = super().pre_convert_data(state, action, None)
         image_feature = normalize_data(
             image_feature,
             self.model_meta_info["image_feature"],
         )
+        wrench = normalize_data(wrench, self.model_meta_info["wrench"])
 
         return {
             "image_feature": torch.tensor(image_feature, dtype=torch.float32),
             "state": torch.tensor(state, dtype=torch.float32),
             "action": torch.tensor(action, dtype=torch.float32),
+            "wrench": torch.tensor(wrench, dtype=torch.float32),
             "observed_time": torch.tensor(
                 time[time_idxes[-1]] - time[0],
                 dtype=torch.float32,
