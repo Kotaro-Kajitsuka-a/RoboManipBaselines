@@ -17,6 +17,7 @@ for train_seed in 42 52 62; do
     DiffusionPolicy MujocoUR5eLiftingi_I0 \
     --demo_name "MujocoUR5eLiftingi_I0_baseline_trainseed${train_seed}" \
     --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/LiftingAB_B_only_Baseline_seed${train_seed}/policy_last.ckpt" \
+    --seed 42 \
     --world_idx_list {70..79} \
     --auto_exit \
     --max_duration 10 \
@@ -28,6 +29,7 @@ for train_seed in 42 52 62; do
     DiffusionPolicy MujocoUR5eLiftingi_I1 \
     --demo_name "MujocoUR5eLiftingi_I1_baseline_trainseed${train_seed}" \
     --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/LiftingAB_B_only_Baseline_seed${train_seed}/policy_last.ckpt" \
+    --seed 42 \
     --world_idx_list {170..179} \
     --auto_exit \
     --max_duration 10 \
@@ -39,6 +41,7 @@ for train_seed in 42 52 62; do
     DiffusionPolicy MujocoUR5eLiftingi_I2 \
     --demo_name "MujocoUR5eLiftingi_I2_baseline_trainseed${train_seed}" \
     --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/LiftingAB_B_only_Baseline_seed${train_seed}/policy_last.ckpt" \
+    --seed 42 \
     --world_idx_list {270..279} \
     --auto_exit \
     --max_duration 10 \
@@ -50,6 +53,7 @@ for train_seed in 42 52 62; do
     DiffusionPolicy MujocoUR5eLiftingi_I4 \
     --demo_name "MujocoUR5eLiftingi_I4_baseline_trainseed${train_seed}" \
     --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/LiftingAB_B_only_Baseline_seed${train_seed}/policy_last.ckpt" \
+    --seed 42 \
     --world_idx_list {470..479} \
     --auto_exit \
     --max_duration 10 \
@@ -61,6 +65,7 @@ for train_seed in 42 52 62; do
     DiffusionPolicy MujocoUR5eLiftingi_I5 \
     --demo_name "MujocoUR5eLiftingi_I5_baseline_trainseed${train_seed}" \
     --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/LiftingAB_B_only_Baseline_seed${train_seed}/policy_last.ckpt" \
+    --seed 42 \
     --world_idx_list {570..579} \
     --auto_exit \
     --max_duration 10 \
@@ -72,6 +77,7 @@ for train_seed in 42 52 62; do
     DiffusionPolicy MujocoUR5eLiftingi_I6 \
     --demo_name "MujocoUR5eLiftingi_I6_baseline_trainseed${train_seed}" \
     --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/LiftingAB_B_only_Baseline_seed${train_seed}/policy_last.ckpt" \
+    --seed 42 \
     --world_idx_list {670..679} \
     --auto_exit \
     --max_duration 10 \
@@ -83,6 +89,7 @@ for train_seed in 42 52 62; do
     DiffusionPolicy MujocoUR5eLiftingi_I7 \
     --demo_name "MujocoUR5eLiftingi_I7_baseline_trainseed${train_seed}" \
     --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/LiftingAB_B_only_Baseline_seed${train_seed}/policy_last.ckpt" \
+    --seed 42 \
     --world_idx_list {770..779} \
     --auto_exit \
     --max_duration 10 \
