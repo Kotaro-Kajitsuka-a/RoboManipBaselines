@@ -7,6 +7,7 @@ python robo_manip_baselines/policy/wrench_predictor4_online/AddOnlinePbToDataset
   0 \
   --checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only/policy_best.ckpt \
   --lr 6e-3 \
+  --wrench_loss_weight 0.0 \
   --overwrite
 
 # Train seed 42.

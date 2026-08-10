@@ -19,6 +19,7 @@ for train_seed in 42 52 62; do
     --demo_name "MujocoUR5eLiftingi_I0_constant_pb_trainseed${train_seed}" \
     --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/LiftingAB_B_only_ConstantPB_seed${train_seed}/policy_last.ckpt" \
     --wp4_checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only/policy_best.ckpt \
+    --wrench_loss_weight 0.0 \
     --seed 42 \
     --world_idx_list {70..79} \
     --auto_exit \
@@ -32,6 +33,7 @@ for train_seed in 42 52 62; do
     --demo_name "MujocoUR5eLiftingi_I1_constant_pb_trainseed${train_seed}" \
     --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/LiftingAB_B_only_ConstantPB_seed${train_seed}/policy_last.ckpt" \
     --wp4_checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only/policy_best.ckpt \
+    --wrench_loss_weight 0.0 \
     --seed 42 \
     --world_idx_list {170..179} \
     --auto_exit \
@@ -45,6 +47,7 @@ for train_seed in 42 52 62; do
     --demo_name "MujocoUR5eLiftingi_I2_constant_pb_trainseed${train_seed}" \
     --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/LiftingAB_B_only_ConstantPB_seed${train_seed}/policy_last.ckpt" \
     --wp4_checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only/policy_best.ckpt \
+    --wrench_loss_weight 0.0 \
     --seed 42 \
     --world_idx_list {270..279} \
     --auto_exit \
@@ -58,6 +61,7 @@ for train_seed in 42 52 62; do
     --demo_name "MujocoUR5eLiftingi_I4_constant_pb_trainseed${train_seed}" \
     --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/LiftingAB_B_only_ConstantPB_seed${train_seed}/policy_last.ckpt" \
     --wp4_checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only/policy_best.ckpt \
+    --wrench_loss_weight 0.0 \
     --seed 42 \
     --world_idx_list {470..479} \
     --auto_exit \
@@ -71,6 +75,7 @@ for train_seed in 42 52 62; do
     --demo_name "MujocoUR5eLiftingi_I5_constant_pb_trainseed${train_seed}" \
     --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/LiftingAB_B_only_ConstantPB_seed${train_seed}/policy_last.ckpt" \
     --wp4_checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only/policy_best.ckpt \
+    --wrench_loss_weight 0.0 \
     --seed 42 \
     --world_idx_list {570..579} \
     --auto_exit \
@@ -84,6 +89,7 @@ for train_seed in 42 52 62; do
     --demo_name "MujocoUR5eLiftingi_I6_constant_pb_trainseed${train_seed}" \
     --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/LiftingAB_B_only_ConstantPB_seed${train_seed}/policy_last.ckpt" \
     --wp4_checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only/policy_best.ckpt \
+    --wrench_loss_weight 0.0 \
     --seed 42 \
     --world_idx_list {670..679} \
     --auto_exit \
@@ -97,6 +103,7 @@ for train_seed in 42 52 62; do
     --demo_name "MujocoUR5eLiftingi_I7_constant_pb_trainseed${train_seed}" \
     --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/LiftingAB_B_only_ConstantPB_seed${train_seed}/policy_last.ckpt" \
     --wp4_checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only/policy_best.ckpt \
+    --wrench_loss_weight 0.0 \
     --seed 42 \
     --world_idx_list {770..779} \
     --auto_exit \
