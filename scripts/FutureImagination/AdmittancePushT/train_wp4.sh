@@ -14,7 +14,8 @@ python robo_manip_baselines/bin/Train.py WrenchPredictor4 \
   --wrench_source_key measured_eef_wrench \
   --pb_dim 2 \
   --wrench_loss_weight 0.1 \
-  --num_epochs 500
+  --num_epochs 500 \
+  --seed 42
 
 source_dataset=robo_manip_baselines/dataset/DatasetMujocoXarm7AdmittancePusht
 online_dataset=robo_manip_baselines/dataset/DatasetMujocoXarm7AdmittancePusht_online_pb2

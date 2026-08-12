@@ -10,4 +10,5 @@ python robo_manip_baselines/bin/Train.py DiffusionPolicy \
   --state_keys measured_eef_pose measured_tblock_pose material_property \
   --action_keys command_eef_pose \
   --train_ratio 1.0 \
-  --val_ratio 0.01
+  --val_ratio 0.01 \
+  --seed 42
