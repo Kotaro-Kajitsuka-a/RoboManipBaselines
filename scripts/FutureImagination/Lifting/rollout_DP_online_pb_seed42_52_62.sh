@@ -8,6 +8,8 @@ eval_timestamp=$(date +%Y%m%d_%H%M%S)
 eval_dir="robo_manip_baselines/dataset/tests/FutureImagination/LiftingAB_B_only/DP_online_pb_eval_${eval_timestamp}"
 rmb_dir="$eval_dir/rmb"
 mkdir -p "$rmb_dir"
+rollout_start_marker="$eval_dir/.rollout_start"
+touch "$rollout_start_marker"
 
 # Run 10 episodes for each object under every training seed.
 for train_seed in 42 52 62; do
@@ -117,7 +119,8 @@ for train_seed in 42 52 62; do
     -maxdepth 1 \
     -type d \
     -name "RolloutDiffusionPolicyOnlinePb_MujocoUR5eLiftingi_I*_online_pb_trainseed${train_seed}_20*" \
-    -exec mv -t "$seed_dir" -- {} +
+    -newer "$rollout_start_marker" \
+    -exec mv -- {} "$seed_dir" \;
 done
 
 # Evaluate the 210 saved RMB episodes: lift at least 10 cm and tilt less than

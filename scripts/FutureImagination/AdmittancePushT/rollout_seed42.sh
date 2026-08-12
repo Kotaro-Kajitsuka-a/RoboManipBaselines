@@ -9,8 +9,11 @@ online_checkpoint=robo_manip_baselines/checkpoint/DiffusionPolicy/AdmittancePush
 constant_checkpoint=robo_manip_baselines/checkpoint/DiffusionPolicy/AdmittancePushT/constant_seed42/policy_last.ckpt
 wp4_checkpoint=robo_manip_baselines/checkpoint/WrenchPredictor4/AdmittancePushT/policy_best.ckpt
 eval_dir=robo_manip_baselines/dataset/tests/FutureImagination/AdmittancePushT/save_rollout_seed42
+rmb_dir="$eval_dir/rmb"
 
-mkdir -p "$eval_dir"
+mkdir -p "$rmb_dir"
+rollout_start_marker="$eval_dir/.rollout_start"
+touch "$rollout_start_marker"
 
 # Baseline.
 python robo_manip_baselines/bin/Rollout.py DiffusionPolicy MujocoXarm7AdmittancePusht_T0 \
@@ -234,3 +237,15 @@ python robo_manip_baselines/bin/Rollout.py DiffusionPolicyOnlinePb MujocoXarm7Ad
   --save_rollout \
   --no_plot \
   --no_render
+
+find robo_manip_baselines/dataset \
+  -mindepth 1 \
+  -maxdepth 1 \
+  -type d \
+  \( \
+    -name "RolloutDiffusionPolicy_AdmittancePushTBaseline_seed42_T*_20*" \
+    -o -name "RolloutDiffusionPolicyOnlinePb_AdmittancePushTOnline_seed42_T*_20*" \
+    -o -name "RolloutDiffusionPolicyOnlinePb_AdmittancePushTConstant_seed42_T*_20*" \
+  \) \
+  -newer "$rollout_start_marker" \
+  -exec mv -- {} "$rmb_dir" \;
