@@ -28,7 +28,8 @@ for train_seed in 42 52 62; do
     --max_duration 10 \
     --save_rollout \
     --result_filename "$eval_dir/constant_pb_trainseed${train_seed}_I0.yaml" \
-    --no_plot
+    --no_plot \
+    --no_render
 
   python robo_manip_baselines/bin/Rollout.py \
     DiffusionPolicyOnlinePb MujocoUR5eLiftingi_I1 \
@@ -42,7 +43,8 @@ for train_seed in 42 52 62; do
     --max_duration 10 \
     --save_rollout \
     --result_filename "$eval_dir/constant_pb_trainseed${train_seed}_I1.yaml" \
-    --no_plot
+    --no_plot \
+    --no_render
 
   python robo_manip_baselines/bin/Rollout.py \
     DiffusionPolicyOnlinePb MujocoUR5eLiftingi_I2 \
@@ -56,7 +58,8 @@ for train_seed in 42 52 62; do
     --max_duration 10 \
     --save_rollout \
     --result_filename "$eval_dir/constant_pb_trainseed${train_seed}_I2.yaml" \
-    --no_plot
+    --no_plot \
+    --no_render
 
   python robo_manip_baselines/bin/Rollout.py \
     DiffusionPolicyOnlinePb MujocoUR5eLiftingi_I4 \
@@ -70,7 +73,8 @@ for train_seed in 42 52 62; do
     --max_duration 10 \
     --save_rollout \
     --result_filename "$eval_dir/constant_pb_trainseed${train_seed}_I4.yaml" \
-    --no_plot
+    --no_plot \
+    --no_render
 
   python robo_manip_baselines/bin/Rollout.py \
     DiffusionPolicyOnlinePb MujocoUR5eLiftingi_I5 \
@@ -84,7 +88,8 @@ for train_seed in 42 52 62; do
     --max_duration 10 \
     --save_rollout \
     --result_filename "$eval_dir/constant_pb_trainseed${train_seed}_I5.yaml" \
-    --no_plot
+    --no_plot \
+    --no_render
 
   python robo_manip_baselines/bin/Rollout.py \
     DiffusionPolicyOnlinePb MujocoUR5eLiftingi_I6 \
@@ -98,7 +103,8 @@ for train_seed in 42 52 62; do
     --max_duration 10 \
     --save_rollout \
     --result_filename "$eval_dir/constant_pb_trainseed${train_seed}_I6.yaml" \
-    --no_plot
+    --no_plot \
+    --no_render
 
   python robo_manip_baselines/bin/Rollout.py \
     DiffusionPolicyOnlinePb MujocoUR5eLiftingi_I7 \
@@ -112,7 +118,8 @@ for train_seed in 42 52 62; do
     --max_duration 10 \
     --save_rollout \
     --result_filename "$eval_dir/constant_pb_trainseed${train_seed}_I7.yaml" \
-    --no_plot
+    --no_plot \
+    --no_render
 
   find robo_manip_baselines/dataset \
     -mindepth 1 \
