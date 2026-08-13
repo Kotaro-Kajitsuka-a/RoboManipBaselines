@@ -64,18 +64,6 @@ python robo_manip_baselines/bin/Rollout.py DiffusionPolicy MujocoXarm7Admittance
   --no_plot \
   --no_render
 
-python robo_manip_baselines/bin/Rollout.py DiffusionPolicy MujocoXarm7AdmittancePusht_T4 \
-  --demo_name AdmittancePushTBaseline_seed42_T4 \
-  --checkpoint "$baseline_checkpoint" \
-  --world_idx_list {470..479} \
-  --seed 42 \
-  --auto_exit \
-  --max_duration 22 \
-  --result_filename "$eval_dir/baseline_T4.yaml" \
-  --save_rollout \
-  --no_plot \
-  --no_render
-
 # Proposed online PB.
 python robo_manip_baselines/bin/Rollout.py DiffusionPolicyOnlinePb MujocoXarm7AdmittancePusht_T0 \
   --demo_name AdmittancePushTOnline_seed42_T0 \
@@ -137,22 +125,6 @@ python robo_manip_baselines/bin/Rollout.py DiffusionPolicyOnlinePb MujocoXarm7Ad
   --auto_exit \
   --max_duration 22 \
   --result_filename "$eval_dir/online_T3.yaml" \
-  --save_rollout \
-  --no_plot \
-  --no_render
-
-python robo_manip_baselines/bin/Rollout.py DiffusionPolicyOnlinePb MujocoXarm7AdmittancePusht_T4 \
-  --demo_name AdmittancePushTOnline_seed42_T4 \
-  --checkpoint "$online_checkpoint" \
-  --wp4_checkpoint "$wp4_checkpoint" \
-  --initial_object_id 0 \
-  --online_pb_lr 2.5e-2 \
-  --wrench_loss_weight 0.01 \
-  --world_idx_list {470..479} \
-  --seed 42 \
-  --auto_exit \
-  --max_duration 22 \
-  --result_filename "$eval_dir/online_T4.yaml" \
   --save_rollout \
   --no_plot \
   --no_render
@@ -222,30 +194,14 @@ python robo_manip_baselines/bin/Rollout.py DiffusionPolicyOnlinePb MujocoXarm7Ad
   --no_plot \
   --no_render
 
-python robo_manip_baselines/bin/Rollout.py DiffusionPolicyOnlinePb MujocoXarm7AdmittancePusht_T4 \
-  --demo_name AdmittancePushTConstant_seed42_T4 \
-  --checkpoint "$constant_checkpoint" \
-  --wp4_checkpoint "$wp4_checkpoint" \
-  --initial_object_id 0 \
-  --online_pb_lr 2.5e-2 \
-  --wrench_loss_weight 0.01 \
-  --world_idx_list {470..479} \
-  --seed 42 \
-  --auto_exit \
-  --max_duration 22 \
-  --result_filename "$eval_dir/constant_T4.yaml" \
-  --save_rollout \
-  --no_plot \
-  --no_render
-
 find robo_manip_baselines/dataset \
   -mindepth 1 \
   -maxdepth 1 \
   -type d \
   \( \
-    -name "RolloutDiffusionPolicy_AdmittancePushTBaseline_seed42_T*_20*" \
-    -o -name "RolloutDiffusionPolicyOnlinePb_AdmittancePushTOnline_seed42_T*_20*" \
-    -o -name "RolloutDiffusionPolicyOnlinePb_AdmittancePushTConstant_seed42_T*_20*" \
+    -name "RolloutDiffusionPolicy_AdmittancePushTBaseline_seed42_T[0-3]_20*" \
+    -o -name "RolloutDiffusionPolicyOnlinePb_AdmittancePushTOnline_seed42_T[0-3]_20*" \
+    -o -name "RolloutDiffusionPolicyOnlinePb_AdmittancePushTConstant_seed42_T[0-3]_20*" \
   \) \
   -newer "$rollout_start_marker" \
   -exec mv -- {} "$rmb_dir" \;

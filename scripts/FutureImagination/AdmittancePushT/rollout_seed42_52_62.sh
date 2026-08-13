@@ -67,18 +67,6 @@ for train_seed in 42 52 62; do
     --no_plot \
     --no_render
 
-  python robo_manip_baselines/bin/Rollout.py DiffusionPolicy MujocoXarm7AdmittancePusht_T4 \
-    --demo_name AdmittancePushTBaseline_trainseed${train_seed}_rollseed42_T4 \
-    --checkpoint "$baseline_checkpoint" \
-    --world_idx_list {470..479} \
-    --seed 42 \
-    --auto_exit \
-    --max_duration 22 \
-    --result_filename "$eval_dir/baseline_trainseed${train_seed}_rollseed42_T4.yaml" \
-    --save_rollout \
-    --no_plot \
-    --no_render
-
   # Proposed online PB.
   python robo_manip_baselines/bin/Rollout.py DiffusionPolicyOnlinePb MujocoXarm7AdmittancePusht_T0 \
     --demo_name AdmittancePushTOnline_trainseed${train_seed}_rollseed42_T0 \
@@ -140,22 +128,6 @@ for train_seed in 42 52 62; do
     --auto_exit \
     --max_duration 22 \
     --result_filename "$eval_dir/online_trainseed${train_seed}_rollseed42_T3.yaml" \
-    --save_rollout \
-    --no_plot \
-    --no_render
-
-  python robo_manip_baselines/bin/Rollout.py DiffusionPolicyOnlinePb MujocoXarm7AdmittancePusht_T4 \
-    --demo_name AdmittancePushTOnline_trainseed${train_seed}_rollseed42_T4 \
-    --checkpoint "$online_checkpoint" \
-    --wp4_checkpoint "$wp4_checkpoint" \
-    --initial_object_id 0 \
-    --online_pb_lr 2.5e-2 \
-    --wrench_loss_weight 0.01 \
-    --world_idx_list {470..479} \
-    --seed 42 \
-    --auto_exit \
-    --max_duration 22 \
-    --result_filename "$eval_dir/online_trainseed${train_seed}_rollseed42_T4.yaml" \
     --save_rollout \
     --no_plot \
     --no_render
@@ -225,21 +197,6 @@ for train_seed in 42 52 62; do
     --no_plot \
     --no_render
 
-  python robo_manip_baselines/bin/Rollout.py DiffusionPolicyOnlinePb MujocoXarm7AdmittancePusht_T4 \
-    --demo_name AdmittancePushTConstant_trainseed${train_seed}_rollseed42_T4 \
-    --checkpoint "$constant_checkpoint" \
-    --wp4_checkpoint "$wp4_checkpoint" \
-    --initial_object_id 0 \
-    --online_pb_lr 2.5e-2 \
-    --wrench_loss_weight 0.01 \
-    --world_idx_list {470..479} \
-    --seed 42 \
-    --auto_exit \
-    --max_duration 22 \
-    --result_filename "$eval_dir/constant_trainseed${train_seed}_rollseed42_T4.yaml" \
-    --save_rollout \
-    --no_plot \
-    --no_render
 done
 
 find robo_manip_baselines/dataset \
@@ -247,10 +204,9 @@ find robo_manip_baselines/dataset \
   -maxdepth 1 \
   -type d \
   \( \
-    -name "RolloutDiffusionPolicy_AdmittancePushTBaseline_trainseed*_rollseed42_T*_20*" \
-    -o -name "RolloutDiffusionPolicyOnlinePb_AdmittancePushTOnline_trainseed*_rollseed42_T*_20*" \
-    -o -name "RolloutDiffusionPolicyOnlinePb_AdmittancePushTConstant_trainseed*_rollseed42_T*_20*" \
+    -name "RolloutDiffusionPolicy_AdmittancePushTBaseline_trainseed*_rollseed42_T[0-3]_20*" \
+    -o -name "RolloutDiffusionPolicyOnlinePb_AdmittancePushTOnline_trainseed*_rollseed42_T[0-3]_20*" \
+    -o -name "RolloutDiffusionPolicyOnlinePb_AdmittancePushTConstant_trainseed*_rollseed42_T[0-3]_20*" \
   \) \
   -newer "$rollout_start_marker" \
   -exec mv -- {} "$rmb_dir" \;
-
