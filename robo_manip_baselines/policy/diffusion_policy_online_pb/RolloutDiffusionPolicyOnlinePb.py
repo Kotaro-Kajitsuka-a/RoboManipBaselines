@@ -1,6 +1,7 @@
 from collections import deque
 from pathlib import Path
 
+import cv2
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -50,6 +51,19 @@ class RolloutDiffusionPolicyOnlinePb(RolloutDiffusionPolicy):
             default=0.0,
             help="weight of the normalized wrench prediction loss used to adapt PB",
         )
+        parser.add_argument(
+            "--image_vae_checkpoint_path",
+            "--image_vae_checkpoint",
+            type=Path,
+            default=None,
+            help="image VAE used when WP4 predicts an offline VAE feature",
+        )
+        parser.add_argument(
+            "--image_vae_camera_name",
+            type=str,
+            default="hand",
+            help="camera encoded by --image_vae_checkpoint_path",
+        )
 
     def setup_policy(self):
         super().setup_policy()
@@ -84,6 +98,24 @@ class RolloutDiffusionPolicyOnlinePb(RolloutDiffusionPolicy):
         self.wp4_wrench_clip_min = np.asarray(wrench_clip_info["min"])
         self.wp4_wrench_clip_max = np.asarray(wrench_clip_info["max"])
 
+        self.wp4_image_vae = None
+        self.wp4_image_feature_key = self.wp4_model_meta_info["data"][
+            "image_feature_key"
+        ]
+        if self.wp4_image_feature_key == "image_vae_hand_9":
+            assert self.args.image_vae_checkpoint_path is not None
+            from pythae.models import AutoModel
+
+            self.image_vae_checkpoint_path = self.args.image_vae_checkpoint_path.resolve()
+            self.wp4_image_vae = AutoModel.load_from_folder(
+                str(self.image_vae_checkpoint_path)
+            )
+            self.wp4_image_vae.eval().to(self.device)
+            self.wp4_image_vae.requires_grad_(False)
+            input_dim = self.wp4_image_vae.model_config.input_dim
+            assert self.wp4_image_vae.model_config.latent_dim == 9
+            self.wp4_image_size = (input_dim[2], input_dim[1])
+
         wp4_data_info = self.wp4_model_meta_info["data"]
         print(
             f"[{self.__class__.__name__}] Construct online PB adapter.\n"
@@ -97,6 +129,12 @@ class RolloutDiffusionPolicyOnlinePb(RolloutDiffusionPolicy):
             f"obs steps: {wp4_data_info['n_obs_steps']}, "
             f"skip: {wp4_data_info['skip']}"
         )
+        if self.wp4_image_vae is not None:
+            print(
+                f"  - image feature: {self.wp4_image_feature_key} from "
+                f"{self.args.image_vae_camera_name} camera, model: "
+                f"{self.image_vae_checkpoint_path}"
+            )
 
     def setup_variables(self):
         super().setup_variables()
@@ -110,6 +148,13 @@ class RolloutDiffusionPolicyOnlinePb(RolloutDiffusionPolicy):
         self.data_manager.meta_data["online_pb_wrench_loss_weight"] = (
             self.args.wrench_loss_weight
         )
+        if self.wp4_image_vae is not None:
+            self.data_manager.meta_data["online_pb_image_vae_checkpoint"] = str(
+                self.image_vae_checkpoint_path
+            )
+            self.data_manager.meta_data["online_pb_image_vae_camera_name"] = (
+                self.args.image_vae_camera_name
+            )
 
     def reset_variables(self):
         super().reset_variables()
@@ -151,11 +196,13 @@ class RolloutDiffusionPolicyOnlinePb(RolloutDiffusionPolicy):
                 for state_key in self.wp4_model_meta_info["state"]["keys"]
             ]
         )
-        image_feature_key = self.wp4_model_meta_info["data"]["image_feature_key"]
-        image_feature = convert_data_to_policy(
-            self.motion_manager.get_data(image_feature_key, self.obs),
-            image_feature_key,
-        )
+        if self.wp4_image_vae is None:
+            image_feature = convert_data_to_policy(
+                self.motion_manager.get_data(self.wp4_image_feature_key, self.obs),
+                self.wp4_image_feature_key,
+            )
+        else:
+            image_feature = self.encode_wp4_image_feature()
         wrench = np.clip(
             self.motion_manager.get_data(self.wp4_wrench_source_key, self.obs),
             self.wp4_wrench_clip_min,
@@ -168,6 +215,19 @@ class RolloutDiffusionPolicyOnlinePb(RolloutDiffusionPolicy):
                 "wrench": wrench.copy(),
             }
         )
+
+    def encode_wp4_image_feature(self):
+        image = self.info["rgb_images"][self.args.image_vae_camera_name]
+        image = cv2.resize(
+            image,
+            self.wp4_image_size,
+            interpolation=cv2.INTER_LINEAR,
+        )
+        image = torch.from_numpy(image).to(self.device)
+        image = image.permute(2, 0, 1).unsqueeze(0).float() / 255.0
+        with torch.no_grad():
+            feature = self.wp4_image_vae.encoder(image).embedding[0]
+        return feature.cpu().numpy()
 
     def update_online_pb(self):
         horizon = self.wp4_model_meta_info["data"]["horizon"]
