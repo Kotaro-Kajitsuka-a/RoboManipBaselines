@@ -82,6 +82,7 @@ future-imagination = [
   "huggingface_hub==0.23.4",
   "accelerate==0.31.0",
   "safetensors==0.4.3",
+  "pythae==0.1.2",
 ]
 diffusion-policy-3d = [
   "zarr==2.12.0",
