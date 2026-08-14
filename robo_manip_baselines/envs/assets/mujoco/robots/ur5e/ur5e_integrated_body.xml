@@ -162,6 +162,9 @@
                   <camera name="hand" fovy="62" euler="0 3.1415 0"/>
                   <body name="camera_frame"/>
                 </body>
+                <body name="d435i_2" pos="0 0.1 0.05" euler="-1.5708 0 0">
+                  <camera name="hand_2" fovy="62" euler="0 3.1415 0"/>
+                </body>
               </body>
             </body>
           </body>
