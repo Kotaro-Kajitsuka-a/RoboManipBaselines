@@ -32,11 +32,12 @@ class EvalWrenchPredictor4SweepDir(EvalWrenchPredictor4SweepBase):
 
     def get_heatmap_metrics(self):
         return [
+            ("normalized object-state MSE", "normalized image feature MSE"),
+            ("normalized object-state MAE", "normalized image feature mean"),
             ("object position [m]", "tblock position [m]"),
             ("object rotation [deg]", "tblock rotation [deg]"),
             ("auxiliary force MAE [N]", "force mean"),
             ("auxiliary torque MAE [N m]", "torque mean"),
-            ("normalized image feature error", "normalized image feature mean"),
             ("normalized wrench error", "normalized wrench mean"),
             ("normalized total error", "normalized total mean"),
         ]
@@ -116,6 +117,9 @@ class EvalWrenchPredictor4SweepDir(EvalWrenchPredictor4SweepBase):
             "torque mean": wrench_mae[3:].mean(),
             "wrench mean": wrench_mae.mean(),
             "normalized image feature mean": normalized_image_feature_abs_error.mean(),
+            "normalized image feature MSE": np.square(
+                normalized_image_feature_abs_error
+            ).mean(),
             "normalized wrench mean": normalized_wrench_abs_error.mean(),
             "normalized total mean": total_abs_error.mean(),
         }
@@ -187,6 +191,7 @@ class EvalWrenchPredictor4SweepDir(EvalWrenchPredictor4SweepBase):
             "torque mean",
             "wrench mean",
             "normalized image feature mean",
+            "normalized image feature MSE",
             "normalized wrench mean",
             "normalized total mean",
         ]

@@ -32,11 +32,12 @@ class EvalWrenchPredictor4ImageFeatureSweepDir(EvalWrenchPredictor4SweepBase):
 
     def get_heatmap_metrics(self):
         return [
+            ("normalized image feature MSE", "normalized image feature MSE"),
+            ("normalized image feature MAE", "normalized image feature mean"),
             ("image feature MAE", "image feature mean"),
             ("image feature RMSE", "image feature RMSE"),
             ("auxiliary force MAE [N]", "force mean"),
             ("auxiliary torque MAE [N m]", "torque mean"),
-            ("normalized image feature error", "normalized image feature mean"),
             ("normalized wrench error", "normalized wrench mean"),
             ("normalized total error", "normalized total mean"),
         ]
@@ -102,6 +103,9 @@ class EvalWrenchPredictor4ImageFeatureSweepDir(EvalWrenchPredictor4SweepBase):
             "torque mean": wrench_mae[3:].mean(),
             "wrench mean": wrench_mae.mean(),
             "normalized image feature mean": normalized_image_feature_abs_error.mean(),
+            "normalized image feature MSE": np.square(
+                normalized_image_feature_abs_error
+            ).mean(),
             "normalized wrench mean": normalized_wrench_abs_error.mean(),
             "normalized total mean": total_abs_error.mean(),
         }
@@ -137,6 +141,7 @@ class EvalWrenchPredictor4ImageFeatureSweepDir(EvalWrenchPredictor4SweepBase):
             "torque mean",
             "wrench mean",
             "normalized image feature mean",
+            "normalized image feature MSE",
             "normalized wrench mean",
             "normalized total mean",
         ]
@@ -178,15 +183,15 @@ class EvalWrenchPredictor4ImageFeatureSweepDir(EvalWrenchPredictor4SweepBase):
         final_time_idx = self.get_final_time_idx(filename, dataset)
         gt_wrench = None
         material_key_to_pred_wrench = {}
-        material_key_to_feature_mae = {}
-        material_key_to_feature_rmse = {}
+        material_key_to_normalized_feature_mse = {}
+        material_key_to_normalized_feature_mae = {}
 
         for material_object_key in self.material_object_keys:
             material_object_id = self.object_key_to_id[material_object_key]
             gt_wrench_list = []
             pred_wrench_list = []
-            feature_mae_list = []
-            feature_rmse_list = []
+            normalized_feature_mse_list = []
+            normalized_feature_mae_list = []
             for batch in dataloader:
                 batch = self.move_batch_to_device(batch, material_object_id)
                 with torch.inference_mode():
@@ -194,27 +199,31 @@ class EvalWrenchPredictor4ImageFeatureSweepDir(EvalWrenchPredictor4SweepBase):
                 batch_result = self.compute_hstep_plot_data(batch, pred)
                 gt_wrench_list.append(batch_result[0])
                 pred_wrench_list.append(batch_result[1])
-                feature_mae_list.append(batch_result[2])
-                feature_rmse_list.append(batch_result[3])
+                normalized_feature_mse_list.append(batch_result[2])
+                normalized_feature_mae_list.append(batch_result[3])
 
             if gt_wrench is None:
                 gt_wrench = np.concatenate(gt_wrench_list)
             material_key_to_pred_wrench[material_object_key] = np.concatenate(
                 pred_wrench_list
             )
-            material_key_to_feature_mae[material_object_key] = np.concatenate(
-                feature_mae_list
+            material_key_to_normalized_feature_mse[material_object_key] = (
+                np.concatenate(normalized_feature_mse_list)
             )
-            material_key_to_feature_rmse[material_object_key] = np.concatenate(
-                feature_rmse_list
+            material_key_to_normalized_feature_mae[material_object_key] = (
+                np.concatenate(normalized_feature_mae_list)
             )
 
         return {
             "time_idx": final_time_idx,
             "gt_wrench": gt_wrench,
             "material_key_to_pred_wrench": material_key_to_pred_wrench,
-            "material_key_to_feature_mae": material_key_to_feature_mae,
-            "material_key_to_feature_rmse": material_key_to_feature_rmse,
+            "material_key_to_normalized_feature_mse": (
+                material_key_to_normalized_feature_mse
+            ),
+            "material_key_to_normalized_feature_mae": (
+                material_key_to_normalized_feature_mae
+            ),
         }
 
     def compute_hstep_plot_data(self, batch, pred):
@@ -226,18 +235,15 @@ class EvalWrenchPredictor4ImageFeatureSweepDir(EvalWrenchPredictor4SweepBase):
             pred["wrench"][:, -1].detach().cpu().numpy(),
             self.model_meta_info["wrench"],
         )
-        gt_image_feature = denormalize_data(
-            batch["image_feature"][:, -1].detach().cpu().numpy(),
-            self.model_meta_info["image_feature"],
+        normalized_image_feature_abs_error = np.abs(
+            pred["image_feature"][:, -1].detach().cpu().numpy()
+            - batch["image_feature"][:, -1].detach().cpu().numpy()
         )
-        pred_image_feature = denormalize_data(
-            pred["image_feature"][:, -1].detach().cpu().numpy(),
-            self.model_meta_info["image_feature"],
-        )
-        image_feature_abs_error = np.abs(pred_image_feature - gt_image_feature)
-        feature_mae = image_feature_abs_error.mean(axis=-1)
-        feature_rmse = np.sqrt(np.mean(np.square(image_feature_abs_error), axis=-1))
-        return gt_wrench, pred_wrench, feature_mae, feature_rmse
+        normalized_feature_mse = np.square(
+            normalized_image_feature_abs_error
+        ).mean(axis=-1)
+        normalized_feature_mae = normalized_image_feature_abs_error.mean(axis=-1)
+        return gt_wrench, pred_wrench, normalized_feature_mse, normalized_feature_mae
 
     def save_episode_plot(
         self,
@@ -271,8 +277,16 @@ class EvalWrenchPredictor4ImageFeatureSweepDir(EvalWrenchPredictor4SweepBase):
             ax.legend(loc="best", fontsize=8)
 
         for ax, data_key, ylabel in (
-            (axes[6], "material_key_to_feature_mae", "feature MAE"),
-            (axes[7], "material_key_to_feature_rmse", "feature RMSE"),
+            (
+                axes[6],
+                "material_key_to_normalized_feature_mse",
+                "normalized feature MSE",
+            ),
+            (
+                axes[7],
+                "material_key_to_normalized_feature_mae",
+                "normalized feature MAE",
+            ),
         ):
             for material_object_key, error in plot_data[data_key].items():
                 ax.plot(
