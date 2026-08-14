@@ -66,6 +66,13 @@ def parse_sweep_argument():
         help="maximum WrenchPredObject id used as material PB sweep targets",
     )
     parser.add_argument(
+        "--material_object_ids",
+        type=int,
+        nargs="+",
+        default=None,
+        help="explicit WrenchPredObject ids used as material PB sweep targets",
+    )
+    parser.add_argument(
         "--checkpoint_names",
         type=str,
         nargs="*",
@@ -169,6 +176,7 @@ class EvalWrenchPredictor4SweepBase:
         num_files=None,
         no_plot=False,
         max_material_object_id=DEFAULT_MAX_MATERIAL_OBJECT_ID,
+        material_object_ids=None,
         checkpoint_names=None,
         output_suffix="",
     ):
@@ -179,10 +187,14 @@ class EvalWrenchPredictor4SweepBase:
         self.no_plot = no_plot
         self.checkpoint_names = checkpoint_names
         self.output_suffix = output_suffix
-        assert max_material_object_id >= 0, max_material_object_id
+        if material_object_ids is None:
+            assert max_material_object_id >= 0, max_material_object_id
+            material_object_ids = range(max_material_object_id + 1)
+        else:
+            assert len(material_object_ids) == len(set(material_object_ids))
+            assert all(object_id >= 0 for object_id in material_object_ids)
         self.material_object_keys = [
-            f"WrenchPredObject{object_id}"
-            for object_id in range(max_material_object_id + 1)
+            f"WrenchPredObject{object_id}" for object_id in material_object_ids
         ]
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
