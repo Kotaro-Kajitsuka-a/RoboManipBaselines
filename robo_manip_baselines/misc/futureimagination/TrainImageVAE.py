@@ -1,3 +1,4 @@
+import argparse
 from pathlib import Path
 
 import numpy as np
@@ -16,15 +17,8 @@ from robo_manip_baselines.misc.futureimagination.ImageVAE import (
 )
 
 
-TRAIN_DATASET_DIR = Path("robo_manip_baselines/dataset/LiftingAB_B_only")
-VALIDATION_DATASET_DIR = Path("robo_manip_baselines/dataset/LiftingABValidation")
-OUTPUT_DIR = Path("robo_manip_baselines/checkpoint/ImageVAE/LiftingAB_B_only_hand_9")
-RGB_IMAGE_KEY = DataKey.get_rgb_image_key("hand")
-LATENT_DIM = 9
-
-
 class RmbImageDataset(Dataset):
-    def __init__(self, dataset_dir, rgb_image_key=RGB_IMAGE_KEY):
+    def __init__(self, dataset_dir, rgb_image_key):
         videos = []
         for rmb_path in tqdm(find_rmb_files(str(dataset_dir)), desc=str(dataset_dir)):
             with RmbData(rmb_path, image_size=(IMAGE_WIDTH, IMAGE_HEIGHT)) as rmb_data:
@@ -40,14 +34,26 @@ class RmbImageDataset(Dataset):
         return DatasetOutput(data=image)
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="Train an image VAE on RMB data.")
+    parser.add_argument("--train_dataset_dir", type=Path, required=True)
+    parser.add_argument("--validation_dataset_dir", type=Path, required=True)
+    parser.add_argument("--output_dir", type=Path, required=True)
+    parser.add_argument("--camera_name", required=True)
+    parser.add_argument("--latent_dim", type=int, required=True)
+    return parser.parse_args()
+
+
 def main():
+    args = parse_args()
     assert torch.cuda.is_available(), "Image VAE training requires a CUDA GPU."
 
-    train_dataset = RmbImageDataset(TRAIN_DATASET_DIR)
-    validation_dataset = RmbImageDataset(VALIDATION_DATASET_DIR)
-    model = create_image_vae(LATENT_DIM)
+    rgb_image_key = DataKey.get_rgb_image_key(args.camera_name)
+    train_dataset = RmbImageDataset(args.train_dataset_dir, rgb_image_key)
+    validation_dataset = RmbImageDataset(args.validation_dataset_dir, rgb_image_key)
+    model = create_image_vae(args.latent_dim)
     training_config = BaseTrainerConfig(
-        output_dir=str(OUTPUT_DIR),
+        output_dir=str(args.output_dir),
         num_epochs=100,
         learning_rate=1e-3,
         per_device_train_batch_size=64,
@@ -60,7 +66,7 @@ def main():
     pipeline(train_dataset, validation_dataset)
     pipeline.trainer.save_model(
         pipeline.trainer._best_model,
-        str(OUTPUT_DIR / "final_model"),
+        str(args.output_dir / "final_model"),
     )
 
 
