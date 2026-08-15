@@ -16,7 +16,7 @@ for train_seed in 42 52 62; do
     DiffusionPolicyOnlinePb MujocoUR5eLiftingi_I0 \
     --demo_name "MujocoUR5eLiftingi_I0_image_constant_pb_trainseed${train_seed}" \
     --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/LiftingImageAB_B_only_ConstantPB_seed${train_seed}/policy_last.ckpt" \
-    --wp4_checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only_hand_image_vae_9_b_only_val_retrain_seed42_20260814/policy_best.ckpt \
+    --wp4_checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only_hand_image_vae_9/policy_best.ckpt \
     --image_vae_checkpoint robo_manip_baselines/checkpoint/ImageVAE/LiftingAB_B_only_hand_9/final_model \
     --online_pb_lr 6e-3 \
     --wrench_loss_weight 0.0 \
@@ -33,7 +33,7 @@ for train_seed in 42 52 62; do
     DiffusionPolicyOnlinePb MujocoUR5eLiftingi_I1 \
     --demo_name "MujocoUR5eLiftingi_I1_image_constant_pb_trainseed${train_seed}" \
     --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/LiftingImageAB_B_only_ConstantPB_seed${train_seed}/policy_last.ckpt" \
-    --wp4_checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only_hand_image_vae_9_b_only_val_retrain_seed42_20260814/policy_best.ckpt \
+    --wp4_checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only_hand_image_vae_9/policy_best.ckpt \
     --image_vae_checkpoint robo_manip_baselines/checkpoint/ImageVAE/LiftingAB_B_only_hand_9/final_model \
     --online_pb_lr 6e-3 \
     --wrench_loss_weight 0.0 \
@@ -50,7 +50,7 @@ for train_seed in 42 52 62; do
     DiffusionPolicyOnlinePb MujocoUR5eLiftingi_I2 \
     --demo_name "MujocoUR5eLiftingi_I2_image_constant_pb_trainseed${train_seed}" \
     --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/LiftingImageAB_B_only_ConstantPB_seed${train_seed}/policy_last.ckpt" \
-    --wp4_checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only_hand_image_vae_9_b_only_val_retrain_seed42_20260814/policy_best.ckpt \
+    --wp4_checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only_hand_image_vae_9/policy_best.ckpt \
     --image_vae_checkpoint robo_manip_baselines/checkpoint/ImageVAE/LiftingAB_B_only_hand_9/final_model \
     --online_pb_lr 6e-3 \
     --wrench_loss_weight 0.0 \
@@ -67,7 +67,7 @@ for train_seed in 42 52 62; do
     DiffusionPolicyOnlinePb MujocoUR5eLiftingi_I4 \
     --demo_name "MujocoUR5eLiftingi_I4_image_constant_pb_trainseed${train_seed}" \
     --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/LiftingImageAB_B_only_ConstantPB_seed${train_seed}/policy_last.ckpt" \
-    --wp4_checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only_hand_image_vae_9_b_only_val_retrain_seed42_20260814/policy_best.ckpt \
+    --wp4_checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only_hand_image_vae_9/policy_best.ckpt \
     --image_vae_checkpoint robo_manip_baselines/checkpoint/ImageVAE/LiftingAB_B_only_hand_9/final_model \
     --online_pb_lr 6e-3 \
     --wrench_loss_weight 0.0 \
@@ -84,7 +84,7 @@ for train_seed in 42 52 62; do
     DiffusionPolicyOnlinePb MujocoUR5eLiftingi_I5 \
     --demo_name "MujocoUR5eLiftingi_I5_image_constant_pb_trainseed${train_seed}" \
     --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/LiftingImageAB_B_only_ConstantPB_seed${train_seed}/policy_last.ckpt" \
-    --wp4_checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only_hand_image_vae_9_b_only_val_retrain_seed42_20260814/policy_best.ckpt \
+    --wp4_checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only_hand_image_vae_9/policy_best.ckpt \
     --image_vae_checkpoint robo_manip_baselines/checkpoint/ImageVAE/LiftingAB_B_only_hand_9/final_model \
     --online_pb_lr 6e-3 \
     --wrench_loss_weight 0.0 \
@@ -101,7 +101,7 @@ for train_seed in 42 52 62; do
     DiffusionPolicyOnlinePb MujocoUR5eLiftingi_I6 \
     --demo_name "MujocoUR5eLiftingi_I6_image_constant_pb_trainseed${train_seed}" \
     --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/LiftingImageAB_B_only_ConstantPB_seed${train_seed}/policy_last.ckpt" \
-    --wp4_checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only_hand_image_vae_9_b_only_val_retrain_seed42_20260814/policy_best.ckpt \
+    --wp4_checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only_hand_image_vae_9/policy_best.ckpt \
     --image_vae_checkpoint robo_manip_baselines/checkpoint/ImageVAE/LiftingAB_B_only_hand_9/final_model \
     --online_pb_lr 6e-3 \
     --wrench_loss_weight 0.0 \
@@ -118,7 +118,7 @@ for train_seed in 42 52 62; do
     DiffusionPolicyOnlinePb MujocoUR5eLiftingi_I7 \
     --demo_name "MujocoUR5eLiftingi_I7_image_constant_pb_trainseed${train_seed}" \
     --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/LiftingImageAB_B_only_ConstantPB_seed${train_seed}/policy_last.ckpt" \
-    --wp4_checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only_hand_image_vae_9_b_only_val_retrain_seed42_20260814/policy_best.ckpt \
+    --wp4_checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only_hand_image_vae_9/policy_best.ckpt \
     --image_vae_checkpoint robo_manip_baselines/checkpoint/ImageVAE/LiftingAB_B_only_hand_9/final_model \
     --online_pb_lr 6e-3 \
     --wrench_loss_weight 0.0 \

@@ -15,12 +15,12 @@ cp -aL robo_manip_baselines/dataset/LiftingAB_B_only/. \
 python robo_manip_baselines/policy/wrench_predictor4_online/AddOnlinePbToDataset.py \
   robo_manip_baselines/dataset/LiftingImageAB_B_only_OnlinePB \
   0 \
-  --checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only_hand_image_vae_9_b_only_val_retrain_seed42_20260814/policy_best.ckpt \
+  --checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only_hand_image_vae_9/policy_best.ckpt \
   --lr 6e-3 \
   --wrench_loss_weight 0.0 \
   --overwrite
 
 python robo_manip_baselines/policy/wrench_predictor4_online/AddConstantPbToDataset.py \
   robo_manip_baselines/dataset/LiftingImageAB_B_only_ConstantPB \
-  --checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only_hand_image_vae_9_b_only_val_retrain_seed42_20260814/policy_best.ckpt \
+  --checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only_hand_image_vae_9/policy_best.ckpt \
   --overwrite
