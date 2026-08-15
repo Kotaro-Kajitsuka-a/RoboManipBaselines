@@ -17,6 +17,7 @@ class TrainMain:
         "WrenchPredictor2",
         "WrenchPredictor3",
         "WrenchPredictor4",
+        "WrenchPredictor5",
     ]
 
     def __init__(self):
