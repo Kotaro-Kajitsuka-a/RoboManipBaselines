@@ -1,5 +1,4 @@
 import argparse
-import re
 from pathlib import Path
 
 import matplotlib
@@ -35,14 +34,6 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def get_actual_object_id(dataset_path: Path) -> int:
-    match = re.search(r"WrenchPredObject(\d+)", str(dataset_path.resolve()))
-    assert match is not None, (
-        f"dataset path must contain WrenchPredObject<id>: {dataset_path}"
-    )
-    return int(match.group(1))
-
-
 def load_episode(filename: str) -> dict:
     with RmbData(filename) as rmb_data:
         assert DataKey.TIME in rmb_data, filename
@@ -50,48 +41,22 @@ def load_episode(filename: str) -> dict:
 
         time = rmb_data[DataKey.TIME][:]
         pb = rmb_data[DataKey.MATERIAL_PROPERTY][:]
-        attrs = dict(rmb_data[DataKey.MATERIAL_PROPERTY].attrs)
+        if "online_pb_wp4_checkpoint" in rmb_data.attrs:
+            source_checkpoint = Path(rmb_data.attrs["online_pb_wp4_checkpoint"])
+        else:
+            source_checkpoint = Path(
+                rmb_data[DataKey.MATERIAL_PROPERTY].attrs["source_checkpoint"]
+            )
 
     assert time.ndim == 1, (filename, time.shape)
     assert pb.shape == (len(time), 1), (filename, pb.shape)
-    skip = int(attrs["online_skip"])
-    horizon = int(attrs["online_horizon"])
-    num_updates = int(attrs["online_num_updates"])
-    first_update_idx = (horizon - 1) * skip
-    update_idxes = first_update_idx + np.arange(num_updates) * skip
-    assert update_idxes[-1] < len(time), (filename, update_idxes[-1], len(time))
-    plot_idxes = np.concatenate([np.asarray([0, first_update_idx - 1]), update_idxes])
     elapsed_time = time - time[0]
     return {
         "name": Path(filename).stem,
-        "time": elapsed_time,
-        "pb": pb[:, 0],
-        "plot_time": elapsed_time[plot_idxes],
-        "plot_pb": pb[plot_idxes, 0],
-        "initial_pb": float(np.asarray(attrs["initial_pb"]).item()),
-        "learning_rate": float(attrs["online_learning_rate"]),
-        "source_checkpoint": Path(attrs["source_checkpoint"]),
+        "plot_time": elapsed_time,
+        "plot_pb": pb[:, 0],
+        "source_checkpoint": source_checkpoint,
     }
-
-
-def check_episode_metadata(episodes: list[dict]) -> tuple[float, float, Path]:
-    initial_pb = episodes[0]["initial_pb"]
-    learning_rate = episodes[0]["learning_rate"]
-    source_checkpoint = episodes[0]["source_checkpoint"]
-    for episode in episodes[1:]:
-        assert np.isclose(episode["initial_pb"], initial_pb), episode["name"]
-        assert np.isclose(episode["learning_rate"], learning_rate), episode["name"]
-        assert episode["source_checkpoint"] == source_checkpoint, episode["name"]
-    return initial_pb, learning_rate, source_checkpoint
-
-
-def load_reference_pb(checkpoint_path: Path, object_id: int) -> float:
-    assert checkpoint_path.is_file(), checkpoint_path
-    state_dict = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
-    reference_pb = state_dict["material_property.weight"]
-    assert reference_pb.ndim == 2 and reference_pb.shape[1] == 1, reference_pb.shape
-    assert object_id < reference_pb.shape[0], (object_id, reference_pb.shape)
-    return reference_pb[object_id, 0].item()
 
 
 def get_mean_trajectory(episodes: list[dict]) -> tuple[np.ndarray, np.ndarray]:
@@ -103,16 +68,29 @@ def get_mean_trajectory(episodes: list[dict]) -> tuple[np.ndarray, np.ndarray]:
     return time_array.mean(axis=0), pb_array.mean(axis=0)
 
 
+def load_reference_pbs(checkpoint_path: Path) -> np.ndarray:
+    assert checkpoint_path.is_file(), checkpoint_path
+    state_dict = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
+    reference_pbs = state_dict["material_property.weight"]
+    assert reference_pbs.ndim == 2 and reference_pbs.shape[1] == 1, reference_pbs.shape
+    assert reference_pbs.shape[0] >= 3, reference_pbs.shape
+    return reference_pbs[:3, 0].numpy()
+
+
+def get_source_checkpoint(episodes: list[dict]) -> Path:
+    source_checkpoint = episodes[0]["source_checkpoint"]
+    for episode in episodes[1:]:
+        assert episode["source_checkpoint"] == source_checkpoint, episode["name"]
+    return source_checkpoint
+
+
 def get_default_output_path(dataset_path: Path) -> Path:
     return dataset_path.resolve() / "online_pb_trajectories.png"
 
 
 def save_plot(
     episodes: list[dict],
-    actual_object_id: int,
-    initial_pb: float,
-    target_pb: float,
-    learning_rate: float,
+    reference_pbs: np.ndarray,
     output_path: Path,
 ) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -138,28 +116,21 @@ def save_plot(
         linewidth=2.6,
         label=f"mean trajectory (all {len(episodes)} episodes)",
     )
-    axis.axhline(
-        target_pb,
-        color="tab:red",
-        linestyle="--",
-        linewidth=2.0,
-        label=f"trained Object{actual_object_id} PB={target_pb:.4f}",
-    )
-    if not np.isclose(initial_pb, target_pb):
+    reference_colors = ("tab:red", "tab:orange", "tab:green")
+    for object_id, (reference_pb, color) in enumerate(
+        zip(reference_pbs, reference_colors, strict=True)
+    ):
         axis.axhline(
-            initial_pb,
-            color="0.4",
-            linestyle=":",
+            reference_pb,
+            color=color,
+            linestyle="--",
             linewidth=2.0,
-            label=f"initial PB={initial_pb:.4f}",
+            label=f"trained Object{object_id} PB={reference_pb:.4f}",
         )
 
     axis.set_xlabel("episode elapsed time [s]")
     axis.set_ylabel("PB")
-    axis.set_title(
-        f"Online PB identification: actual WrenchPredObject{actual_object_id} "
-        f"(lr={learning_rate:g})"
-    )
+    axis.set_title("Online PB trajectories")
     axis.grid(alpha=0.3)
     axis.legend(loc="best")
     figure.tight_layout()
@@ -172,28 +143,22 @@ def main() -> None:
     filenames = sorted(find_rmb_files(str(args.dataset_path)))
     assert len(filenames) > 0, args.dataset_path
 
-    actual_object_id = get_actual_object_id(args.dataset_path)
     episodes = [load_episode(filename) for filename in filenames]
-    initial_pb, learning_rate, source_checkpoint = check_episode_metadata(episodes)
-    target_pb = load_reference_pb(source_checkpoint, actual_object_id)
+    source_checkpoint = get_source_checkpoint(episodes)
+    reference_pbs = load_reference_pbs(source_checkpoint)
 
     output_path = args.output
     if output_path is None:
         output_path = get_default_output_path(args.dataset_path)
     save_plot(
         episodes,
-        actual_object_id,
-        initial_pb,
-        target_pb,
-        learning_rate,
+        reference_pbs,
         output_path,
     )
 
-    final_pb = np.asarray([episode["pb"][-1] for episode in episodes])
+    final_pb = np.asarray([episode["plot_pb"][-1] for episode in episodes])
     print(f"episodes: {len(episodes)}")
-    print(f"actual object: WrenchPredObject{actual_object_id}")
-    print(f"initial PB: {initial_pb:.6f}")
-    print(f"trained target PB: {target_pb:.6f}")
+    print(f"trained PBs: {reference_pbs.tolist()}")
     print(
         f"final PB: mean={final_pb.mean():.6f}, std={final_pb.std():.6f}, "
         f"range=[{final_pb.min():.6f}, {final_pb.max():.6f}]"
