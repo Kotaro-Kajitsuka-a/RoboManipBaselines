@@ -8,7 +8,9 @@ mkdir -p "$rmb_dir"
 rollout_start_marker="$eval_dir/.rollout_start"
 touch "$rollout_start_marker"
 
+pids=()
 for train_seed in 42 52 62; do
+  (
   seed_dir="$rmb_dir/seed${train_seed}"
   mkdir -p "$seed_dir"
 
@@ -138,6 +140,12 @@ for train_seed in 42 52 62; do
     -name "RolloutDiffusionPolicyOnlinePb_MujocoUR5eLiftingi_I*_image_online_pb_trainseed${train_seed}_20*" \
     -newer "$rollout_start_marker" \
     -exec mv -- {} "$seed_dir" \;
+  ) &
+  pids+=("$!")
+done
+
+for pid in "${pids[@]}"; do
+  wait "$pid"
 done
 
 python robo_manip_baselines/misc/futureimagination/AnalyzeLiftingSuccess.py \

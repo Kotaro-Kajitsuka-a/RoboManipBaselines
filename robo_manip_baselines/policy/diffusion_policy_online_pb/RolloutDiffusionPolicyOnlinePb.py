@@ -102,7 +102,7 @@ class RolloutDiffusionPolicyOnlinePb(RolloutDiffusionPolicy):
         self.wp4_image_feature_key = self.wp4_model_meta_info["data"][
             "image_feature_key"
         ]
-        if self.wp4_image_feature_key == "image_vae_hand_9":
+        if self.wp4_image_feature_key.startswith("image_vae"):
             assert self.args.image_vae_checkpoint_path is not None
             from pythae.models import AutoModel
 
@@ -113,7 +113,9 @@ class RolloutDiffusionPolicyOnlinePb(RolloutDiffusionPolicy):
             self.wp4_image_vae.eval().to(self.device)
             self.wp4_image_vae.requires_grad_(False)
             input_dim = self.wp4_image_vae.model_config.input_dim
-            assert self.wp4_image_vae.model_config.latent_dim == 9
+            assert self.wp4_image_vae.model_config.latent_dim == len(
+                self.wp4_model_meta_info["image_feature"]["example"]
+            )
             self.wp4_image_size = (input_dim[2], input_dim[1])
 
         wp4_data_info = self.wp4_model_meta_info["data"]
