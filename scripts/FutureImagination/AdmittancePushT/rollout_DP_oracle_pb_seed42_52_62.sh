@@ -2,7 +2,7 @@
 set -e
 
 # Run from the repository root after train_seed42_52_62.sh.
-# Evaluate the online-PB-trained DP with the correct learned PB fixed per object.
+# Evaluate the constant-PB-trained DP with the correct learned PB fixed per object.
 eval_timestamp=$(date +%Y%m%d_%H%M%S)
 eval_dir="robo_manip_baselines/dataset/tests/FutureImagination/AdmittancePushT/DP_oracle_pb_eval_${eval_timestamp}"
 rmb_dir="$eval_dir/rmb"
@@ -20,7 +20,7 @@ for train_seed in 42 52 62; do
   python robo_manip_baselines/bin/Rollout.py \
     DiffusionPolicyOnlinePb MujocoXarm7AdmittancePusht_T0 \
     --demo_name "AdmittancePushTOraclePb_trainseed${train_seed}_rollseed42_T0" \
-    --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/AdmittancePushT/online_seed${train_seed}/policy_last.ckpt" \
+    --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/AdmittancePushT/constant_seed${train_seed}/policy_last.ckpt" \
     --wp4_checkpoint "$wp4_checkpoint" \
     --initial_object_id 0 \
     --fixed_pb \
@@ -36,7 +36,7 @@ for train_seed in 42 52 62; do
   python robo_manip_baselines/bin/Rollout.py \
     DiffusionPolicyOnlinePb MujocoXarm7AdmittancePusht_T1 \
     --demo_name "AdmittancePushTOraclePb_trainseed${train_seed}_rollseed42_T1" \
-    --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/AdmittancePushT/online_seed${train_seed}/policy_last.ckpt" \
+    --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/AdmittancePushT/constant_seed${train_seed}/policy_last.ckpt" \
     --wp4_checkpoint "$wp4_checkpoint" \
     --initial_object_id 1 \
     --fixed_pb \
@@ -52,7 +52,7 @@ for train_seed in 42 52 62; do
   python robo_manip_baselines/bin/Rollout.py \
     DiffusionPolicyOnlinePb MujocoXarm7AdmittancePusht_T2 \
     --demo_name "AdmittancePushTOraclePb_trainseed${train_seed}_rollseed42_T2" \
-    --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/AdmittancePushT/online_seed${train_seed}/policy_last.ckpt" \
+    --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/AdmittancePushT/constant_seed${train_seed}/policy_last.ckpt" \
     --wp4_checkpoint "$wp4_checkpoint" \
     --initial_object_id 2 \
     --fixed_pb \
@@ -68,7 +68,7 @@ for train_seed in 42 52 62; do
   python robo_manip_baselines/bin/Rollout.py \
     DiffusionPolicyOnlinePb MujocoXarm7AdmittancePusht_T3 \
     --demo_name "AdmittancePushTOraclePb_trainseed${train_seed}_rollseed42_T3" \
-    --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/AdmittancePushT/online_seed${train_seed}/policy_last.ckpt" \
+    --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/AdmittancePushT/constant_seed${train_seed}/policy_last.ckpt" \
     --wp4_checkpoint "$wp4_checkpoint" \
     --initial_object_id 3 \
     --fixed_pb \
