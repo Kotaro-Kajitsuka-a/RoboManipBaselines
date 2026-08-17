@@ -40,6 +40,14 @@ class RolloutDiffusionPolicyOnlinePb(RolloutDiffusionPolicy):
             ),
         )
         parser.add_argument(
+            "--fixed_pb",
+            action="store_true",
+            help=(
+                "keep the PB selected by --initial_object_id fixed throughout "
+                "the rollout instead of adapting it online"
+            ),
+        )
+        parser.add_argument(
             "--online_pb_lr",
             type=float,
             default=6e-3,
@@ -124,6 +132,7 @@ class RolloutDiffusionPolicyOnlinePb(RolloutDiffusionPolicy):
             f"  - WP4 checkpoint: {self.wp4_checkpoint}\n"
             f"  - initial object: {self.initial_object_key} "
             f"(id={self.args.initial_object_id}, PB={self.initial_pb.tolist()})\n"
+            f"  - fixed PB: {self.args.fixed_pb}\n"
             f"  - PB dimension: {wp4_pb_dim}\n"
             f"  - learning rate: {self.args.online_pb_lr}\n"
             f"  - wrench loss weight: {self.args.wrench_loss_weight}\n"
@@ -146,6 +155,7 @@ class RolloutDiffusionPolicyOnlinePb(RolloutDiffusionPolicy):
         self.data_manager.meta_data["online_pb_initial_object_id"] = (
             self.args.initial_object_id
         )
+        self.data_manager.meta_data["online_pb_fixed"] = self.args.fixed_pb
         self.data_manager.meta_data["online_pb_learning_rate"] = self.args.online_pb_lr
         self.data_manager.meta_data["online_pb_wrench_loss_weight"] = (
             self.args.wrench_loss_weight
@@ -176,12 +186,16 @@ class RolloutDiffusionPolicyOnlinePb(RolloutDiffusionPolicy):
         )
 
     def infer_policy(self):
-        self.append_online_observation()
-        if len(self.online_observation_window) == self.online_observation_window.maxlen:
-            # RolloutPhase calls infer_policy() under torch.inference_mode().
-            # Re-enable autograd locally and create all WP4 tensors in this scope.
-            with torch.inference_mode(False), torch.enable_grad():
-                self.update_online_pb()
+        if not self.args.fixed_pb:
+            self.append_online_observation()
+            if (
+                len(self.online_observation_window)
+                == self.online_observation_window.maxlen
+            ):
+                # RolloutPhase calls infer_policy() under torch.inference_mode().
+                # Re-enable autograd locally and create all WP4 tensors in this scope.
+                with torch.inference_mode(False), torch.enable_grad():
+                    self.update_online_pb()
 
         # The updated PB is inserted into the DP state by update_state_buf().
         # Keep the existing DP action buffer; the latest PB takes effect at the
