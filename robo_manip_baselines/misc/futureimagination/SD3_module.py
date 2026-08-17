@@ -2,9 +2,8 @@ import einops
 import torch
 from diffusers.models import AutoencoderKL
 
-#from __future__ import annotations
+# from __future__ import annotations
 
-import json
 import logging
 from abc import ABC, abstractmethod
 from typing import Any, Dict
@@ -160,7 +159,9 @@ class VAE(BaseAutoencoder):
     def __init__(self):
         super().__init__()
         self.vae = AutoencoderKL.from_pretrained(
-            "stabilityai/stable-diffusion-3-medium-diffusers", subfolder="vae"
+            "stabilityai/stable-diffusion-3-medium-diffusers",
+            subfolder="vae",
+            use_safetensors=True,
         )
         self.vae.eval().requires_grad_(False)
         self.vae.to(torch.bfloat16)
@@ -172,7 +173,7 @@ class VAE(BaseAutoencoder):
     def _chunked(self, fn, x: torch.Tensor, chunk: int = 64) -> torch.Tensor:
         if x.shape[0] <= chunk:
             return fn(x)
-        return torch.cat([fn(x[i:i + chunk]) for i in range(0, x.shape[0], chunk)])
+        return torch.cat([fn(x[i : i + chunk]) for i in range(0, x.shape[0], chunk)])
 
     def encode(self, x: torch.Tensor) -> torch.Tensor:
         B, T, H, W, C = x.shape
@@ -197,6 +198,7 @@ class VAE(BaseAutoencoder):
         x = (x + 1) / 2
         x = einops.rearrange(x, "(b t) c h w -> b t h w c", b=B, t=T)
         return x
+
 
 if __name__ == "__main__":
     import argparse

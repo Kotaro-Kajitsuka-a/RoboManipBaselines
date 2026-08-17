@@ -177,6 +177,47 @@ class EvalWrenchPredictor4ImageFeatureSweepDir(EvalWrenchPredictor4SweepBase):
                 rmb_stem,
                 plot_data,
             )
+            output_csv = os.path.splitext(output_png)[0] + ".csv"
+            self.save_episode_timeseries_csv(output_csv, plot_data)
+
+    def save_episode_timeseries_csv(self, output_csv, plot_data):
+        fieldnames = ["time_idx"]
+        for wrench_label in WRENCH_LABELS:
+            fieldnames.append(f"gt_{wrench_label}")
+        for material_object_key in self.material_object_keys:
+            for wrench_label in WRENCH_LABELS:
+                fieldnames.append(f"{material_object_key}_pred_{wrench_label}")
+            fieldnames.extend(
+                [
+                    f"{material_object_key}_normalized_feature_mse",
+                    f"{material_object_key}_normalized_feature_mae",
+                ]
+            )
+
+        with open(output_csv, "w", newline="") as file:
+            writer = csv.DictWriter(file, fieldnames=fieldnames)
+            writer.writeheader()
+            for time_offset, time_idx in enumerate(plot_data["time_idx"]):
+                row = {"time_idx": int(time_idx)}
+                for wrench_idx, wrench_label in enumerate(WRENCH_LABELS):
+                    row[f"gt_{wrench_label}"] = plot_data["gt_wrench"][
+                        time_offset, wrench_idx
+                    ]
+                for material_object_key in self.material_object_keys:
+                    pred_wrench = plot_data["material_key_to_pred_wrench"][
+                        material_object_key
+                    ]
+                    for wrench_idx, wrench_label in enumerate(WRENCH_LABELS):
+                        row[f"{material_object_key}_pred_{wrench_label}"] = (
+                            pred_wrench[time_offset, wrench_idx]
+                        )
+                    row[f"{material_object_key}_normalized_feature_mse"] = plot_data[
+                        "material_key_to_normalized_feature_mse"
+                    ][material_object_key][time_offset]
+                    row[f"{material_object_key}_normalized_feature_mae"] = plot_data[
+                        "material_key_to_normalized_feature_mae"
+                    ][material_object_key][time_offset]
+                writer.writerow(row)
 
     def evaluate_episode_for_plot(self, filename):
         dataset, dataloader = self.make_dataloader([filename])

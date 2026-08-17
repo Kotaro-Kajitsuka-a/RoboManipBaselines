@@ -12,7 +12,7 @@ class TestWrenchPredictor5Model(unittest.TestCase):
         batch_size = 2
         horizon = 4
         n_obs_steps = 2
-        image_feature_dim = 16 * 15 * 20
+        image_feature_dim = 16 * 12 * 16
         model = WrenchPredictor5Model(
             image_feature_dim=image_feature_dim,
             state_dim=10,
@@ -22,7 +22,7 @@ class TestWrenchPredictor5Model(unittest.TestCase):
             pb_dim=1,
             horizon=horizon,
             n_obs_steps=n_obs_steps,
-            latent_shape=(16, 15, 20),
+            latent_shape=(16, 12, 16),
             hidden_dim=32,
             nhead=4,
             num_encoder_layers=1,

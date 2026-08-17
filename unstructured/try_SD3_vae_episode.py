@@ -13,8 +13,8 @@ DEFAULT_EPISODE = Path(
     "robo_manip_baselines/dataset/DatasetMujocoXarm7Pusht/"
     "WrenchPredObject0/WrenchPredObject0_world0_000.rmb"
 )
-IMAGE_WIDTH = 160
-IMAGE_HEIGHT = 120
+IMAGE_WIDTH = 128
+IMAGE_HEIGHT = 96
 
 
 def parse_args():
@@ -120,10 +120,8 @@ def main():
     assert fps > 0
     expected_num_frames = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
 
-    resized_video_path = args.output_dir / "left_resized_160x120.mp4"
-    reconstructed_video_path = (
-        args.output_dir / "left_SD3_VAE_reconstructed_160x120.mp4"
-    )
+    resized_video_path = args.output_dir / "left_resized_128x96.mp4"
+    reconstructed_video_path = args.output_dir / "left_SD3_VAE_reconstructed_128x96.mp4"
     comparison_video_path = args.output_dir / "left_resized_vs_SD3_VAE.mp4"
     resized_writer = create_video_writer(
         resized_video_path, fps, (IMAGE_WIDTH, IMAGE_HEIGHT)
@@ -140,6 +138,7 @@ def main():
         MODEL_NAME,
         subfolder="vae",
         torch_dtype=torch.bfloat16,
+        use_safetensors=True,
     ).to(device)
     vae.eval().requires_grad_(False)
 
@@ -159,7 +158,7 @@ def main():
                 resized_bgr_image = cv2.resize(
                     bgr_image,
                     (IMAGE_WIDTH, IMAGE_HEIGHT),
-                    interpolation=cv2.INTER_AREA,
+                    interpolation=cv2.INTER_LINEAR,
                 )
                 resized_rgb_images.append(
                     cv2.cvtColor(resized_bgr_image, cv2.COLOR_BGR2RGB)
@@ -171,7 +170,7 @@ def main():
             latents, reconstructed_rgb_images = encode_decode(
                 vae, resized_rgb_images, device
             )
-            assert latents.shape[1:] == (16, 15, 20), latents.shape
+            assert latents.shape[1:] == (16, 12, 16), latents.shape
             latent_batches.append(latents.astype(np.float16))
 
             input_rgb_images = np.stack(resized_rgb_images).astype(np.float32) / 255.0
@@ -205,7 +204,7 @@ def main():
 
     assert num_frames == expected_num_frames, (num_frames, expected_num_frames)
     latents = np.concatenate(latent_batches, axis=0)
-    assert latents.shape == (num_frames, 16, 15, 20), latents.shape
+    assert latents.shape == (num_frames, 16, 12, 16), latents.shape
     latents = np.transpose(latents, (0, 2, 3, 1))
     latent_path = args.output_dir / "left_SD3_VAE_latents_mode_float16.npy"
     np.save(latent_path, latents)

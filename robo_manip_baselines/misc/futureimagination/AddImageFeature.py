@@ -14,11 +14,11 @@ MODEL_NAME = "stabilityai/stable-diffusion-3-medium-diffusers"
 CAMERA_NAME = "left"
 RGB_IMAGE_KEY = DataKey.get_rgb_image_key(CAMERA_NAME)
 IMAGE_FEATURE_KEY = "sd3_vae"
-IMAGE_WIDTH = 160
-IMAGE_HEIGHT = 120
+IMAGE_WIDTH = 128
+IMAGE_HEIGHT = 96
 LATENT_CHANNELS = 16
-LATENT_HEIGHT = 15
-LATENT_WIDTH = 20
+LATENT_HEIGHT = 12
+LATENT_WIDTH = 16
 IMAGE_FEATURE_DIM = LATENT_CHANNELS * LATENT_HEIGHT * LATENT_WIDTH
 BATCH_SIZE = 16
 
@@ -68,8 +68,10 @@ def encode_image_batch(sd3_vae, rgb_images, device):
 
     vae = sd3_vae.vae
     with torch.inference_mode():
-        latents = vae.encode(images).latent_dist.mode() 
-        latents = (latents - vae.config.shift_factor) * vae.config.scaling_factor  # soft normalization (-1~1) to latent space
+        latents = vae.encode(images).latent_dist.mode()
+        latents = (
+            latents - vae.config.shift_factor
+        ) * vae.config.scaling_factor  # soft normalization (-1~1) to latent space
 
     assert latents.shape[1:] == (
         LATENT_CHANNELS,
@@ -92,7 +94,7 @@ def encode_episode(sd3_vae, rmb_path, device):
             cv2.resize(
                 rgb_image,
                 (IMAGE_WIDTH, IMAGE_HEIGHT),
-                interpolation=cv2.INTER_AREA,
+                interpolation=cv2.INTER_LINEAR,
             )
             for rgb_image in rgb_video[start : start + BATCH_SIZE]
         ]

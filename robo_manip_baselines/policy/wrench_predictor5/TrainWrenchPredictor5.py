@@ -15,7 +15,7 @@ from .WrenchPredictor5Model import WrenchPredictor5Model
 
 class TrainWrenchPredictor5(TrainWrenchPredictor4):
     DatasetClass = WrenchPredictor5Dataset
-    LATENT_SHAPE = (16, 15, 20)
+    LATENT_SHAPE = (16, 12, 16)
 
     def setup_args(self):
         TrainBase.setup_args(self)
@@ -134,7 +134,7 @@ class TrainWrenchPredictor5(TrainWrenchPredictor4):
 
     def setup_policy(self):
         image_feature_dim = len(self.model_meta_info["image_feature"]["example"])
-        assert image_feature_dim == 16 * 15 * 20, image_feature_dim
+        assert image_feature_dim == 16 * 12 * 16, image_feature_dim
         self.model_meta_info["policy"]["args"] = {
             "image_feature_dim": image_feature_dim,
             "state_dim": len(self.model_meta_info["state"]["example"]),
