@@ -6,45 +6,60 @@ from pathlib import Path
 import cv2
 import numpy as np
 import torch
+from diffusers.models import AutoencoderKL
 from pythae.models import AutoModel
 from torch.utils.data import DataLoader
 
 from robo_manip_baselines.common import DataKey, RmbData, denormalize_data
+from robo_manip_baselines.common import find_rmb_files
 from robo_manip_baselines.policy.wrench_predictor4.EvalWrenchPredictor4SweepCommon import (
     EvalWrenchPredictor4Dataset,
 )
 from robo_manip_baselines.policy.wrench_predictor4.WrenchPredictor4Model import (
     WrenchPredictor4Model,
 )
+from robo_manip_baselines.policy.wrench_predictor5.WrenchPredictor5Model import (
+    WrenchPredictor5Model,
+)
 
 
 BATCH_SIZE = 64
+WP5_BATCH_SIZE = 8
 DEFAULT_MATERIAL_OBJECT_IDS = (0, 1, 2)
+SD3_MODEL_NAME = "stabilityai/stable-diffusion-3-medium-diffusers"
+SD3_LATENT_SHAPE = (16, 12, 16)
+SD3_LATENT_DIM = int(np.prod(SD3_LATENT_SHAPE))
 
 
 def parse_args():
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
         description=(
-            "Create one video comparing the real camera image with ImageVAE "
-            "reconstructions predicted using each WrenchPredictor4 PB."
+            "Create one video comparing the real camera image with VAE "
+            "reconstructions predicted using each WrenchPredictor PB."
         ),
     )
     parser.add_argument(
         "checkpoint_dir",
         type=Path,
-        help="WrenchPredictor4 checkpoint directory",
+        help="WrenchPredictor4 or WrenchPredictor5 checkpoint directory",
     )
-    parser.add_argument("rmb_path", type=Path, help="one RMB episode directory")
+    parser.add_argument(
+        "rmb_path",
+        type=Path,
+        help="one RMB episode directory or a dataset directory",
+    )
     parser.add_argument(
         "vae_checkpoint",
         type=Path,
-        help="ImageVAE checkpoint directory containing model.pt",
+        nargs="?",
+        default=None,
+        help="ImageVAE checkpoint directory (required only for WrenchPredictor4)",
     )
     parser.add_argument(
         "--checkpoint_name",
         default="policy_best.ckpt",
-        help="WrenchPredictor4 checkpoint filename",
+        help="WrenchPredictor checkpoint filename",
     )
     parser.add_argument(
         "--material_object_ids",
@@ -55,10 +70,35 @@ def parse_args():
     )
     parser.add_argument("--camera_name", default=None, help="override camera name")
     parser.add_argument("--output", type=Path, default=None, help="output MP4 path")
+    parser.add_argument(
+        "--output_dir",
+        type=Path,
+        default=None,
+        help="output directory when rmb_path is a dataset directory",
+    )
     return parser.parse_args()
 
 
-def infer_camera_name(image_feature_key, latent_dim):
+def infer_camera_name(image_feature_key, latent_dim, policy_name):
+    if policy_name == "WrenchPredictor5":
+        if image_feature_key == "sd3_vae":
+            return "left"
+        prefix = "sd3_vae_"
+        assert image_feature_key.startswith(prefix), image_feature_key
+        camera_name = image_feature_key[len(prefix) :]
+        assert camera_name, image_feature_key
+        return camera_name
+
+    assert policy_name == "WrenchPredictor4", policy_name
+    sd3_prefix = "sd3_vae_"
+    sd3_suffix = f"_ae_{latent_dim}"
+    if image_feature_key.startswith(sd3_prefix) and image_feature_key.endswith(
+        sd3_suffix
+    ):
+        camera_name = image_feature_key[len(sd3_prefix) : -len(sd3_suffix)]
+        assert camera_name, image_feature_key
+        return camera_name
+
     prefix = "image_vae_"
     suffix = f"_{latent_dim}"
     assert image_feature_key.startswith(prefix), image_feature_key
@@ -101,7 +141,13 @@ def load_model_meta_info(checkpoint_dir):
 def load_policy(checkpoint_dir, checkpoint_name, model_meta_info, device):
     checkpoint = checkpoint_dir / checkpoint_name
     assert checkpoint.is_file(), checkpoint
-    policy = WrenchPredictor4Model(**model_meta_info["policy"]["args"])
+    policy_name = model_meta_info["policy"]["name"]
+    if policy_name == "WrenchPredictor4":
+        policy_class = WrenchPredictor4Model
+    else:
+        assert policy_name == "WrenchPredictor5", policy_name
+        policy_class = WrenchPredictor5Model
+    policy = policy_class(**model_meta_info["policy"]["args"])
     policy.load_state_dict(
         torch.load(checkpoint, map_location=device, weights_only=True)
     )
@@ -121,9 +167,14 @@ def predict_image_features(
         model_meta_info,
         enable_rmb_cache=False,
     )
+    batch_size = (
+        WP5_BATCH_SIZE
+        if model_meta_info["policy"]["name"] == "WrenchPredictor5"
+        else BATCH_SIZE
+    )
     dataloader = DataLoader(
         dataset,
-        batch_size=BATCH_SIZE,
+        batch_size=batch_size,
         shuffle=False,
         num_workers=0,
     )
@@ -163,7 +214,7 @@ def predict_image_features(
     return time_idx * skip, material_id_to_features
 
 
-def decode_features(vae, features, device):
+def decode_image_vae_features(vae, features, device):
     reconstructed_batches = []
     for start in range(0, len(features), BATCH_SIZE):
         latent = torch.from_numpy(features[start : start + BATCH_SIZE]).to(
@@ -177,6 +228,46 @@ def decode_features(vae, features, device):
         )
     reconstructed = np.concatenate(reconstructed_batches)
     return np.round(255.0 * reconstructed).clip(0, 255).astype(np.uint8)
+
+
+def decode_sd3_features(vae, features, latent_shape, device):
+    reconstructed_batches = []
+    for start in range(0, len(features), WP5_BATCH_SIZE):
+        latent = torch.from_numpy(features[start : start + WP5_BATCH_SIZE]).to(
+            device=device,
+            dtype=torch.bfloat16,
+        )
+        latent = latent.reshape(-1, *latent_shape)
+        decode_latent = latent / vae.config.scaling_factor + vae.config.shift_factor
+        with torch.inference_mode():
+            reconstruction = vae.decode(decode_latent, return_dict=False)[0]
+        reconstruction = ((reconstruction.float() + 1.0) / 2.0).clamp(0.0, 1.0)
+        reconstructed_batches.append(
+            reconstruction.permute(0, 2, 3, 1).cpu().numpy()
+        )
+    reconstructed = np.concatenate(reconstructed_batches)
+    return np.round(255.0 * reconstructed).astype(np.uint8)
+
+
+def decode_sd3_latent_ae_features(sd3_vae, latent_ae, features, device):
+    reconstructed_batches = []
+    for start in range(0, len(features), WP5_BATCH_SIZE):
+        compact_latent = torch.from_numpy(
+            features[start : start + WP5_BATCH_SIZE]
+        ).to(device=device, dtype=torch.float32)
+        with torch.inference_mode():
+            flat_sd3_latent = latent_ae.decoder(compact_latent).reconstruction
+        assert flat_sd3_latent.shape[1] == SD3_LATENT_DIM, flat_sd3_latent.shape
+        sd3_latent = flat_sd3_latent.reshape(-1, *SD3_LATENT_SHAPE)
+        reconstructed_batches.append(
+            decode_sd3_features(
+                sd3_vae,
+                sd3_latent.cpu().numpy(),
+                SD3_LATENT_SHAPE,
+                device,
+            )
+        )
+    return np.concatenate(reconstructed_batches)
 
 
 def read_selected_frames(video_path, raw_frame_idx):
@@ -291,38 +382,74 @@ def main():
     args = parse_args()
     assert args.checkpoint_dir.is_dir(), args.checkpoint_dir
     assert args.rmb_path.is_dir(), args.rmb_path
-    assert args.vae_checkpoint.is_dir(), args.vae_checkpoint
     assert len(args.material_object_ids) == len(set(args.material_object_ids))
+    if args.rmb_path.suffix == ".rmb":
+        assert args.output_dir is None
+        rmb_paths = [args.rmb_path]
+    else:
+        assert args.output is None, "Use --output_dir for a dataset directory."
+        rmb_paths = [Path(path) for path in find_rmb_files(str(args.rmb_path))]
+        assert rmb_paths, args.rmb_path
     assert torch.cuda.is_available(), "PB reconstruction requires a CUDA GPU."
     device = torch.device("cuda")
 
     model_meta_info = load_model_meta_info(args.checkpoint_dir)
+    policy_name = model_meta_info["policy"]["name"]
     image_feature_dim = model_meta_info["policy"]["args"]["image_feature_dim"]
     image_feature_key = model_meta_info["data"]["image_feature_key"]
-    vae = AutoModel.load_from_folder(str(args.vae_checkpoint)).eval().to(device)
-    vae.requires_grad_(False)
-    assert vae.model_config.latent_dim == image_feature_dim, (
-        vae.model_config.latent_dim,
-        image_feature_dim,
-    )
+    sd3_vae = None
+    latent_ae = None
+    if policy_name == "WrenchPredictor4":
+        assert args.vae_checkpoint is not None
+        assert args.vae_checkpoint.is_dir(), args.vae_checkpoint
+        vae = AutoModel.load_from_folder(str(args.vae_checkpoint)).eval().to(device)
+        vae.requires_grad_(False)
+        assert vae.model_config.latent_dim == image_feature_dim, (
+            vae.model_config.latent_dim,
+            image_feature_dim,
+        )
+        if tuple(vae.model_config.input_dim) == (SD3_LATENT_DIM,):
+            latent_ae = vae
+            sd3_vae = AutoencoderKL.from_pretrained(
+                SD3_MODEL_NAME,
+                subfolder="vae",
+                torch_dtype=torch.bfloat16,
+                use_safetensors=True,
+            ).to(device)
+            sd3_vae.eval().requires_grad_(False)
+    else:
+        assert policy_name == "WrenchPredictor5", policy_name
+        assert args.vae_checkpoint is None, (
+            "WrenchPredictor5 uses the pretrained SD3 VAE; do not pass "
+            "vae_checkpoint"
+        )
+        vae = AutoencoderKL.from_pretrained(
+            SD3_MODEL_NAME,
+            subfolder="vae",
+            torch_dtype=torch.bfloat16,
+            use_safetensors=True,
+        ).to(device)
+        vae.eval().requires_grad_(False)
 
     camera_name = args.camera_name
     if camera_name is None:
-        camera_name = infer_camera_name(image_feature_key, image_feature_dim)
-    video_path = args.rmb_path / f"{camera_name}_rgb_image.rmb.mp4"
-    assert video_path.is_file(), video_path
-
+        camera_name = infer_camera_name(
+            image_feature_key,
+            image_feature_dim,
+            policy_name,
+        )
     object_key_to_id = model_meta_info["material_property"]["object_key_to_id"]
     known_object_ids = set(object_key_to_id.values())
     assert all(
         material_object_id in known_object_ids
         for material_object_id in args.material_object_ids
     ), args.material_object_ids
-    checkpoint_meta = model_meta_info["material_property"][
-        Path(args.checkpoint_name).stem
-    ]
+    checkpoint = args.checkpoint_dir / args.checkpoint_name
+    state_dict = torch.load(checkpoint, map_location="cpu", weights_only=True)
+    material_property = state_dict["material_property.weight"]
+    assert material_property.shape[1] == 1, material_property.shape
     material_pb_by_id = {
-        object_id: checkpoint_meta["pb_by_object"][f"WrenchPredObject{object_id}"][0]
+        object_id: material_property[object_id, 0].item()
         for object_id in args.material_object_ids
     }
 
@@ -332,46 +459,85 @@ def main():
         model_meta_info,
         device,
     )
-    raw_frame_idx, material_id_to_features = predict_image_features(
-        policy,
-        model_meta_info,
-        args.rmb_path,
-        args.material_object_ids,
-        device,
-    )
-    reconstructed_by_material_id = {
-        material_object_id: decode_features(vae, features, device)
-        for material_object_id, features in material_id_to_features.items()
-    }
-    input_frames, source_fps, width, height = read_selected_frames(
-        video_path,
-        raw_frame_idx,
-    )
-
-    output_path = args.output
-    if output_path is None:
-        output_path = args.rmb_path.parent / (
-            f"{args.rmb_path.stem}_{camera_name}_pb_reconstruction.mp4"
-        )
-    skip = model_meta_info["data"]["skip"]
-    encode_video(
-        output_path,
-        input_frames,
-        reconstructed_by_material_id,
-        args.material_object_ids,
-        material_pb_by_id,
-        source_fps / skip,
-        width,
-        height,
-        camera_name,
-    )
-
-    print(f"RMB: {args.rmb_path}")
     print(f"Checkpoint: {args.checkpoint_dir / args.checkpoint_name}")
+    print(f"Policy: {policy_name}")
     print(f"Image feature: {image_feature_key} ({image_feature_dim}D)")
     print(f"Camera: {camera_name}")
-    print(f"Frames: {len(input_frames)} at {source_fps / skip:.3f} fps")
-    print(f"Output: {output_path.resolve()}")
+    print(f"Episodes: {len(rmb_paths)}")
+
+    output_dir = args.output_dir
+    if len(rmb_paths) > 1 and output_dir is None:
+        output_dir = args.rmb_path.with_name(
+            f"{args.rmb_path.name}_PbReconstructionVideos"
+        )
+
+    for episode_idx, rmb_path in enumerate(rmb_paths, start=1):
+        video_path = rmb_path / f"{camera_name}_rgb_image.rmb.mp4"
+        assert video_path.is_file(), video_path
+        raw_frame_idx, material_id_to_features = predict_image_features(
+            policy,
+            model_meta_info,
+            rmb_path,
+            args.material_object_ids,
+            device,
+        )
+        if latent_ae is not None:
+            reconstructed_by_material_id = {
+                material_object_id: decode_sd3_latent_ae_features(
+                    sd3_vae,
+                    latent_ae,
+                    features,
+                    device,
+                )
+                for material_object_id, features in material_id_to_features.items()
+            }
+        elif policy_name == "WrenchPredictor4":
+            reconstructed_by_material_id = {
+                material_object_id: decode_image_vae_features(vae, features, device)
+                for material_object_id, features in material_id_to_features.items()
+            }
+        else:
+            latent_shape = tuple(model_meta_info["policy"]["args"]["latent_shape"])
+            reconstructed_by_material_id = {
+                material_object_id: decode_sd3_features(
+                    vae,
+                    features,
+                    latent_shape,
+                    device,
+                )
+                for material_object_id, features in material_id_to_features.items()
+            }
+        input_frames, source_fps, width, height = read_selected_frames(
+            video_path,
+            raw_frame_idx,
+        )
+
+        if output_dir is not None:
+            output_path = output_dir / (
+                f"{rmb_path.stem}_{camera_name}_pb_reconstruction.mp4"
+            )
+        elif args.output is not None:
+            output_path = args.output
+        else:
+            output_path = rmb_path.parent / (
+                f"{rmb_path.stem}_{camera_name}_pb_reconstruction.mp4"
+            )
+        skip = model_meta_info["data"]["skip"]
+        encode_video(
+            output_path,
+            input_frames,
+            reconstructed_by_material_id,
+            args.material_object_ids,
+            material_pb_by_id,
+            source_fps / skip,
+            width,
+            height,
+            camera_name,
+        )
+        print(
+            f"[{episode_idx}/{len(rmb_paths)}] {rmb_path.name}: "
+            f"{len(input_frames)} frames -> {output_path.resolve()}"
+        )
 
 
 if __name__ == "__main__":
