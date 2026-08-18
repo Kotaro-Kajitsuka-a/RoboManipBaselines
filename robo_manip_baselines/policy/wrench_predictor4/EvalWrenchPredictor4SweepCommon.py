@@ -3,6 +3,7 @@ import csv
 import glob
 import os
 import pickle
+from pathlib import Path
 
 import numpy as np
 import torch
@@ -206,6 +207,7 @@ class EvalWrenchPredictor4SweepBase:
         for checkpoint in self.checkpoints:
             print(f"[{self.__class__.__name__}] Evaluate checkpoint: {checkpoint}")
             self.setup_policy(checkpoint)
+            self.save_learned_pb_plot(checkpoint)
             for actual_object_key in self.target_object_keys:
                 actual_filenames = self.object_key_to_filenames[actual_object_key]
                 for material_object_key in self.material_object_keys:
@@ -229,6 +231,33 @@ class EvalWrenchPredictor4SweepBase:
         self.save_diagonal_accuracy_csv(rows)
         self.save_heatmaps(rows)
         print(f"[{self.__class__.__name__}] Save csv: {self.output_csv}")
+
+    def save_learned_pb_plot(self, checkpoint):
+        pb_dim = self.model_meta_info["material_property"]["pb_dim"]
+        checkpoint_path = Path(checkpoint)
+        output_path = Path(self.pb_dir) / (
+            f"{checkpoint_path.stem}_learned_pb_{pb_dim}d.png"
+        )
+        if pb_dim == 1:
+            from robo_manip_baselines.misc.futureimagination.PlotLearnedPb import (
+                load_pb,
+                save_plot,
+            )
+        elif pb_dim == 2:
+            from robo_manip_baselines.misc.futureimagination.PlotLearnedPb2d import (
+                load_pb,
+                save_plot,
+            )
+        else:
+            print(
+                f"[{self.__class__.__name__}] Skip learned PB plot: "
+                f"unsupported pb_dim={pb_dim}"
+            )
+            return
+
+        pb = load_pb(checkpoint_path)
+        save_plot(pb, output_path)
+        print(f"[{self.__class__.__name__}] Save learned PB plot: {output_path}")
 
     def setup_model_meta_info(self):
         model_meta_info_path = os.path.join(self.checkpoint_dir, "model_meta_info.pkl")
@@ -275,10 +304,12 @@ class EvalWrenchPredictor4SweepBase:
         self.raw_dir = os.path.join(self.output_dir, "raw")
         self.summary_dir = os.path.join(self.output_dir, "summary")
         self.heatmap_dir = os.path.join(self.output_dir, "heatmaps")
+        self.pb_dir = os.path.join(self.output_dir, "learned_pbs")
         self.episode_dir = os.path.join(self.output_dir, "episodes")
         os.makedirs(self.raw_dir, exist_ok=True)
         os.makedirs(self.summary_dir, exist_ok=True)
         os.makedirs(self.heatmap_dir, exist_ok=True)
+        os.makedirs(self.pb_dir, exist_ok=True)
         os.makedirs(self.episode_dir, exist_ok=True)
         self.output_csv = os.path.join(self.raw_dir, self.get_output_csv_name())
         self.summary_csv = os.path.join(
