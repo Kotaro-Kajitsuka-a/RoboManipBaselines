@@ -298,3 +298,18 @@ python robo_manip_baselines/policy/wrench_predictor4/EvalWrenchPredictor4ImageFe
   robo_manip_baselines/dataset/LiftingAB_B_only_Validation_hand_2_replay \
   --material_object_ids 0 1 2 \
   --checkpoint_names policy_best.ckpt
+
+# Compare the actual hand-camera video with ImageVAE9 predictions for each PB
+python robo_manip_baselines/misc/futureimagination/MakePbSweepReconstructionVideo.py \
+  robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only_hand_image_vae_9 \
+  robo_manip_baselines/dataset/LiftingAB_B_only_Validation/WrenchPredObject2/RolloutDiffusionPolicy_MujocoUR5eLiftingi_I2_DP500_I2_B_validation_20260803_061219/MujocoUR5eLiftingi_I2_DP500_I2_B_validation_world269_009.rmb \
+  robo_manip_baselines/checkpoint/ImageVAE/LiftingAB_B_only_hand_9/final_model \
+  --output robo_manip_baselines/dataset/LiftingAB_B_only_Validation_PbReconstructionVideos/MujocoUR5eLiftingi_I2_DP500_I2_B_validation_world269_009_hand_pb_reconstruction.mp4
+
+# Compare WP5 epoch-50 SD3 predictions for each PB
+python robo_manip_baselines/misc/futureimagination/MakePbSweepReconstructionVideo.py \
+  robo_manip_baselines/checkpoint/WrenchPredictor5/LiftingAB_B_only_hand_sd3_vae_3072 \
+  robo_manip_baselines/dataset/LiftingAB_B_only_Validation/WrenchPredObject2/RolloutDiffusionPolicy_MujocoUR5eLiftingi_I2_DP500_I2_B_validation_20260803_061219/MujocoUR5eLiftingi_I2_DP500_I2_B_validation_world269_009.rmb \
+  --checkpoint_name policy_epoch0050.ckpt \
+  --output robo_manip_baselines/dataset/LiftingAB_B_only_Validation_PbReconstructionVideos/MujocoUR5eLiftingi_I2_DP500_I2_B_validation_world269_009_hand_wp5_sd3_epoch0050_pb_reconstruction.mp4
+

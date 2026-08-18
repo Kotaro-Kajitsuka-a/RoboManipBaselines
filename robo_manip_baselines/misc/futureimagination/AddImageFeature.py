@@ -11,8 +11,7 @@ from robo_manip_baselines.misc.futureimagination.SD3_module import VAE as SD3VAE
 
 
 MODEL_NAME = "stabilityai/stable-diffusion-3-medium-diffusers"
-CAMERA_NAME = "left"
-RGB_IMAGE_KEY = DataKey.get_rgb_image_key(CAMERA_NAME)
+DEFAULT_CAMERA_NAME = "left"
 IMAGE_FEATURE_KEY = "sd3_vae"
 IMAGE_WIDTH = 128
 IMAGE_HEIGHT = 96
@@ -26,8 +25,17 @@ BATCH_SIZE = 16
 def parse_args():
     parser = argparse.ArgumentParser(
         description=(
-            "Add flattened SD3 VAE features from every left-camera frame to RMB HDF5 files."
+            "Add flattened SD3 VAE features from every camera frame to RMB HDF5 files."
         )
+    )
+    parser.add_argument(
+        "--camera_name",
+        default=DEFAULT_CAMERA_NAME,
+        help="camera used as the SD3 VAE input",
+    )
+    parser.add_argument(
+        "--output_key",
+        help="HDF5 key for the features; defaults to the camera-derived key",
     )
     parser.add_argument(
         "path",
@@ -42,16 +50,22 @@ def parse_args():
     return parser.parse_args()
 
 
-def preflight(rmb_paths, overwrite):
+def get_image_feature_key(camera_name):
+    if camera_name == DEFAULT_CAMERA_NAME:
+        return IMAGE_FEATURE_KEY
+    return f"{IMAGE_FEATURE_KEY}_{camera_name}"
+
+
+def preflight(rmb_paths, overwrite, image_feature_key, rgb_image_key):
     total_num_frames = 0
     for rmb_path in rmb_paths:
         with RmbData(rmb_path) as rmb_data:
-            assert RGB_IMAGE_KEY in rmb_data, (rmb_path, RGB_IMAGE_KEY)
-            num_video_frames = len(rmb_data[RGB_IMAGE_KEY])
+            assert rgb_image_key in rmb_data, (rmb_path, rgb_image_key)
+            num_video_frames = len(rmb_data[rgb_image_key])
 
-            if IMAGE_FEATURE_KEY in rmb_data and not overwrite:
+            if image_feature_key in rmb_data and not overwrite:
                 raise FileExistsError(
-                    f"{rmb_path}: '{IMAGE_FEATURE_KEY}' already exists "
+                    f"{rmb_path}: '{image_feature_key}' already exists "
                     "(use --overwrite to replace it)"
                 )
 
@@ -84,9 +98,9 @@ def encode_image_batch(sd3_vae, rgb_images, device):
     return features.astype(np.float16)
 
 
-def encode_episode(sd3_vae, rmb_path, device):
+def encode_episode(sd3_vae, rmb_path, device, rgb_image_key):
     with RmbData(rmb_path) as rmb_data:
-        rgb_video = rmb_data[RGB_IMAGE_KEY][:]
+        rgb_video = rmb_data[rgb_image_key][:]
 
     feature_batches = []
     for start in range(0, len(rgb_video), BATCH_SIZE):
@@ -106,24 +120,32 @@ def encode_episode(sd3_vae, rmb_path, device):
     return features
 
 
-def write_features(rmb_path, features, sd3_vae, overwrite):
+def write_features(
+    rmb_path,
+    features,
+    sd3_vae,
+    overwrite,
+    image_feature_key,
+    camera_name,
+    rgb_image_key,
+):
     with RmbData(rmb_path, mode="r+") as rmb_data:
         h5file = rmb_data.h5file
 
-        if IMAGE_FEATURE_KEY in h5file:
+        if image_feature_key in h5file:
             assert overwrite
-            del h5file[IMAGE_FEATURE_KEY]
+            del h5file[image_feature_key]
 
         dataset = h5file.create_dataset(
-            IMAGE_FEATURE_KEY,
+            image_feature_key,
             data=features,
             chunks=(min(BATCH_SIZE, features.shape[0]), IMAGE_FEATURE_DIM),
             compression="lzf",
             shuffle=True,
         )
         dataset.attrs["model"] = MODEL_NAME
-        dataset.attrs["source_camera"] = CAMERA_NAME
-        dataset.attrs["source_image_key"] = RGB_IMAGE_KEY
+        dataset.attrs["source_camera"] = camera_name
+        dataset.attrs["source_image_key"] = rgb_image_key
         dataset.attrs["resized_image_size"] = [IMAGE_WIDTH, IMAGE_HEIGHT]
         dataset.attrs["latent_shape_chw"] = [
             LATENT_CHANNELS,
@@ -139,7 +161,14 @@ def write_features(rmb_path, features, sd3_vae, overwrite):
 def main():
     args = parse_args()
     rmb_paths = find_rmb_files(str(args.path))
-    total_num_frames = preflight(rmb_paths, args.overwrite)
+    rgb_image_key = DataKey.get_rgb_image_key(args.camera_name)
+    image_feature_key = args.output_key or get_image_feature_key(args.camera_name)
+    total_num_frames = preflight(
+        rmb_paths,
+        args.overwrite,
+        image_feature_key,
+        rgb_image_key,
+    )
 
     assert torch.cuda.is_available(), "This operation requires a CUDA GPU."
     device = torch.device("cuda")
@@ -149,12 +178,20 @@ def main():
     processed_num_frames = 0
     for rmb_path in progress:
         progress.set_description(Path(rmb_path).name)
-        features = encode_episode(sd3_vae, rmb_path, device)
-        write_features(rmb_path, features, sd3_vae, args.overwrite)
+        features = encode_episode(sd3_vae, rmb_path, device, rgb_image_key)
+        write_features(
+            rmb_path,
+            features,
+            sd3_vae,
+            args.overwrite,
+            image_feature_key,
+            args.camera_name,
+            rgb_image_key,
+        )
         processed_num_frames += features.shape[0]
 
     assert processed_num_frames == total_num_frames
-    print(f"HDF5 key: {IMAGE_FEATURE_KEY}")
+    print(f"HDF5 key: {image_feature_key}")
     print(f"Feature shape per episode: (T, {IMAGE_FEATURE_DIM})")
     print(f"Episodes: {len(rmb_paths)}")
     print(f"Frames: {processed_num_frames}")
