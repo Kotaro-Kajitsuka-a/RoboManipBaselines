@@ -38,3 +38,8 @@ python robo_manip_baselines/bin/Train.py WrenchPredictor4 \
   --pb_dim 1 \
   --wrench_loss_weight 0.1 \
   --num_epochs 500
+
+python robo_manip_baselines/policy/wrench_predictor4/EvalWrenchPredictor4ImageFeatureSweepDir.py \
+  "$wp4_checkpoint_dir/policy_best.ckpt" \
+  "$validation_dataset_dir" \
+  --material_object_ids 0 1 2

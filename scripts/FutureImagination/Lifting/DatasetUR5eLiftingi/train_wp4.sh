@@ -17,3 +17,8 @@ python robo_manip_baselines/bin/Train.py WrenchPredictor4 \
   --num_epochs 500 \
   --train_ratio 1.0 \
   --val_ratio 0.01
+
+python robo_manip_baselines/policy/wrench_predictor4/EvalWrenchPredictor4SweepDir.py \
+  robo_manip_baselines/checkpoint/WrenchPredictor4/DatasetMujocoUR5eLiftingi/policy_best.ckpt \
+  robo_manip_baselines/dataset/DatasetMujocoUR5eLiftingi/validation \
+  --material_object_ids 0 1 2
