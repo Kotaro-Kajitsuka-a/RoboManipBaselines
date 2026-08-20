@@ -84,10 +84,9 @@ uv run python robo_manip_baselines/bin/Train.py WrenchPredictor4 \
   --skip 3 --batch_size 64 --num_epochs 500 --lr 1e-4
 
 # Evaluate policy_best.ckpt by sweeping the Object0/Object1/Object2 material PBs
-python robo_manip_baselines/policy/wrench_predictor4/EvalWrenchPredictor4LiftingSweepDir.py \
-  robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only/ \
+python robo_manip_baselines/policy/wrench_predictor4/EvalWrenchPredictor4SweepDir.py \
+  robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only/policy_best.ckpt \
   robo_manip_baselines/dataset/LiftingAB_B_only_Validation \
-  --checkpoint_names policy_best.ckpt \
   --max_material_object_id 2
 
 
@@ -294,10 +293,9 @@ python robo_manip_baselines/bin/Train.py WrenchPredictor4 \
   --train_ratio 1.0
 
 python robo_manip_baselines/policy/wrench_predictor4/EvalWrenchPredictor4ImageFeatureSweepDir.py \
-  robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only_hand_2_sd3_vae_adaptive_avg_pool_1x1 \
+  robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only_hand_2_sd3_vae_adaptive_avg_pool_1x1/policy_best.ckpt \
   robo_manip_baselines/dataset/LiftingAB_B_only_Validation_hand_2_replay \
-  --material_object_ids 0 1 2 \
-  --checkpoint_names policy_best.ckpt
+  --material_object_ids 0 1 2
 
 # Compare the actual hand-camera video with ImageVAE9 predictions for each PB
 python robo_manip_baselines/misc/futureimagination/MakePbSweepReconstructionVideo.py \
@@ -312,4 +310,3 @@ python robo_manip_baselines/misc/futureimagination/MakePbSweepReconstructionVide
   robo_manip_baselines/dataset/LiftingAB_B_only_Validation/WrenchPredObject2/RolloutDiffusionPolicy_MujocoUR5eLiftingi_I2_DP500_I2_B_validation_20260803_061219/MujocoUR5eLiftingi_I2_DP500_I2_B_validation_world269_009.rmb \
   --checkpoint_name policy_epoch0050.ckpt \
   --output robo_manip_baselines/dataset/LiftingAB_B_only_Validation_PbReconstructionVideos/MujocoUR5eLiftingi_I2_DP500_I2_B_validation_world269_009_hand_wp5_sd3_epoch0050_pb_reconstruction.mp4
-

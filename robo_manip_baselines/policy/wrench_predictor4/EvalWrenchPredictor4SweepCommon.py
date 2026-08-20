@@ -39,9 +39,12 @@ def parse_sweep_argument():
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     parser.add_argument(
-        "checkpoint_dir",
+        "checkpoint",
         type=str,
-        help="directory containing model_meta_info.pkl and policy_*.ckpt",
+        help=(
+            "checkpoint file; a directory containing model_meta_info.pkl and "
+            "policy_*.ckpt is also accepted for legacy all-checkpoint evaluation"
+        ),
     )
     parser.add_argument(
         "rmb_dir",
@@ -72,13 +75,6 @@ def parse_sweep_argument():
         nargs="+",
         default=None,
         help="explicit WrenchPredObject ids used as material PB sweep targets",
-    )
-    parser.add_argument(
-        "--checkpoint_names",
-        type=str,
-        nargs="*",
-        default=None,
-        help="checkpoint basenames to evaluate, e.g. policy_best.ckpt policy_last.ckpt",
     )
     parser.add_argument(
         "--output_suffix",
@@ -171,22 +167,24 @@ class EvalWrenchPredictor4Dataset(WrenchPredictor4Dataset):
 class EvalWrenchPredictor4SweepBase:
     def __init__(
         self,
-        checkpoint_dir,
+        checkpoint,
         rmb_dir,
         batch_size=64,
         num_files=None,
         no_plot=False,
         max_material_object_id=DEFAULT_MAX_MATERIAL_OBJECT_ID,
         material_object_ids=None,
-        checkpoint_names=None,
         output_suffix="",
     ):
-        self.checkpoint_dir = checkpoint_dir
+        self.checkpoint = checkpoint
+        if os.path.isdir(self.checkpoint):
+            self.checkpoint_dir = self.checkpoint
+        else:
+            self.checkpoint_dir = os.path.dirname(self.checkpoint) or "."
         self.rmb_dir = rmb_dir
         self.batch_size = batch_size
         self.num_files = num_files
         self.no_plot = no_plot
-        self.checkpoint_names = checkpoint_names
         self.output_suffix = output_suffix
         if material_object_ids is None:
             assert max_material_object_id >= 0, max_material_object_id
@@ -274,17 +272,14 @@ class EvalWrenchPredictor4SweepBase:
         )
 
     def setup_paths(self):
-        self.checkpoints = sorted(
-            glob.glob(os.path.join(self.checkpoint_dir, "policy_*.ckpt"))
-        )
-        if self.checkpoint_names is not None:
-            checkpoint_name_set = set(self.checkpoint_names)
-            self.checkpoints = [
-                checkpoint
-                for checkpoint in self.checkpoints
-                if os.path.basename(checkpoint) in checkpoint_name_set
-            ]
-        assert len(self.checkpoints) > 0, self.checkpoint_dir
+        if os.path.isdir(self.checkpoint):
+            self.checkpoints = sorted(
+                glob.glob(os.path.join(self.checkpoint_dir, "policy_*.ckpt"))
+            )
+            assert len(self.checkpoints) > 0, self.checkpoint_dir
+        else:
+            assert os.path.isfile(self.checkpoint), self.checkpoint
+            self.checkpoints = [self.checkpoint]
 
         rmb_path_list = find_rmb_files(self.rmb_dir, num_files=self.num_files)
         assert len(rmb_path_list) > 0, self.rmb_dir
