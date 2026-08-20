@@ -29,7 +29,7 @@ for train_seed in 42 52 62; do
     --seed 42 \
     --world_idx_list {70..79} \
     --auto_exit \
-    --max_duration 20 \
+    --max_duration 17 \
     --save_rollout \
     --result_filename "$eval_dir/constant_pb_trainseed${train_seed}_I0.yaml" \
     --no_plot \
@@ -44,7 +44,7 @@ for train_seed in 42 52 62; do
     --seed 42 \
     --world_idx_list {170..179} \
     --auto_exit \
-    --max_duration 20 \
+    --max_duration 17 \
     --save_rollout \
     --result_filename "$eval_dir/constant_pb_trainseed${train_seed}_I1.yaml" \
     --no_plot \
@@ -59,7 +59,7 @@ for train_seed in 42 52 62; do
     --seed 42 \
     --world_idx_list {270..279} \
     --auto_exit \
-    --max_duration 20 \
+    --max_duration 17 \
     --save_rollout \
     --result_filename "$eval_dir/constant_pb_trainseed${train_seed}_I2.yaml" \
     --no_plot \
@@ -74,7 +74,7 @@ for train_seed in 42 52 62; do
     --seed 42 \
     --world_idx_list {470..479} \
     --auto_exit \
-    --max_duration 20 \
+    --max_duration 17 \
     --save_rollout \
     --result_filename "$eval_dir/constant_pb_trainseed${train_seed}_I4.yaml" \
     --no_plot \
@@ -89,7 +89,7 @@ for train_seed in 42 52 62; do
     --seed 42 \
     --world_idx_list {570..579} \
     --auto_exit \
-    --max_duration 20 \
+    --max_duration 17 \
     --save_rollout \
     --result_filename "$eval_dir/constant_pb_trainseed${train_seed}_I5.yaml" \
     --no_plot \
@@ -104,7 +104,7 @@ for train_seed in 42 52 62; do
     --seed 42 \
     --world_idx_list {670..679} \
     --auto_exit \
-    --max_duration 20 \
+    --max_duration 17 \
     --save_rollout \
     --result_filename "$eval_dir/constant_pb_trainseed${train_seed}_I6.yaml" \
     --no_plot \
@@ -119,7 +119,7 @@ for train_seed in 42 52 62; do
     --seed 42 \
     --world_idx_list {770..779} \
     --auto_exit \
-    --max_duration 20 \
+    --max_duration 17 \
     --save_rollout \
     --result_filename "$eval_dir/constant_pb_trainseed${train_seed}_I7.yaml" \
     --no_plot \
