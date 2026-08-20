@@ -12,6 +12,9 @@ from .MujocoUR5eEnvBase import MujocoUR5eEnvBase
 class MujocoUR5eLiftingiEnvBase(MujocoUR5eEnvBase):
     sim_timestep = 0.002
     frame_skip = 16
+    success_hold_duration = 1.0  # [s]
+    success_lift_threshold = 0.10  # [m]
+    success_tilt_threshold = np.deg2rad(7.5)
     metadata = {
         "render_modes": [
             "human",
@@ -71,6 +74,37 @@ class MujocoUR5eLiftingiEnvBase(MujocoUR5eEnvBase):
 
     def get_tblock_pose_from_obs(self, obs):
         return obs["tblock_pose"]
+
+    def _get_reward(self):
+        if self._lifting_success:
+            return 1.0
+
+        tblock = self.data.body("tblock")
+        lift = tblock.xpos[2] - self._initial_tblock_height
+
+        qw, qx, qy, qz = tblock.xquat
+        local_y_world_z = 2.0 * (qy * qz + qw * qx)
+        tilt = np.arcsin(np.clip(np.abs(local_y_world_z), 0.0, 1.0))
+
+        if (
+            lift >= self.success_lift_threshold
+            and tilt <= self.success_tilt_threshold
+        ):
+            self._lifting_success_duration += self.dt
+        else:
+            self._lifting_success_duration = 0.0
+
+        if self._lifting_success_duration >= self.success_hold_duration:
+            self._lifting_success = True
+
+        return 1.0 if self._lifting_success else 0.0
+
+    def reset_model(self):
+        obs = super().reset_model()
+        self._initial_tblock_height = self.data.body("tblock").xpos[2]
+        self._lifting_success_duration = 0.0
+        self._lifting_success = False
+        return obs
 
     def modify_world(self, world_idx=None, cumulative_idx=None):
         assert world_idx is not None
