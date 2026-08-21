@@ -4,6 +4,7 @@ set -e
 # Run after prepare_datasets.sh.
 # State-based Diffusion Policy trained with causal PB trajectories identified
 # from hand-camera VAE 9D prediction errors at learning rate 6e-3.
+# State and action use EEF pose plus the gripper joint position.
 python robo_manip_baselines/bin/Train.py DiffusionPolicy \
   --dataset_dir robo_manip_baselines/dataset/DatasetMujocoUR5eLiftingi_Image_OnlinePB \
   --checkpoint_dir robo_manip_baselines/checkpoint/DiffusionPolicy/DatasetMujocoUR5eLiftingi_Image_Online_seed42 \

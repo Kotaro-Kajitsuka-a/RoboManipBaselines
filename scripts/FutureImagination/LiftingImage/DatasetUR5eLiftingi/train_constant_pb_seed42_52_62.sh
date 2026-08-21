@@ -4,6 +4,7 @@ set -e
 # Run after prepare_datasets.sh.
 # State-based Diffusion Policy trained with the oracle constant PB of each
 # training object. Evaluation still identifies PB online from hand VAE 9D.
+# State and action use EEF pose plus the gripper joint position.
 python robo_manip_baselines/bin/Train.py DiffusionPolicy \
   --dataset_dir robo_manip_baselines/dataset/DatasetMujocoUR5eLiftingi_Image_ConstantPB \
   --checkpoint_dir robo_manip_baselines/checkpoint/DiffusionPolicy/DatasetMujocoUR5eLiftingi_Image_ConstantPB_seed42 \
