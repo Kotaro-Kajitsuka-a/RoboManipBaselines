@@ -13,8 +13,6 @@ touch "$rollout_start_marker"
 
 # Run 10 episodes for each object under every training seed.
 for train_seed in 42 52 62; do
-  seed_dir="$rmb_dir/seed${train_seed}"
-  mkdir -p "$seed_dir"
 
   python robo_manip_baselines/bin/Rollout.py \
     DiffusionPolicyOnlinePb MujocoUR5eLiftingi_I0 \
@@ -121,13 +119,17 @@ for train_seed in 42 52 62; do
     --no_plot \
     --no_render
 
-  find robo_manip_baselines/dataset \
-    -mindepth 1 \
-    -maxdepth 1 \
-    -type d \
-    -name "RolloutDiffusionPolicyOnlinePb_MujocoUR5eLiftingi_I*_online_pb_trainseed${train_seed}_20*" \
-    -newer "$rollout_start_marker" \
-    -exec mv -- {} "$seed_dir" \;
+  for object_id in 0 1 2 4 5 6 7; do
+    object_dir="$rmb_dir/WrenchPredObject${object_id}"
+    mkdir -p "$object_dir"
+    find robo_manip_baselines/dataset \
+      -mindepth 1 \
+      -maxdepth 1 \
+      -type d \
+      -name "RolloutDiffusionPolicyOnlinePb_MujocoUR5eLiftingi_I${object_id}_online_pb_trainseed${train_seed}_20*" \
+      -newer "$rollout_start_marker" \
+      -exec mv -- {} "$object_dir" \;
+  done
 done
 
 # Evaluate the 210 saved RMB episodes: lift at least 10 cm and tilt less than

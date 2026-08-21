@@ -13,9 +13,7 @@ touch "$rollout_start_marker"
 pids=()
 for train_seed in 42 52 62; do
   (
-  seed_dir="$rmb_dir/seed${train_seed}"
   dp_checkpoint="robo_manip_baselines/checkpoint/DiffusionPolicy/DatasetMujocoUR5eLiftingi_LeftScratchVAE9_ConstantPB_seed${train_seed}/policy_last.ckpt"
-  mkdir -p "$seed_dir"
 
   python robo_manip_baselines/bin/Rollout.py \
     DiffusionPolicyOnlinePb MujocoUR5eLiftingi_I0 \
@@ -143,13 +141,17 @@ for train_seed in 42 52 62; do
     --no_plot \
     --no_render
 
-  find robo_manip_baselines/dataset \
-    -mindepth 1 \
-    -maxdepth 1 \
-    -type d \
-    -name "RolloutDiffusionPolicyOnlinePb_MujocoUR5eLiftingi_I*_left_scratch_vae9_constant_pb_trainseed${train_seed}_20*" \
-    -newer "$rollout_start_marker" \
-    -exec mv -- {} "$seed_dir" \;
+  for object_id in 0 1 2 4 5 6 7; do
+    object_dir="$rmb_dir/WrenchPredObject${object_id}"
+    mkdir -p "$object_dir"
+    find robo_manip_baselines/dataset \
+      -mindepth 1 \
+      -maxdepth 1 \
+      -type d \
+      -name "RolloutDiffusionPolicyOnlinePb_MujocoUR5eLiftingi_I${object_id}_left_scratch_vae9_constant_pb_trainseed${train_seed}_20*" \
+      -newer "$rollout_start_marker" \
+      -exec mv -- {} "$object_dir" \;
+  done
   ) &
   pids+=("$!")
 done

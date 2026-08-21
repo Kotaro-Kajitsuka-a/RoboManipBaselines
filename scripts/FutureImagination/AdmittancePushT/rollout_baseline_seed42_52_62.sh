@@ -12,8 +12,6 @@ touch "$rollout_start_marker"
 
 # Run 10 episodes for T0-T3 under every training seed.
 for train_seed in 42 52 62; do
-  seed_dir="$rmb_dir/seed${train_seed}"
-  mkdir -p "$seed_dir"
 
   python robo_manip_baselines/bin/Rollout.py \
     DiffusionPolicy MujocoXarm7AdmittancePusht_T0 \
@@ -67,11 +65,15 @@ for train_seed in 42 52 62; do
     --no_plot \
     --no_render
 
-  find robo_manip_baselines/dataset \
-    -mindepth 1 \
-    -maxdepth 1 \
-    -type d \
-    -name "RolloutDiffusionPolicy_AdmittancePushTBaseline_trainseed${train_seed}_rollseed42_T[0-3]_20*" \
-    -newer "$rollout_start_marker" \
-    -exec mv -- {} "$seed_dir" \;
+  for object_id in 0 1 2 3; do
+    object_dir="$rmb_dir/WrenchPredObject${object_id}"
+    mkdir -p "$object_dir"
+    find robo_manip_baselines/dataset \
+      -mindepth 1 \
+      -maxdepth 1 \
+      -type d \
+      -name "RolloutDiffusionPolicy_AdmittancePushTBaseline_trainseed${train_seed}_rollseed42_T${object_id}_20*" \
+      -newer "$rollout_start_marker" \
+      -exec mv -- {} "$object_dir" \;
+  done
 done
