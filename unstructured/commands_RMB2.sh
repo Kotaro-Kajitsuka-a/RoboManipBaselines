@@ -110,6 +110,29 @@ python robo_manip_baselines/misc/futureimagination/AddImageFeature.py \
   robo_manip_baselines/dataset/LiftingAB_B_only \
   --overwrite
 
+# Compare the original hand-camera videos with the best 9D ImageVAE reconstructions
+python robo_manip_baselines/misc/futureimagination/MakeReconstructionVideos.py \
+  robo_manip_baselines/dataset/LiftingAB_B_only \
+  robo_manip_baselines/checkpoint/ImageVAE/LiftingAB_B_only_hand_9/final_model \
+  --camera_name hand
+
+# Create the same hand VAE9 reconstruction comparison videos for validation data
+python robo_manip_baselines/misc/futureimagination/MakeReconstructionVideos.py \
+  robo_manip_baselines/dataset/LiftingAB_B_only_Validation \
+  robo_manip_baselines/checkpoint/ImageVAE/LiftingAB_B_only_hand_9/final_model \
+  --camera_name hand
+
+# Compare the successful B-validation hand videos with SD3 VAE reconstructions
+python robo_manip_baselines/misc/futureimagination/MakeSD3ReconstructionVideos.py \
+  robo_manip_baselines/dataset/LiftingAB_B_only_Validation \
+  --camera_name hand
+
+# Compare 9D ImageVAE and 3072D SD3 VAE reconstruction metrics on the same frames
+python robo_manip_baselines/misc/futureimagination/CompareVAEReconstruction.py \
+  robo_manip_baselines/dataset/LiftingAB_B_only_Validation \
+  robo_manip_baselines/checkpoint/ImageVAE/LiftingAB_B_only_hand_9/final_model \
+  --camera_name hand
+
 # Train state-based Diffusion Policy on all 150 LiftingAB A/B episodes with PB
 uv run python robo_manip_baselines/bin/Train.py DiffusionPolicy \
   --dataset_dir robo_manip_baselines/dataset/LiftingAB_B_only \
