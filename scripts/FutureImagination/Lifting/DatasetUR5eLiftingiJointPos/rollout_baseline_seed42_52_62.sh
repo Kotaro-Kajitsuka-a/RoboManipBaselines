@@ -4,7 +4,7 @@ set -e
 # Run from the repository root after train_baseline_seed42_52_62.sh.
 # Evaluate ordinary Diffusion Policy without online PB adaptation.
 eval_timestamp=$(date +%Y%m%d_%H%M%S)
-eval_dir="robo_manip_baselines/dataset/tests/FutureImagination/DatasetMujocoUR5eLiftingi/DP_eef_pose_baseline_eval_${eval_timestamp}"
+eval_dir="robo_manip_baselines/dataset/tests/FutureImagination/DatasetMujocoUR5eLiftingi/DP_joint_pos_baseline_eval_${eval_timestamp}"
 rmb_dir="$eval_dir/rmb"
 mkdir -p "$rmb_dir"
 rollout_start_marker="$eval_dir/.rollout_start"
@@ -15,12 +15,12 @@ pids=()
 for train_seed in 42 52 62; do
   (
   seed_dir="$rmb_dir/seed${train_seed}"
-  checkpoint="robo_manip_baselines/checkpoint/DiffusionPolicy/DatasetMujocoUR5eLiftingi_EefPose_Baseline_seed${train_seed}/policy_last.ckpt"
+  checkpoint="robo_manip_baselines/checkpoint/DiffusionPolicy/DatasetMujocoUR5eLiftingi_JointPos_Baseline_seed${train_seed}/policy_last.ckpt"
   mkdir -p "$seed_dir"
 
   python robo_manip_baselines/bin/Rollout.py \
     DiffusionPolicy MujocoUR5eLiftingi_I0 \
-    --demo_name "MujocoUR5eLiftingi_I0_eef_pose_baseline_trainseed${train_seed}" \
+    --demo_name "MujocoUR5eLiftingi_I0_joint_pos_baseline_trainseed${train_seed}" \
     --checkpoint "$checkpoint" \
     --seed 42 \
     --world_idx_list {70..79} \
@@ -33,7 +33,7 @@ for train_seed in 42 52 62; do
 
   python robo_manip_baselines/bin/Rollout.py \
     DiffusionPolicy MujocoUR5eLiftingi_I1 \
-    --demo_name "MujocoUR5eLiftingi_I1_eef_pose_baseline_trainseed${train_seed}" \
+    --demo_name "MujocoUR5eLiftingi_I1_joint_pos_baseline_trainseed${train_seed}" \
     --checkpoint "$checkpoint" \
     --seed 42 \
     --world_idx_list {170..179} \
@@ -46,7 +46,7 @@ for train_seed in 42 52 62; do
 
   python robo_manip_baselines/bin/Rollout.py \
     DiffusionPolicy MujocoUR5eLiftingi_I2 \
-    --demo_name "MujocoUR5eLiftingi_I2_eef_pose_baseline_trainseed${train_seed}" \
+    --demo_name "MujocoUR5eLiftingi_I2_joint_pos_baseline_trainseed${train_seed}" \
     --checkpoint "$checkpoint" \
     --seed 42 \
     --world_idx_list {270..279} \
@@ -59,7 +59,7 @@ for train_seed in 42 52 62; do
 
   python robo_manip_baselines/bin/Rollout.py \
     DiffusionPolicy MujocoUR5eLiftingi_I4 \
-    --demo_name "MujocoUR5eLiftingi_I4_eef_pose_baseline_trainseed${train_seed}" \
+    --demo_name "MujocoUR5eLiftingi_I4_joint_pos_baseline_trainseed${train_seed}" \
     --checkpoint "$checkpoint" \
     --seed 42 \
     --world_idx_list {470..479} \
@@ -72,7 +72,7 @@ for train_seed in 42 52 62; do
 
   python robo_manip_baselines/bin/Rollout.py \
     DiffusionPolicy MujocoUR5eLiftingi_I5 \
-    --demo_name "MujocoUR5eLiftingi_I5_eef_pose_baseline_trainseed${train_seed}" \
+    --demo_name "MujocoUR5eLiftingi_I5_joint_pos_baseline_trainseed${train_seed}" \
     --checkpoint "$checkpoint" \
     --seed 42 \
     --world_idx_list {570..579} \
@@ -85,7 +85,7 @@ for train_seed in 42 52 62; do
 
   python robo_manip_baselines/bin/Rollout.py \
     DiffusionPolicy MujocoUR5eLiftingi_I6 \
-    --demo_name "MujocoUR5eLiftingi_I6_eef_pose_baseline_trainseed${train_seed}" \
+    --demo_name "MujocoUR5eLiftingi_I6_joint_pos_baseline_trainseed${train_seed}" \
     --checkpoint "$checkpoint" \
     --seed 42 \
     --world_idx_list {670..679} \
@@ -98,7 +98,7 @@ for train_seed in 42 52 62; do
 
   python robo_manip_baselines/bin/Rollout.py \
     DiffusionPolicy MujocoUR5eLiftingi_I7 \
-    --demo_name "MujocoUR5eLiftingi_I7_eef_pose_baseline_trainseed${train_seed}" \
+    --demo_name "MujocoUR5eLiftingi_I7_joint_pos_baseline_trainseed${train_seed}" \
     --checkpoint "$checkpoint" \
     --seed 42 \
     --world_idx_list {770..779} \
@@ -113,7 +113,7 @@ for train_seed in 42 52 62; do
     -mindepth 1 \
     -maxdepth 1 \
     -type d \
-    -name "RolloutDiffusionPolicy_MujocoUR5eLiftingi_I*_eef_pose_baseline_trainseed${train_seed}_20*" \
+    -name "RolloutDiffusionPolicy_MujocoUR5eLiftingi_I*_joint_pos_baseline_trainseed${train_seed}_20*" \
     -newer "$rollout_start_marker" \
     -exec mv -- {} "$seed_dir" \;
   ) &
@@ -129,5 +129,5 @@ done
 python robo_manip_baselines/misc/futureimagination/AnalyzeLiftingSuccess.py \
   "$rmb_dir" \
   --output_dir "$eval_dir" \
-  --output_prefix eef_pose_baseline_training_seed_42_52_62 \
+  --output_prefix joint_pos_baseline_training_seed_42_52_62 \
   --expected_episode_count 210

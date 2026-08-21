@@ -3,8 +3,8 @@ set -e
 
 # Run from the repository root with the virtual environment activated.
 source_dataset=robo_manip_baselines/dataset/DatasetMujocoUR5eLiftingi/validation
-online_dataset=robo_manip_baselines/dataset/DatasetMujocoUR5eLiftingi_EefPose_Validation_OnlinePB
-wp4_checkpoint=robo_manip_baselines/checkpoint/WrenchPredictor4/DatasetMujocoUR5eLiftingi_EefPose/policy_best.ckpt
+online_dataset=robo_manip_baselines/dataset/DatasetMujocoUR5eLiftingi_JointPos_Validation_OnlinePB
+wp4_checkpoint=robo_manip_baselines/checkpoint/WrenchPredictor4/DatasetMujocoUR5eLiftingi_JointPos/policy_best.ckpt
 
 mkdir -p "$online_dataset"
 cp -aL "$source_dataset/." "$online_dataset/"
