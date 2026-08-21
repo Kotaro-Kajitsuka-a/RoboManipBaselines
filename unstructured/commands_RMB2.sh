@@ -264,39 +264,6 @@ uv run python robo_manip_baselines/bin/Rollout.py DiffusionPolicy MujocoUR5eLift
 # Blind teleoperation collection (trial counts are configured in the script)
 uv run python unstructured/collect_blind_teleop.py
 
-# hand_2 SD3 16D global-average-pooling experiment
-python robo_manip_baselines/misc/futureimagination/AddImageFeature.py \
-  robo_manip_baselines/dataset/LiftingAB_B_only_hand_2_replay_success \
-  --camera_name hand_2 \
-  --feature_type adaptive_avg_pool_1x1
-
-python robo_manip_baselines/misc/futureimagination/AddImageFeature.py \
-  robo_manip_baselines/dataset/LiftingAB_B_only_Validation_hand_2_replay \
-  --camera_name hand_2 \
-  --feature_type adaptive_avg_pool_1x1
-
-python robo_manip_baselines/bin/Train.py WrenchPredictor4 \
-  --dataset_dir robo_manip_baselines/dataset/LiftingAB_B_only_hand_2_replay_success \
-  --val_dataset_dir robo_manip_baselines/dataset/LiftingAB_B_only_Validation_hand_2_replay \
-  --checkpoint_dir robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only_hand_2_sd3_vae_adaptive_avg_pool_1x1 \
-  --camera_names \
-  --state_keys measured_eef_pose measured_gripper_joint_pos \
-  --action_keys command_eef_pose command_gripper_joint_pos \
-  --image_feature_key sd3_vae_hand_2_adaptive_avg_pool_1x1 \
-  --wrench_source_key measured_eef_wrench \
-  --pb_dim 1 \
-  --wrench_loss_weight 0.1 \
-  --skip 3 \
-  --batch_size 64 \
-  --num_epochs 500 \
-  --lr 1e-4 \
-  --train_ratio 1.0
-
-python robo_manip_baselines/policy/wrench_predictor4/EvalWrenchPredictor4ImageFeatureSweepDir.py \
-  robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only_hand_2_sd3_vae_adaptive_avg_pool_1x1/policy_best.ckpt \
-  robo_manip_baselines/dataset/LiftingAB_B_only_Validation_hand_2_replay \
-  --material_object_ids 0 1 2
-
 # Compare the actual hand-camera video with ImageVAE9 predictions for each PB
 python robo_manip_baselines/misc/futureimagination/MakePbSweepReconstructionVideo.py \
   robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only_hand_image_vae_9 \
