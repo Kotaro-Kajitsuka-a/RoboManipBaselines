@@ -105,6 +105,11 @@ class RolloutDiffusionPolicyOnlinePb(RolloutDiffusionPolicy):
         super().setup_policy()
 
         assert self.state_keys.count(DataKey.MATERIAL_PROPERTY) == 1, self.state_keys
+        assert self.state_keys.count(DataKey.ONLINE_PB_STD) <= 1, self.state_keys
+        if DataKey.ONLINE_PB_STD in self.state_keys:
+            assert (
+                self.args.online_pb_update_type == "gaussian_belief"
+            ), self.args.online_pb_update_type
         assert self.args.wrench_loss_weight >= 0.0, self.args.wrench_loss_weight
         if self.args.online_pb_update_type == "adam":
             assert self.args.online_pb_lr > 0.0, self.args.online_pb_lr
@@ -429,6 +434,9 @@ class RolloutDiffusionPolicyOnlinePb(RolloutDiffusionPolicy):
     def get_dp_state_data_including_pb(self, state_key):
         if state_key == DataKey.MATERIAL_PROPERTY:
             return self.online_pb.detach().cpu().numpy().copy()
+        if state_key == DataKey.ONLINE_PB_STD:
+            assert self.online_pb_belief is not None
+            return self.online_pb_belief.std.detach().cpu().numpy().copy()
         return convert_data_to_policy(
             self.motion_manager.get_data(state_key, self.obs),
             state_key,

@@ -12,6 +12,8 @@ class DataKey:
 
     # Learned internal material-property representation stored per timestep
     MATERIAL_PROPERTY = "material_property"
+    # Standard deviation of the online material-property belief
+    ONLINE_PB_STD = "online_pb_std"
 
     # Measured joint position (including both arm and gripper)
     MEASURED_JOINT_POS = "measured_joint_pos"
@@ -103,6 +105,7 @@ class DataKey:
         MEASURED_EEF_WRENCH_MOVING_AVERAGE_PERCENTILE_CLIP,
         MEASURED_MOBILE_OMNI_VEL,
         MATERIAL_PROPERTY,
+        ONLINE_PB_STD,
     ]
 
     # All keys of command data
@@ -140,7 +143,7 @@ class DataKey:
 
         if key == DataKey.TIME:
             return 1
-        elif key == DataKey.MATERIAL_PROPERTY:
+        elif key in (DataKey.MATERIAL_PROPERTY, DataKey.ONLINE_PB_STD):
             return 1
         elif key == DataKey.MEASURED_TBLOCK_POSE:
             return 7

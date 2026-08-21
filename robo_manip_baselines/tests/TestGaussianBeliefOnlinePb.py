@@ -3,13 +3,20 @@ import unittest
 import numpy as np
 import torch
 
+from robo_manip_baselines.common import DataKey
 from robo_manip_baselines.policy.wrench_predictor4_online.WrenchPredictor4OnlineUtils import (
+    ONLINE_PB_STD_KEY,
     GaussianBeliefOnlinePb,
     resolve_gaussian_num_points,
 )
 
 
 class TestGaussianBeliefOnlinePb(unittest.TestCase):
+    def test_online_pb_std_is_available_as_policy_state(self):
+        self.assertEqual(ONLINE_PB_STD_KEY, DataKey.ONLINE_PB_STD)
+        self.assertIn(DataKey.ONLINE_PB_STD, DataKey.MEASURED_DATA_KEYS)
+        self.assertEqual(DataKey.get_dim(DataKey.ONLINE_PB_STD, env=None), 1)
+
     def test_default_quadrature_order_scales_with_pb_dimension(self):
         self.assertEqual(resolve_gaussian_num_points(1, None), 16)
         self.assertEqual(resolve_gaussian_num_points(2, None), 32)

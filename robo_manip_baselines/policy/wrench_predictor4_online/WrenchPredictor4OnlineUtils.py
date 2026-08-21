@@ -6,6 +6,7 @@ import torch
 import torch.nn.functional as F
 from scipy.special import roots_hermitenorm
 
+from robo_manip_baselines.common import DataKey
 from robo_manip_baselines.policy.wrench_predictor4.WrenchPredictor4Dataset import (
     WrenchPredictor4Dataset,
 )
@@ -13,7 +14,7 @@ from robo_manip_baselines.policy.wrench_predictor4.WrenchPredictor4Model import 
     WrenchPredictor4Model,
 )
 
-ONLINE_PB_STD_KEY = "online_pb_std"
+ONLINE_PB_STD_KEY = DataKey.ONLINE_PB_STD
 GAUSSIAN_POINTS_PER_PB_DIM = 16
 
 

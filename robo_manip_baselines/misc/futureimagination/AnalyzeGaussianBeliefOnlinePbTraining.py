@@ -50,8 +50,9 @@ def summarize(records):
     }
 
 
-def plot_mean_trajectories(path, records_by_object, beta, num_points):
+def plot_mean_trajectories(path, records_by_object, beta, num_points, reference_pbs):
     fig, axes = plt.subplots(1, 3, figsize=(15, 4.5), sharey=True)
+    reference_colors = ("#d62728", "#f28e2b", "#2ca02c")
     for object_id, ax in enumerate(axes):
         records = records_by_object[object_id]
         assert len(records) == 25, (object_id, len(records))
@@ -64,13 +65,16 @@ def plot_mean_trajectories(path, records_by_object, beta, num_points):
                 alpha=0.38,
                 label="episode belief mean μ" if episode_idx == 0 else None,
             )
-        ax.axhline(
-            records[0]["target_pb"],
-            color="#d62728",
-            linestyle="--",
-            linewidth=1.4,
-            label="learned target PB",
-        )
+        for reference_id, (reference_pb, color) in enumerate(
+            zip(reference_pbs, reference_colors, strict=True)
+        ):
+            ax.axhline(
+                reference_pb,
+                color=color,
+                linestyle="--",
+                linewidth=1.4,
+                label=f"trained I{reference_id} PB",
+            )
         mean_motion_time = np.mean([record["motion_time_s"] for record in records])
         ax.axvline(
             mean_motion_time,
@@ -238,6 +242,7 @@ def main():
         records_by_object,
         args.beta,
         args.num_points,
+        pb_table[:3, 0],
     )
     write_html(
         args.output_dir / "gaussian_belief_training_mean.html",

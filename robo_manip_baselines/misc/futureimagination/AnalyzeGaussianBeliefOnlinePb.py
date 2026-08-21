@@ -95,6 +95,15 @@ def save_csv(path, records):
 
 def plot_selected_trajectories(path, selected_records, selected_beta, num_points):
     fig, axes = plt.subplots(3, 5, figsize=(18, 9), sharex=False, sharey=True)
+    reference_pbs = [
+        next(
+            record["target_pb"]
+            for record in selected_records
+            if record["object_id"] == object_id
+        )
+        for object_id in range(3)
+    ]
+    reference_colors = ("#d62728", "#f28e2b", "#2ca02c")
     for object_id in range(3):
         records = sorted(
             [r for r in selected_records if r["object_id"] == object_id],
@@ -120,15 +129,20 @@ def plot_selected_trajectories(path, selected_records, selected_beta, num_points
                 linewidth=1.8,
                 label="belief mean" if object_id == 0 and episode_idx == 0 else None,
             )
-            ax.axhline(
-                record["target_pb"],
-                color="#d62728",
-                linestyle="--",
-                linewidth=1.3,
-                label="learned target PB"
-                if object_id == 0 and episode_idx == 0
-                else None,
-            )
+            for reference_id, (reference_pb, color) in enumerate(
+                zip(reference_pbs, reference_colors, strict=True)
+            ):
+                ax.axhline(
+                    reference_pb,
+                    color=color,
+                    linestyle="--",
+                    linewidth=1.3,
+                    label=(
+                        f"trained I{reference_id} PB"
+                        if object_id == 0 and episode_idx == 0
+                        else None
+                    ),
+                )
             if np.isfinite(record["motion_time_s"]):
                 ax.axvline(
                     record["motion_time_s"],
@@ -193,6 +207,72 @@ def plot_beta_sweep(path, grouped_summary, beta_list):
     plt.close(fig)
 
 
+def plot_beta_trajectory_comparison(path, trajectory_records, beta_list):
+    fig, axes = plt.subplots(2, 3, figsize=(16, 8), sharex=True)
+    colors = plt.cm.viridis(np.linspace(0.05, 0.95, len(beta_list)))
+    reference_pbs = [
+        next(
+            record["target_pb"]
+            for record in trajectory_records
+            if record["object_id"] == object_id
+        )
+        for object_id in range(3)
+    ]
+    reference_colors = ("#d62728", "#f28e2b", "#2ca02c")
+    for object_id in range(3):
+        object_records = [
+            record for record in trajectory_records if record["object_id"] == object_id
+        ]
+        for reference_id, (reference_pb, color) in enumerate(
+            zip(reference_pbs, reference_colors, strict=True)
+        ):
+            axes[0, object_id].axhline(
+                reference_pb,
+                color=color,
+                linestyle="--",
+                linewidth=1.4,
+                label=f"trained I{reference_id} PB",
+            )
+        for beta, color in zip(beta_list, colors, strict=True):
+            records = [record for record in object_records if record["beta"] == beta]
+            assert len(records) == 5, (beta, object_id, len(records))
+            common_length = min(len(record["time"]) for record in records)
+            time = np.stack(
+                [record["time"][:common_length] for record in records]
+            ).mean(axis=0)
+            mean = np.stack(
+                [record["mean_trajectory"][:common_length] for record in records]
+            ).mean(axis=0)
+            std = np.stack(
+                [record["std_trajectory"][:common_length] for record in records]
+            ).mean(axis=0)
+            axes[0, object_id].plot(
+                time,
+                mean,
+                color=color,
+                linewidth=1.7,
+                label=f"β={beta:g}",
+            )
+            axes[1, object_id].plot(
+                time,
+                std,
+                color=color,
+                linewidth=1.7,
+                label=f"β={beta:g}",
+            )
+        axes[0, object_id].set_title(f"Object{object_id}")
+        axes[0, object_id].set_ylabel("belief mean μ")
+        axes[1, object_id].set_ylabel("belief std σ")
+        axes[1, object_id].set_xlabel("time [s]")
+        for axis in axes[:, object_id]:
+            axis.grid(alpha=0.25)
+    axes[0, 0].legend(fontsize=8, ncol=2)
+    fig.suptitle("Effect of β on Gaussian-belief Online PB (5-episode mean)")
+    fig.tight_layout()
+    fig.savefig(path, dpi=170)
+    plt.close(fig)
+
+
 def format_summary_table(grouped_summary, beta_list):
     rows = []
     for beta in beta_list:
@@ -243,7 +323,7 @@ th:first-child,td:first-child{{text-align:left}} img{{width:100%;height:auto;bor
 .small{{color:#5a6470;font-size:.9rem}}
 </style></head><body>
 <h1>Gaussian-belief Online PB — state-based validation</h1>
-<p class="note"><strong>結果の読み方:</strong> 青線は Online PB の平均 μ、青帯は μ±2σ、赤破線は各 object の learned PB、緑点線は物体が初期位置から5 mm動いた時刻です。これは recorded validation replay であり、closed-loop rollout の保証ではありません。</p>
+<p class="note"><strong>結果の読み方:</strong> 青線は Online PB の平均 μ、青帯は μ±2σです。PB値を縦軸に持つ全パネルへ、学習済みI0・I1・I2の参照PBを赤・橙・緑の破線で表示しています。縦の緑点線は物体が初期位置から5 mm動いた時刻です。これは recorded validation replay であり、closed-loop rollout の保証ではありません。</p>
 <h2>条件</h2>
 <ul>
 <li>checkpoint: <code>{source_checkpoint}</code>（policy_best）</li>
@@ -260,6 +340,11 @@ th:first-child,td:first-child{{text-align:left}} img{{width:100%;height:auto;bor
 </tbody></table>
 <p class="small">final μ の episode std は episode 間の再現性、final σ は各 episode 内の belief 幅です。異なる量なので両方を分けて表示しています。</p>
 <h2>β sweep</h2>
+<p class="note"><strong>今回の読み取り:</strong> β≤1はbelief幅が大きく残り、Object1/2への平均移動も不足しました。β=30〜100は終端平均の誤差をさらに下げますが、Object2の±2σ coverageが80%/60%へ低下し、β=100ではObject1も80%へ低下します。β=10は3 objectすべてでcoverage 100%を保ちながら十分に平均が移動しており、今回の候補中ではバランスの良い値です。</p>
+<h3>平均PB・σの時間変化</h3>
+<img src="beta_trajectory_comparison.png" alt="PB mean and std trajectories for every beta">
+<p class="small">各線は同じobjectのvalidation 5本平均です。上段は平均μ、下段はbelief標準偏差σです。βが大きいほど証拠を強く信じるため、通常は移動と収縮が速くなります。</p>
+<h3>終端指標</h3>
 <img src="beta_sweep.png" alt="beta sweep metrics">
 <table><thead><tr><th>β</th><th>object</th><th>final μ mean ± episode std</th><th>RMSE</th><th>mean final σ</th><th>coverage</th><th>|μ_motion−μ0|</th><th>σ_motion/σ0</th></tr></thead><tbody>
 {beta_table}
@@ -268,6 +353,56 @@ th:first-child,td:first-child{{text-align:left}} img{{width:100%;height:auto;bor
 <p><code>p_i = μ + σ z_i</code> を1 batchで WP4 に入れ、<code>w_i = softmax(log a_i − β L_i)</code>、<code>μ' = Σw_i p_i</code>、<code>σ'² = Σw_i(p_i−μ')²</code> と更新しました。loss が全候補で同じなら μ と σ は変わりません。</p>
 <h2>判断上の注意</h2>
 <p>βを大きくすると target へ速く寄る場合がありますが、同時に σ が急速に潰れます。したがって final mean の近さだけでは選びません。5 mm motion 前の平均移動・収縮、±2σ coverage、次 window の予測誤差、最終的には同じ条件の closed-loop rollout を併せて判断します。</p>
+<p class="small">Raw numeric records: <a href="episode_summary.csv">episode_summary.csv</a></p>
+</body></html>""",
+        encoding="utf-8",
+    )
+
+
+def write_all_trajectory_html(path, args, initial_pb, target_pb, grouped_summary):
+    beta_text = " / ".join(f"{beta:g}" for beta in args.beta_list)
+    trajectory_count = 15 * len(args.beta_list)
+    trajectory_sections = []
+    for beta in args.beta_list:
+        trajectory_sections.append(
+            f"""<section>
+<h2>β={beta:g} — validation 15本</h2>
+<img src="trajectories_beta_{beta:g}.png" alt="beta {beta:g}: all 15 validation PB trajectories">
+</section>"""
+        )
+    source_checkpoint = html.escape(str(args.checkpoint.resolve()))
+    source_dataset = html.escape(str(args.dataset_dir.resolve()))
+    beta_table = format_summary_table(grouped_summary, args.beta_list)
+    reference_text = ", ".join(
+        f"I{object_id}={pb:.5f}" for object_id, pb in enumerate(target_pb)
+    )
+    path.write_text(
+        f"""<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gaussian-belief Online PB: β={beta_text} all trajectories</title>
+<style>
+body{{font-family:system-ui,sans-serif;max-width:1500px;margin:32px auto;padding:0 20px;line-height:1.65;color:#20242a}}
+h1,h2{{line-height:1.25}} code{{background:#f1f3f5;padding:.12em .35em;border-radius:4px}}
+.note{{background:#eef6ff;border-left:4px solid #4c78a8;padding:12px 16px}}
+table{{border-collapse:collapse;width:100%;font-size:.92rem}} th,td{{border:1px solid #ccd2d8;padding:7px 9px;text-align:right}}
+th:first-child,td:first-child{{text-align:left}} img{{width:100%;height:auto;border:1px solid #d8dde3}}
+.small{{color:#5a6470;font-size:.9rem}} section{{margin:42px 0 58px}}
+</style></head><body>
+<h1>Gaussian-belief Online PB — β={beta_text}の全{trajectory_count}本</h1>
+<p class="note">平均化せず、各βについてvalidation 15本をすべて表示しています。各図は上からObject0/1/2、左から5 episodeです。青線はbelief平均μ、青帯はμ±2σ、赤・橙・緑の破線は学習済みI0・I1・I2 PBです。</p>
+<h2>条件</h2>
+<ul>
+<li>checkpoint: <code>{source_checkpoint}</code>（policy_best）</li>
+<li>validation: <code>{source_dataset}</code>（Object0/1/2 各5 episode）</li>
+<li>初期 belief: N({initial_pb:.6f}, {args.initial_std:.3f}²)</li>
+<li>Gauss–Hermite: M={args.num_points}、全overlapping windowで更新</li>
+<li>参照PB: {reference_text}</li>
+</ul>
+{''.join(trajectory_sections)}
+<h2>終端値の集計</h2>
+<table><thead><tr><th>β</th><th>object</th><th>final μ mean ± episode std</th><th>RMSE</th><th>mean final σ</th><th>coverage</th><th>|μ_motion−μ0|</th><th>σ_motion/σ0</th></tr></thead><tbody>
+{beta_table}
+</tbody></table>
 <p class="small">Raw numeric records: <a href="episode_summary.csv">episode_summary.csv</a></p>
 </body></html>""",
         encoding="utf-8",
@@ -295,6 +430,7 @@ def main():
 
     records = []
     selected_records = []
+    trajectory_records = []
     for beta in args.beta_list:
         for episode_idx, filename in enumerate(filenames, start=1):
             object_id = int(filename.parent.name.removeprefix("WrenchPredObject"))
@@ -343,16 +479,17 @@ def main():
                 "std_at_motion": float(std_at_motion),
             }
             records.append(record)
+            trajectory_record = record.copy()
+            trajectory_record.update(
+                {
+                    "time": time,
+                    "mean_trajectory": mean_trajectory,
+                    "std_trajectory": std_trajectory,
+                }
+            )
+            trajectory_records.append(trajectory_record)
             if beta == args.selected_beta:
-                selected_record = record.copy()
-                selected_record.update(
-                    {
-                        "time": time,
-                        "mean_trajectory": mean_trajectory,
-                        "std_trajectory": std_trajectory,
-                    }
-                )
-                selected_records.append(selected_record)
+                selected_records.append(trajectory_record)
             print(
                 f"[{episode_idx:02d}/15] beta={beta:g} {filename.stem}: "
                 f"mean={final_mean[0]:.5f}, std={final_std[0]:.5f}"
@@ -372,9 +509,25 @@ def main():
         args.selected_beta,
         args.num_points,
     )
+    for beta in args.beta_list:
+        beta_records = [
+            record for record in trajectory_records if record["beta"] == beta
+        ]
+        assert len(beta_records) == 15, (beta, len(beta_records))
+        plot_selected_trajectories(
+            args.output_dir / f"trajectories_beta_{beta:g}.png",
+            beta_records,
+            beta,
+            args.num_points,
+        )
     plot_beta_sweep(
         args.output_dir / "beta_sweep.png",
         grouped_summary,
+        args.beta_list,
+    )
+    plot_beta_trajectory_comparison(
+        args.output_dir / "beta_trajectory_comparison.png",
+        trajectory_records,
         args.beta_list,
     )
     write_html(
@@ -384,7 +537,18 @@ def main():
         target_pb,
         grouped_summary,
     )
+    write_all_trajectory_html(
+        args.output_dir / "gaussian_belief_all_trajectories.html",
+        args,
+        float(initial_pb[0]),
+        target_pb,
+        grouped_summary,
+    )
     print(f"report: {args.output_dir / 'gaussian_belief_validation.html'}")
+    print(
+        "all trajectories report: "
+        f"{args.output_dir / 'gaussian_belief_all_trajectories.html'}"
+    )
 
 
 if __name__ == "__main__":
