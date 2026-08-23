@@ -114,7 +114,9 @@ class RolloutDiffusionPolicyOnlinePb(RolloutDiffusionPolicy):
             assert self.args.image_vae_checkpoint_path is not None
             from pythae.models import AutoModel
 
-            self.image_vae_checkpoint_path = self.args.image_vae_checkpoint_path.resolve()
+            self.image_vae_checkpoint_path = (
+                self.args.image_vae_checkpoint_path.resolve()
+            )
             self.wp4_image_vae = AutoModel.load_from_folder(
                 str(self.image_vae_checkpoint_path)
             )
@@ -136,6 +138,9 @@ class RolloutDiffusionPolicyOnlinePb(RolloutDiffusionPolicy):
             f"  - PB dimension: {wp4_pb_dim}\n"
             f"  - learning rate: {self.args.online_pb_lr}\n"
             f"  - wrench loss weight: {self.args.wrench_loss_weight}\n"
+            f"  - DP action keys: {self.action_keys}\n"
+            f"  - WP4 action keys: "
+            f"{self.wp4_model_meta_info['action']['keys']}\n"
             f"  - horizon: {wp4_data_info['horizon']}, "
             f"obs steps: {wp4_data_info['n_obs_steps']}, "
             f"skip: {wp4_data_info['skip']}"
@@ -160,6 +165,10 @@ class RolloutDiffusionPolicyOnlinePb(RolloutDiffusionPolicy):
         self.data_manager.meta_data["online_pb_wrench_loss_weight"] = (
             self.args.wrench_loss_weight
         )
+        self.data_manager.meta_data["online_pb_dp_action_keys"] = list(self.action_keys)
+        self.data_manager.meta_data["online_pb_wp4_action_keys"] = list(
+            self.wp4_model_meta_info["action"]["keys"]
+        )
         if self.wp4_image_vae is not None:
             self.data_manager.meta_data["online_pb_image_vae_checkpoint"] = str(
                 self.image_vae_checkpoint_path
@@ -173,6 +182,8 @@ class RolloutDiffusionPolicyOnlinePb(RolloutDiffusionPolicy):
 
         horizon = self.wp4_model_meta_info["data"]["horizon"]
         self.online_observation_window = deque(maxlen=horizon)
+        wp4_action_dim = len(self.wp4_model_meta_info["action"]["example"])
+        self.wp4_action_list = np.empty((0, wp4_action_dim))
         self.online_pb = torch.nn.Parameter(
             torch.tensor(
                 self.initial_pb,
@@ -201,6 +212,17 @@ class RolloutDiffusionPolicyOnlinePb(RolloutDiffusionPolicy):
         # Keep the existing DP action buffer; the latest PB takes effect at the
         # next normal Diffusion Policy inference.
         super().infer_policy()
+
+    def set_command_data(self, action_keys=None):
+        super().set_command_data(action_keys)
+
+        if self.phase_manager.is_phase("RolloutPhase") and (
+            self.rollout_time_idx % self.args.skip == 0
+        ):
+            wp4_action = self.get_wp4_current_action()
+            self.wp4_action_list = np.concatenate(
+                [self.wp4_action_list, wp4_action[np.newaxis]]
+            )
 
     def append_online_observation(self):
         state = np.concatenate(
@@ -232,6 +254,41 @@ class RolloutDiffusionPolicyOnlinePb(RolloutDiffusionPolicy):
             }
         )
 
+    def get_wp4_current_action(self):
+        action = np.concatenate(
+            [
+                convert_data_to_policy(
+                    self.motion_manager.get_data(action_key, self.obs),
+                    action_key,
+                )
+                for action_key in self.wp4_model_meta_info["action"]["keys"]
+            ]
+        )
+        expected_action_dim = len(self.wp4_model_meta_info["action"]["example"])
+        assert action.shape == (expected_action_dim,), (
+            action.shape,
+            expected_action_dim,
+        )
+        return action
+
+    def get_wp4_action_window(self):
+        horizon = self.wp4_model_meta_info["data"]["horizon"]
+        assert len(self.wp4_action_list) >= horizon - 1, (
+            len(self.wp4_action_list),
+            horizon,
+        )
+
+        expected_action_dim = len(self.wp4_model_meta_info["action"]["example"])
+        past_action = self.wp4_action_list[-(horizon - 1) :].copy()
+        assert past_action.shape == (horizon - 1, expected_action_dim), (
+            past_action.shape,
+            horizon,
+            expected_action_dim,
+        )
+
+        dummy_action = np.zeros_like(past_action[-1:])
+        return np.concatenate([past_action, dummy_action], axis=0)
+
     def encode_wp4_image_feature(self):
         image = self.info["rgb_images"][self.args.image_vae_camera_name]
         image = cv2.resize(
@@ -246,14 +303,6 @@ class RolloutDiffusionPolicyOnlinePb(RolloutDiffusionPolicy):
         return feature.cpu().numpy()
 
     def update_online_pb(self):
-        horizon = self.wp4_model_meta_info["data"]["horizon"]
-        assert (
-            len(self.policy_action_list) >= horizon - 1
-        ), (  # if horizon = 16, we need at least excuted 15 actions.
-            len(self.policy_action_list),
-            horizon,
-        )
-
         state = np.stack([sample["state"] for sample in self.online_observation_window])
         image_feature = np.stack(
             [sample["image_feature"] for sample in self.online_observation_window]
@@ -262,12 +311,12 @@ class RolloutDiffusionPolicyOnlinePb(RolloutDiffusionPolicy):
             [sample["wrench"] for sample in self.online_observation_window]
         )
 
-        # At observation t, actions through t - 1 have already been executed.
+        # Commands are captured immediately after being sent to the environment
+        # and converted into WP4's own action representation. This lets WP4 and
+        # the downstream DP use different command coordinates.
         # WP4 consumes action indices [n_obs_steps - 1, horizon - 1), so the
-        # final action slot is unused and can safely hold the latest past action.
-        past_action = self.policy_action_list[-(horizon - 1) :].copy()
-        dummy_action = np.zeros_like(past_action[-1:])
-        action = np.concatenate([past_action, dummy_action], axis=0)
+        # final action slot is unused and can safely be zero padded.
+        action = self.get_wp4_action_window()
 
         batch = {
             "state": torch.tensor(
