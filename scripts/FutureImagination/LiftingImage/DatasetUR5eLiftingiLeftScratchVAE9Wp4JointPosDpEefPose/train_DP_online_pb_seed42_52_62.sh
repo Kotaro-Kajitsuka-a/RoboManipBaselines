@@ -3,7 +3,7 @@ set -e
 
 # Reuse the Adam Online-PB labels produced by the Left VAE 9D JointPos WP4.
 # Only the downstream Diffusion Policy state/action coordinates change to EEF pose.
-dataset_dir=robo_manip_baselines/dataset/DatasetMujocoUR5eLiftingi_LeftScratchVAE9_Wp4JointPos_DpEefPose_AdamOnlinePB
+dataset_dir=robo_manip_baselines/dataset/DatasetMujocoUR5eLiftingi_LeftScratchVAE9_OnlinePB
 checkpoint_prefix=robo_manip_baselines/checkpoint/DiffusionPolicy/DatasetMujocoUR5eLiftingi_LeftScratchVAE9_Wp4JointPos_DpEefPose_AdamOnlinePB
 
 test -d "$dataset_dir"

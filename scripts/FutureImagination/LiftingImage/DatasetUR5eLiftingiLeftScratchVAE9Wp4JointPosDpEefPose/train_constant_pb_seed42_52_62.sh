@@ -3,7 +3,7 @@ set -e
 
 # Reuse the constant PB labels from the Left VAE 9D JointPos WP4.
 # Only the downstream Diffusion Policy state/action coordinates change to EEF pose.
-dataset_dir=robo_manip_baselines/dataset/DatasetMujocoUR5eLiftingi_LeftScratchVAE9_Wp4JointPos_DpEefPose_ConstantPB
+dataset_dir=robo_manip_baselines/dataset/DatasetMujocoUR5eLiftingi_LeftScratchVAE9_ConstantPB
 checkpoint_prefix=robo_manip_baselines/checkpoint/DiffusionPolicy/DatasetMujocoUR5eLiftingi_LeftScratchVAE9_Wp4JointPos_DpEefPose_ConstantPB
 
 test -d "$dataset_dir"
