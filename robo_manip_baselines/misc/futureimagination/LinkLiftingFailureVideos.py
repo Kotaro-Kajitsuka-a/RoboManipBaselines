@@ -2,6 +2,8 @@ import argparse
 import csv
 import os
 import re
+import subprocess
+import sys
 from pathlib import Path
 
 SEED_PATTERN = re.compile(r"(?:^|[/_])(?:train)?seed(\d+)(?:[/_]|$)")
@@ -10,8 +12,8 @@ SEED_PATTERN = re.compile(r"(?:^|[/_])(?:train)?seed(\d+)(?:[/_]|$)")
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Create symlinks to the left-camera RGB videos of failed Lifting "
-            "episodes listed by AnalyzeLiftingSuccess.py."
+            "Create symlinks to the left-camera RGB videos and online-PB plots "
+            "of failed Lifting episodes listed by AnalyzeLiftingSuccess.py."
         )
     )
     parser.add_argument(
@@ -67,6 +69,7 @@ def main() -> None:
     failure_rows = [row for row in rows if not parse_bool(row["success"])]
     created_count = 0
     existing_count = 0
+    plot_count = 0
     for row in failure_rows:
         episode_path = Path(row["episode_path"]).resolve()
         video_path = episode_path / f"{args.camera_name}_rgb_image.rmb.mp4"
@@ -83,14 +86,28 @@ def main() -> None:
         if link_path.is_symlink():
             assert Path(os.readlink(link_path)) == relative_target, link_path
             existing_count += 1
-            continue
-        assert not link_path.exists(), link_path
-        link_path.symlink_to(relative_target)
-        created_count += 1
+        else:
+            assert not link_path.exists(), link_path
+            link_path.symlink_to(relative_target)
+            created_count += 1
+
+        plot_path = link_path.with_suffix(".png")
+        subprocess.run(
+            [
+                sys.executable,
+                str(Path(__file__).with_name("PlotOnlinePbDataset.py")),
+                str(episode_path),
+                "--output",
+                str(plot_path),
+            ],
+            check=True,
+        )
+        plot_count += 1
 
     print(f"Failure episodes: {len(failure_rows)} / {len(rows)}")
     print(f"Created symlinks: {created_count}")
     print(f"Existing symlinks: {existing_count}")
+    print(f"Generated online PB plots: {plot_count}")
     print(args.output_dir.resolve())
 
 
