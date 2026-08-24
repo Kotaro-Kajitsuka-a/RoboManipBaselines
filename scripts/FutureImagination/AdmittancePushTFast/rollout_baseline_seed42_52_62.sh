@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-# Run from the repository root after train_seed42_52_62.sh.
+# Run from the repository root after train_baseline_seed42_52_62.sh.
 # Evaluate ordinary Diffusion Policy without online PB adaptation.
 eval_timestamp=$(date +%Y%m%d_%H%M%S)
 eval_dir="robo_manip_baselines/dataset/tests/FutureImagination/AdmittancePushTFast/DP_baseline_eval_${eval_timestamp}"
