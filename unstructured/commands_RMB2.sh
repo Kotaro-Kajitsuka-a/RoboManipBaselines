@@ -99,7 +99,7 @@ python robo_manip_baselines/policy/wrench_predictor4_online/AddConstantPbToDatas
 uv run python robo_manip_baselines/policy/wrench_predictor4_online/AddOnlinePbToDataset.py \
   robo_manip_baselines/dataset/LiftingAB_B_only/ 0 \
   --checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only/policy_last.ckpt \
-  --lr 6e-3
+  --lr 6e-3 --wrench_loss_weight 0.0
 
 # Plot the online PB trajectories stored in the Object1 B episodes
 uv run python robo_manip_baselines/misc/futureimagination/PlotOnlinePbDataset.py \
