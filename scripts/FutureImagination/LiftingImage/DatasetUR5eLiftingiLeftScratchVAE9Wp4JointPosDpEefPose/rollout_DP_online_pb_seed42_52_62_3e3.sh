@@ -1,24 +1,18 @@
 #!/usr/bin/env bash
 set -e
 
-# Evaluate the DP trained with recomputed causal PB trajectories. Rollout PB
-# adaptation is Adam-only and uses the same learning rate as dataset creation.
-online_pb_lr=${ONLINE_PB_LR:-6e-3}
-experiment_suffix=${EXPERIMENT_SUFFIX:-}
-eval_timestamp=$(date +%Y%m%d_%H%M%S)
-eval_dir="robo_manip_baselines/dataset/tests/FutureImagination/DatasetMujocoUR5eLiftingi_LeftScratchVAE9_Wp4JointPos_DpEefPose/DP_adam_online_pb_recomputed${experiment_suffix}_eval_${eval_timestamp}"
+# Evaluate the DP trained with causal online-PB trajectories. Rollout PB
+# adaptation uses Adam with the same learning rate as dataset creation.
+eval_dir=robo_manip_baselines/dataset/tests/FutureImagination/DatasetMujocoUR5eLiftingi_LeftScratchVAE9_Wp4JointPos_DpEefPose/DP_adam_online_pb_lr3e3_eval
 rmb_dir="$eval_dir/rmb"
-checkpoint_prefix="robo_manip_baselines/checkpoint/DiffusionPolicy/DatasetMujocoUR5eLiftingi_LeftScratchVAE9_Wp4JointPos_DpEefPose_AdamOnlinePB${experiment_suffix}"
+checkpoint_prefix=robo_manip_baselines/checkpoint/DiffusionPolicy/DatasetMujocoUR5eLiftingi_LeftScratchVAE9_Wp4JointPos_DpEefPose_AdamOnlinePB_lr3e3
 wp4_checkpoint=robo_manip_baselines/checkpoint/WrenchPredictor4/DatasetMujocoUR5eLiftingi_left_image_vae_9_joint_pos/policy_best.ckpt
 image_vae_checkpoint=robo_manip_baselines/checkpoint/ImageVAE/DatasetMujocoUR5eLiftingi_left_9/final_model
-demo_tag="left_scratch_vae9_wp4_joint_dp_eef_adam_online_pb_recomputed${experiment_suffix}"
+demo_tag=left_scratch_vae9_wp4_joint_dp_eef_adam_online_pb_lr3e3
 
-test -f "$wp4_checkpoint"
-test -d "$image_vae_checkpoint"
-test -f "${checkpoint_prefix}_seed42/policy_last.ckpt"
-test -f "${checkpoint_prefix}_seed52/policy_last.ckpt"
-test -f "${checkpoint_prefix}_seed62/policy_last.ckpt"
-
+# RolloutBase creates timestamped directories. Clear only the previously
+# collected RMBs so a repeated evaluation still contains exactly 210 episodes.
+rm -rf "$rmb_dir"
 mkdir -p "$rmb_dir"
 rollout_start_marker="$eval_dir/.rollout_start"
 touch "$rollout_start_marker"
@@ -39,14 +33,14 @@ for train_seed in 42 52 62; do
       7) world_idx_list=({770..779}) ;;
     esac
 
-    python scripts/FutureImagination/LiftingImage/DatasetUR5eLiftingiLeftScratchVAE9Wp4JointPosDpEefPose/rollout_with_legacy_wp4.py \
+    python robo_manip_baselines/bin/Rollout.py \
       DiffusionPolicyOnlinePb "MujocoUR5eLiftingi_I${object_id}" \
       --demo_name "MujocoUR5eLiftingi_I${object_id}_${demo_tag}_trainseed${train_seed}" \
       --checkpoint "$checkpoint" \
       --wp4_checkpoint "$wp4_checkpoint" \
       --image_vae_checkpoint "$image_vae_checkpoint" \
       --image_vae_camera_name left \
-      --online_pb_lr "$online_pb_lr" \
+      --online_pb_lr 3e-3 \
       --wrench_loss_weight 0.0 \
       --seed 42 \
       --world_idx_list "${world_idx_list[@]}" \
@@ -80,7 +74,7 @@ done
 python robo_manip_baselines/misc/futureimagination/AnalyzeLiftingSuccess.py \
   "$rmb_dir" \
   --output_dir "$eval_dir" \
-  --output_prefix "adam_online_pb_recomputed${experiment_suffix}_training_seed_42_52_62" \
+  --output_prefix adam_online_pb_lr3e3_training_seed_42_52_62 \
   --expected_episode_count 210
 
 echo "evaluation directory: $eval_dir"
