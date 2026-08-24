@@ -1,15 +1,9 @@
 #!/usr/bin/env bash
 set -e
 
-# Reuse the constant PB labels from the Left VAE 9D JointPos WP4.
-# Only the downstream Diffusion Policy state/action coordinates change to EEF pose.
-dataset_dir=robo_manip_baselines/dataset/DatasetMujocoUR5eLiftingi_LeftScratchVAE9_ConstantPB
+# Run after prepare_datasets.sh.
+dataset_dir=robo_manip_baselines/dataset/DatasetMujocoUR5eLiftingi_LeftScratchVAE9_Wp4JointPos_DpEefPose_ConstantPB
 checkpoint_prefix=robo_manip_baselines/checkpoint/DiffusionPolicy/DatasetMujocoUR5eLiftingi_LeftScratchVAE9_Wp4JointPos_DpEefPose_ConstantPB
-
-test -d "$dataset_dir"
-test ! -e "${checkpoint_prefix}_seed42"
-test ! -e "${checkpoint_prefix}_seed52"
-test ! -e "${checkpoint_prefix}_seed62"
 
 python robo_manip_baselines/bin/Train.py DiffusionPolicy \
   --dataset_dir "$dataset_dir" \

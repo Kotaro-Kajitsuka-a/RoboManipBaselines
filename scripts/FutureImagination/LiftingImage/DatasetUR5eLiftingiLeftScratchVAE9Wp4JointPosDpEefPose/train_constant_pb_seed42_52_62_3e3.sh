@@ -2,10 +2,12 @@
 set -e
 
 # Run after prepare_datasets_3e3.sh.
+dataset_dir=robo_manip_baselines/dataset/DatasetMujocoUR5eLiftingi_LeftScratchVAE9_Wp4JointPos_DpEefPose_ConstantPB_lr3e3
+checkpoint_prefix=robo_manip_baselines/checkpoint/DiffusionPolicy/DatasetMujocoUR5eLiftingi_LeftScratchVAE9_Wp4JointPos_DpEefPose_ConstantPB_lr3e3
 
 python robo_manip_baselines/bin/Train.py DiffusionPolicy \
-  --dataset_dir robo_manip_baselines/dataset/DatasetMujocoUR5eLiftingi_LeftScratchVAE9_Wp4JointPos_DpEefPose_ConstantPB_lr3e3 \
-  --checkpoint_dir robo_manip_baselines/checkpoint/DiffusionPolicy/DatasetMujocoUR5eLiftingi_LeftScratchVAE9_Wp4JointPos_DpEefPose_ConstantPB_lr3e3_seed42 \
+  --dataset_dir "$dataset_dir" \
+  --checkpoint_dir "${checkpoint_prefix}_seed42" \
   --camera_names \
   --state_keys measured_eef_pose measured_gripper_joint_pos measured_tblock_pose material_property \
   --action_keys command_eef_pose command_gripper_joint_pos \
@@ -14,8 +16,8 @@ python robo_manip_baselines/bin/Train.py DiffusionPolicy \
   --seed 42
 
 python robo_manip_baselines/bin/Train.py DiffusionPolicy \
-  --dataset_dir robo_manip_baselines/dataset/DatasetMujocoUR5eLiftingi_LeftScratchVAE9_Wp4JointPos_DpEefPose_ConstantPB_lr3e3 \
-  --checkpoint_dir robo_manip_baselines/checkpoint/DiffusionPolicy/DatasetMujocoUR5eLiftingi_LeftScratchVAE9_Wp4JointPos_DpEefPose_ConstantPB_lr3e3_seed52 \
+  --dataset_dir "$dataset_dir" \
+  --checkpoint_dir "${checkpoint_prefix}_seed52" \
   --camera_names \
   --state_keys measured_eef_pose measured_gripper_joint_pos measured_tblock_pose material_property \
   --action_keys command_eef_pose command_gripper_joint_pos \
@@ -24,8 +26,8 @@ python robo_manip_baselines/bin/Train.py DiffusionPolicy \
   --seed 52
 
 python robo_manip_baselines/bin/Train.py DiffusionPolicy \
-  --dataset_dir robo_manip_baselines/dataset/DatasetMujocoUR5eLiftingi_LeftScratchVAE9_Wp4JointPos_DpEefPose_ConstantPB_lr3e3 \
-  --checkpoint_dir robo_manip_baselines/checkpoint/DiffusionPolicy/DatasetMujocoUR5eLiftingi_LeftScratchVAE9_Wp4JointPos_DpEefPose_ConstantPB_lr3e3_seed62 \
+  --dataset_dir "$dataset_dir" \
+  --checkpoint_dir "${checkpoint_prefix}_seed62" \
   --camera_names \
   --state_keys measured_eef_pose measured_gripper_joint_pos measured_tblock_pose material_property \
   --action_keys command_eef_pose command_gripper_joint_pos \
