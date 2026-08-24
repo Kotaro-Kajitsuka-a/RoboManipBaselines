@@ -4,8 +4,7 @@ import os
 import re
 from pathlib import Path
 
-
-SEED_PATTERN = re.compile(r"(?:^|/)seed(\d+)(?:/|$)")
+SEED_PATTERN = re.compile(r"(?:^|[/_])(?:train)?seed(\d+)(?:[/_]|$)")
 
 
 def parse_args() -> argparse.Namespace:
@@ -76,10 +75,7 @@ def main() -> None:
         seed = get_seed(episode_path)
         world_idx = int(row["world_idx"])
         link_path = (
-            args.output_dir
-            / f"seed{seed}"
-            / row["group"]
-            / f"world{world_idx:03d}.mp4"
+            args.output_dir / f"seed{seed}" / row["group"] / f"world{world_idx:03d}.mp4"
         )
         link_path.parent.mkdir(parents=True, exist_ok=True)
         relative_target = Path(os.path.relpath(video_path, link_path.parent))
