@@ -54,6 +54,18 @@ class RolloutDiffusionPolicyOnlinePb(RolloutDiffusionPolicy):
             help="learning rate applied only to the online PB",
         )
         parser.add_argument(
+            "--online_pb_optimizer",
+            choices=("adam", "sgd"),
+            default="adam",
+            help="optimizer applied only to the online PB",
+        )
+        parser.add_argument(
+            "--online_pb_momentum",
+            type=float,
+            default=0.0,
+            help="SGD momentum; ignored by Adam",
+        )
+        parser.add_argument(
             "--wrench_loss_weight",
             type=float,
             default=0.0,
@@ -78,6 +90,7 @@ class RolloutDiffusionPolicyOnlinePb(RolloutDiffusionPolicy):
 
         assert self.state_keys.count(DataKey.MATERIAL_PROPERTY) == 1, self.state_keys
         assert self.args.online_pb_lr > 0.0, self.args.online_pb_lr
+        assert 0.0 <= self.args.online_pb_momentum < 1.0, self.args.online_pb_momentum
         assert self.args.wrench_loss_weight >= 0.0, self.args.wrench_loss_weight
         self.wp4_checkpoint = self.args.wp4_checkpoint.resolve()
         self.wp4_model_meta_info = load_model_meta_info(self.wp4_checkpoint)
@@ -137,6 +150,8 @@ class RolloutDiffusionPolicyOnlinePb(RolloutDiffusionPolicy):
             f"  - fixed PB: {self.args.fixed_pb}\n"
             f"  - PB dimension: {wp4_pb_dim}\n"
             f"  - learning rate: {self.args.online_pb_lr}\n"
+            f"  - optimizer: {self.args.online_pb_optimizer} "
+            f"(momentum={self.args.online_pb_momentum})\n"
             f"  - wrench loss weight: {self.args.wrench_loss_weight}\n"
             f"  - DP action keys: {self.action_keys}\n"
             f"  - WP4 action keys: "
@@ -162,6 +177,10 @@ class RolloutDiffusionPolicyOnlinePb(RolloutDiffusionPolicy):
         )
         self.data_manager.meta_data["online_pb_fixed"] = self.args.fixed_pb
         self.data_manager.meta_data["online_pb_learning_rate"] = self.args.online_pb_lr
+        self.data_manager.meta_data["online_pb_optimizer"] = (
+            self.args.online_pb_optimizer
+        )
+        self.data_manager.meta_data["online_pb_momentum"] = self.args.online_pb_momentum
         self.data_manager.meta_data["online_pb_wrench_loss_weight"] = (
             self.args.wrench_loss_weight
         )
@@ -191,10 +210,18 @@ class RolloutDiffusionPolicyOnlinePb(RolloutDiffusionPolicy):
                 device=self.device,
             )
         )
-        self.online_pb_optimizer = torch.optim.Adam(
-            [self.online_pb],
-            lr=self.args.online_pb_lr,
-        )
+        if self.args.online_pb_optimizer == "adam":
+            self.online_pb_optimizer = torch.optim.Adam(
+                [self.online_pb],
+                lr=self.args.online_pb_lr,
+            )
+        else:
+            assert self.args.online_pb_optimizer == "sgd", self.args.online_pb_optimizer
+            self.online_pb_optimizer = torch.optim.SGD(
+                [self.online_pb],
+                lr=self.args.online_pb_lr,
+                momentum=self.args.online_pb_momentum,
+            )
 
     def infer_policy(self):
         if not self.args.fixed_pb:
