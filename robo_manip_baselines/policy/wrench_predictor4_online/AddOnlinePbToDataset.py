@@ -15,13 +15,13 @@ from robo_manip_baselines.common import (
 from robo_manip_baselines.policy.wrench_predictor4.WrenchPredictor4Model import (
     WrenchPredictor4Model,
 )
+from robo_manip_baselines.policy.wrench_predictor4_online.WrenchPredictor4OnlineDataset import (
+    WrenchPredictor4OnlineDataset,
+)
 from robo_manip_baselines.policy.wrench_predictor4_online.WrenchPredictor4OnlineUtils import (
     load_model_meta_info,
     load_pb,
     load_policy,
-)
-from robo_manip_baselines.policy.wrench_predictor4_online.WrenchPredictor4OnlineDataset import (
-    WrenchPredictor4OnlineDataset,
 )
 
 
@@ -58,6 +58,18 @@ def parse_args() -> argparse.Namespace:
         help="learning rate applied only to the online PB",
     )
     parser.add_argument(
+        "--optimizer",
+        choices=("adam", "sgd"),
+        default="adam",
+        help="optimizer applied only to the online PB",
+    )
+    parser.add_argument(
+        "--momentum",
+        type=float,
+        default=0.0,
+        help="SGD momentum; ignored by Adam",
+    )
+    parser.add_argument(
         "--wrench_loss_weight",
         type=float,
         default=0.0,
@@ -85,6 +97,8 @@ def adapt_pb_trajectory(
     device: torch.device,
     learning_rate: float,
     wrench_loss_weight: float,
+    optimizer_name: str = "adam",
+    momentum: float = 0.0,
 ) -> tuple[np.ndarray, int, np.ndarray]:
     dataset = WrenchPredictor4OnlineDataset(
         [filename],
@@ -108,7 +122,15 @@ def adapt_pb_trajectory(
     online_pb = torch.nn.Parameter(
         torch.tensor(initial_pb, dtype=torch.float32, device=device)
     )
-    optimizer = torch.optim.Adam([online_pb], lr=learning_rate)
+    if optimizer_name == "adam":
+        optimizer = torch.optim.Adam([online_pb], lr=learning_rate)
+    else:
+        assert optimizer_name == "sgd", optimizer_name
+        optimizer = torch.optim.SGD(
+            [online_pb],
+            lr=learning_rate,
+            momentum=momentum,
+        )
 
     skip = model_meta_info["data"]["skip"]
     horizon = model_meta_info["data"]["horizon"]
@@ -155,6 +177,8 @@ def write_online_pb(
     model_meta_info: dict,
     learning_rate: float,
     wrench_loss_weight: float,
+    optimizer_name: str,
+    momentum: float,
     num_updates: int,
     final_pb: np.ndarray,
     overwrite: bool,
@@ -187,6 +211,8 @@ def write_online_pb(
         dataset.attrs["final_pb"] = final_pb
         dataset.attrs["source_checkpoint"] = str(checkpoint_path.resolve())
         dataset.attrs["online_learning_rate"] = learning_rate
+        dataset.attrs["online_optimizer"] = optimizer_name
+        dataset.attrs["online_momentum"] = momentum
         dataset.attrs["online_wrench_loss_weight"] = wrench_loss_weight
         dataset.attrs["online_num_updates"] = num_updates
         dataset.attrs["online_skip"] = model_meta_info["data"]["skip"]
@@ -200,6 +226,7 @@ def write_online_pb(
 def main() -> None:
     args = parse_args()
     assert args.lr > 0.0, args.lr
+    assert 0.0 <= args.momentum < 1.0, args.momentum
     set_random_seed(args.seed)
 
     filenames = find_rmb_files(str(args.dataset_path))
@@ -227,6 +254,8 @@ def main() -> None:
             device,
             args.lr,
             args.wrench_loss_weight,
+            args.optimizer,
+            args.momentum,
         )
         status = write_online_pb(
             filename,
@@ -238,6 +267,8 @@ def main() -> None:
             model_meta_info,
             args.lr,
             args.wrench_loss_weight,
+            args.optimizer,
+            args.momentum,
             num_updates,
             final_pb,
             args.overwrite,
@@ -255,6 +286,7 @@ def main() -> None:
     )
     print(f"HDF5 key: {DataKey.MATERIAL_PROPERTY}")
     print(f"online wrench loss weight: {args.wrench_loss_weight}")
+    print(f"optimizer: {args.optimizer} (momentum={args.momentum})")
     print(
         "episodes: "
         f"{len(filenames)} "
