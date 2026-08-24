@@ -2,7 +2,7 @@
 set -e
 
 # Run after prepare_datasets_3e3.sh.
-dataset_dir=robo_manip_baselines/dataset/DatasetMujocoUR5eLiftingi_LeftScratchVAE9_Wp4JointPos_DpEefPose_ConstantPB_lr3e3
+dataset_dir=robo_manip_baselines/dataset/DatasetMujocoUR5eLiftingi_LeftScratchVAE9_Wp4JointPos_DpEefPose_ConstantPB
 checkpoint_prefix=robo_manip_baselines/checkpoint/DiffusionPolicy/DatasetMujocoUR5eLiftingi_LeftScratchVAE9_Wp4JointPos_DpEefPose_ConstantPB_lr3e3
 
 python robo_manip_baselines/bin/Train.py DiffusionPolicy \
