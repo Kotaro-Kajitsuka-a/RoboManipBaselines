@@ -149,7 +149,7 @@ class RealXarm7PlanarConstraintDemoEnv(RealXarm7FixedGripperDemoEnv):
         )
 
         arm_config = self.body_config_list[0]
-        approach_se3 = self.original_eef_se3.copy()
+        approach_se3 = self.init_eef_se3.copy()
         approach_se3.translation[2] += self.reset_approach_z_offset
         self.reset_arm_manager.set_command_eef_pose(approach_se3)
 
