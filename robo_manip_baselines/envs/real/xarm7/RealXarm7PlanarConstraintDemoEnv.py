@@ -1,4 +1,5 @@
 import numpy as np
+
 import pinocchio as pin
 
 from robo_manip_baselines.common import ArmManager, get_se3_from_pose
@@ -46,6 +47,7 @@ class RealXarm7PlanarConstraintDemoEnv(RealXarm7FixedGripperDemoEnv):
             fixed_gripper_joint_pos,
         ]
     )
+
 
     def __init__(
         self,
