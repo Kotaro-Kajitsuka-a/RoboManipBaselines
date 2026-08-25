@@ -153,6 +153,10 @@ register(
     id="robo_manip_baselines/RealXarm7FixedGripperDemoEnv-v0",
     entry_point="robo_manip_baselines.envs.real.xarm7:RealXarm7FixedGripperDemoEnv",
 )
+register(
+    id="robo_manip_baselines/RealXarm7PlanarConstraintDemoEnv-v0",
+    entry_point="robo_manip_baselines.envs.real.xarm7:RealXarm7PlanarConstraintDemoEnv",
+)
 
 ## xArm7-Dual
 register(
