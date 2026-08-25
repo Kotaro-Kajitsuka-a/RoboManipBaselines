@@ -122,7 +122,9 @@ class RealXarm7PlanarConstraintDemoEnv(RealXarm7FixedGripperDemoEnv):
         )
 
         arm_config = self.body_config_list[0]
-        obs = self._get_obs()
+        self._get_obs()
+        obs = self._move_eef_to_reset_approach_pose()
+
         while True:
             arm_joint_pos = obs["joint_pos"][arm_config.arm_joint_idxes]
             arm_joint_pos_error = arm_config.init_arm_joint_pos - arm_joint_pos
@@ -140,6 +142,31 @@ class RealXarm7PlanarConstraintDemoEnv(RealXarm7FixedGripperDemoEnv):
         print(
             f"[{self.__class__.__name__}] Finish moving the robot to the reset position."
         )
+
+    def _move_eef_to_reset_approach_pose(self):
+        print(
+            f"[{self.__class__.__name__}] Start moving the EEF to the reset approach pose."
+        )
+
+        arm_config = self.body_config_list[0]
+        approach_se3 = self.original_eef_se3.copy()
+        approach_se3.translation[2] += self.reset_approach_z_offset
+        self.reset_arm_manager.set_command_eef_pose(approach_se3)
+
+        action = self.init_qpos.copy()
+        action[arm_config.arm_joint_idxes] = self.reset_arm_manager.arm_joint_pos
+        self._set_action(
+            action,
+            duration=2.0,
+            joint_vel_limit_scale=0.1,
+            wait=True,
+        )
+        obs = self._get_obs()
+
+        print(
+            f"[{self.__class__.__name__}] Finish moving the EEF to the reset approach pose."
+        )
+        return obs
 
     def _get_obs(self):
         obs = super()._get_obs()
