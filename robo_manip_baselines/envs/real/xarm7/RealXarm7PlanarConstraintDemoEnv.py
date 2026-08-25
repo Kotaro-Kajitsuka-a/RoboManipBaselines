@@ -6,6 +6,11 @@ from .RealXarm7FixedGripperDemoEnv import RealXarm7FixedGripperDemoEnv
 
 
 class PlanarConstraintArmManager(ArmManager):
+    def set_command_joint_pos(self, arm_joint_pos, gripper_joint_pos):
+        raise RuntimeError(
+            f"[{self.__class__.__name__}] Joint position commands bypass the planar constraint. Use command_eef_pose or command_eef_pose_rel."
+        )
+
     def set_command_eef_pose(self, eef_pose):
         if isinstance(eef_pose, pin.SE3):
             target_se3 = eef_pose.copy()
