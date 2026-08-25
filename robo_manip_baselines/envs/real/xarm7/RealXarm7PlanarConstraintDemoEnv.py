@@ -7,7 +7,7 @@ from .RealXarm7FixedGripperDemoEnv import RealXarm7FixedGripperDemoEnv
 
 
 class PlanarConstraintArmManager(ArmManager):
-    max_eef_speed = 0.02  # [m/s]
+    max_eef_speed = 0.05  # [m/s]
 
     def set_command_joint_pos(self, arm_joint_pos, gripper_joint_pos):
         raise RuntimeError(
@@ -35,9 +35,40 @@ class PlanarConstraintArmManager(ArmManager):
 
 
 class RealXarm7PlanarConstraintDemoEnv(RealXarm7FixedGripperDemoEnv):
+    max_eef_z_drop = 0.003  # [m]
+
     def __init__(
         self,
         **kwargs,
     ):
         super().__init__(**kwargs)
         self.body_config_list[0].BodyManagerClass = PlanarConstraintArmManager
+
+        arm_config = self.body_config_list[0]
+        self.eef_pin_model = pin.buildModelFromUrdf(arm_config.arm_urdf_path)
+        self.eef_pin_data = self.eef_pin_model.createData()
+        self.original_eef_z = self._get_eef_z(arm_config.init_arm_joint_pos)
+
+    def _get_obs(self):
+        obs = super()._get_obs()
+
+        arm_config = self.body_config_list[0]
+        arm_joint_pos = obs["joint_pos"][arm_config.arm_joint_idxes]
+        measured_eef_z = self._get_eef_z(arm_joint_pos)
+        if measured_eef_z < self.original_eef_z - self.max_eef_z_drop:
+            raise RuntimeError(
+                f"[{self.__class__.__name__}] Measured EEF z is below the planar constraint: "
+                f"original={self.original_eef_z:.6f} m, measured={measured_eef_z:.6f} m"
+            )
+
+        return obs
+
+    def _get_eef_z(self, arm_joint_pos):
+        pin.forwardKinematics(
+            self.eef_pin_model,
+            self.eef_pin_data,
+            arm_joint_pos,
+        )
+        return self.eef_pin_data.oMi[
+            self.body_config_list[0].ik_eef_joint_id
+        ].translation[2]
