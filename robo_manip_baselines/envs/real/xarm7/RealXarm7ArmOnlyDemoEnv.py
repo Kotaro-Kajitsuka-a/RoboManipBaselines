@@ -16,12 +16,6 @@ class RealXarm7ArmOnlyDemoEnv(RealXarm7ArmOnlyEnvBase):
             **kwargs,
         )
 
-    def get_input_device_kwargs(self, input_device_name):
-        if input_device_name == "spacemouse":
-            return {"gripper_scale": 20.0}
-        else:
-            return super().get_input_device_kwargs(input_device_name)
-
     def modify_world(self, world_idx=None, cumulative_idx=None):
         """Modify simulation world depending on world index."""
         # TODO: Automatically set world index according to task variations

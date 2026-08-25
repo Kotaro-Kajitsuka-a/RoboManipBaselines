@@ -193,7 +193,7 @@ class RealXarm7ArmOnlyEnvBase(RealEnvBase):
         torque = wrench[3:6]
 
         return {
-            "joint_pos": np.concatenate((arm_joint_pos), dtype=np.float64),
-            "joint_vel": np.concatenate((arm_joint_vel), dtype=np.float64),
+            "joint_pos": np.array(arm_joint_pos, dtype=np.float64),
+            "joint_vel": np.array(arm_joint_vel, dtype=np.float64),
             "wrench": np.concatenate((force, torque), dtype=np.float64),
         }
