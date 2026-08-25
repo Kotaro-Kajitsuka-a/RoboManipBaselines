@@ -122,8 +122,11 @@ class RealXarm7PlanarConstraintDemoEnv(RealXarm7FixedGripperDemoEnv):
         )
 
         arm_config = self.body_config_list[0]
-        self._get_obs()
-        obs = self._move_eef_to_reset_approach_pose()
+        obs = self._get_obs()
+        arm_joint_pos = obs["joint_pos"][arm_config.arm_joint_idxes]
+        arm_joint_pos_error = arm_config.init_arm_joint_pos - arm_joint_pos
+        if np.max(np.abs(arm_joint_pos_error)) > self.reset_joint_pos_tolerance:
+            obs = self._move_eef_to_reset_approach_pose()
 
         while True:
             arm_joint_pos = obs["joint_pos"][arm_config.arm_joint_idxes]
