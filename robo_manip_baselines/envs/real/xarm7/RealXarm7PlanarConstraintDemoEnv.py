@@ -1,5 +1,4 @@
 import numpy as np
-
 import pinocchio as pin
 
 from robo_manip_baselines.common import ArmManager, get_se3_from_pose
