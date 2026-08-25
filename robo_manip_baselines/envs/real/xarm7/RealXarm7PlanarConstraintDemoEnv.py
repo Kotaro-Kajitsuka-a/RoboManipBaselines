@@ -48,7 +48,7 @@ class RealXarm7PlanarConstraintDemoEnv(RealXarm7FixedGripperDemoEnv):
 
         arm_config = self.body_config_list[0]
         self.reset_arm_manager = ArmManager(self, arm_config)
-        self.original_eef_se3 = self.reset_arm_manager.current_se3.copy()
+        self.init_eef_se3 = self.reset_arm_manager.current_se3.copy()
 
     def _reset_robot(self):
         print(
@@ -83,7 +83,7 @@ class RealXarm7PlanarConstraintDemoEnv(RealXarm7FixedGripperDemoEnv):
         )
 
         arm_config = self.body_config_list[0]
-        approach_se3 = self.original_eef_se3.copy()
+        approach_se3 = self.init_eef_se3.copy()
         approach_se3.translation[2] += self.reset_approach_z_offset
         self.reset_arm_manager.set_command_eef_pose(approach_se3)
 
@@ -112,11 +112,11 @@ class RealXarm7PlanarConstraintDemoEnv(RealXarm7FixedGripperDemoEnv):
             joint_pos[arm_config.gripper_joint_idxes],
         )
         measured_eef_z = self.reset_arm_manager.current_se3.translation[2]
-        original_eef_z = self.original_eef_se3.translation[2]
-        if measured_eef_z < original_eef_z - self.max_eef_z_drop:
+        init_eef_z = self.init_eef_se3.translation[2]
+        if measured_eef_z < init_eef_z - self.max_eef_z_drop:
             raise RuntimeError(
                 f"[{self.__class__.__name__}] Measured EEF z is below the planar constraint: "
-                f"original={original_eef_z:.6f} m, measured={measured_eef_z:.6f} m"
+                f"init={init_eef_z:.6f} m, measured={measured_eef_z:.6f} m"
             )
 
         return obs
