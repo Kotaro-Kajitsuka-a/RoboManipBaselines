@@ -1,2 +1,3 @@
 from .RealXarm7DemoEnv import RealXarm7DemoEnv
 from .RealXarm7FixedGripperDemoEnv import RealXarm7FixedGripperDemoEnv
+from .RealXarm7PlanarConstraintDemoEnv import RealXarm7PlanarConstraintDemoEnv
