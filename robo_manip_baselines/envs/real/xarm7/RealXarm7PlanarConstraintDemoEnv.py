@@ -36,6 +36,7 @@ class PlanarConstraintArmManager(ArmManager):
 
 class RealXarm7PlanarConstraintDemoEnv(RealXarm7FixedGripperDemoEnv):
     max_eef_z_drop = 0.005  # [m]
+    reset_approach_z_offset = 0.05  # [m]
     reset_joint_pos_tolerance = np.deg2rad(0.1)  # [rad]
 
     def __init__(
@@ -46,9 +47,8 @@ class RealXarm7PlanarConstraintDemoEnv(RealXarm7FixedGripperDemoEnv):
         self.body_config_list[0].BodyManagerClass = PlanarConstraintArmManager
 
         arm_config = self.body_config_list[0]
-        self.eef_pin_model = pin.buildModelFromUrdf(arm_config.arm_urdf_path)
-        self.eef_pin_data = self.eef_pin_model.createData()
-        self.original_eef_z = self._get_eef_z(arm_config.init_arm_joint_pos)
+        self.reset_arm_manager = ArmManager(self, arm_config)
+        self.original_eef_se3 = self.reset_arm_manager.current_se3.copy()
 
     def _reset_robot(self):
         print(
@@ -56,7 +56,9 @@ class RealXarm7PlanarConstraintDemoEnv(RealXarm7FixedGripperDemoEnv):
         )
 
         arm_config = self.body_config_list[0]
-        obs = self._get_obs()
+        self._get_obs()
+        obs = self._move_eef_to_reset_approach_pose()
+
         while True:
             arm_joint_pos = obs["joint_pos"][arm_config.arm_joint_idxes]
             arm_joint_pos_error = arm_config.init_arm_joint_pos - arm_joint_pos
@@ -75,26 +77,46 @@ class RealXarm7PlanarConstraintDemoEnv(RealXarm7FixedGripperDemoEnv):
             f"[{self.__class__.__name__}] Finish moving the robot to the reset position."
         )
 
+    def _move_eef_to_reset_approach_pose(self):
+        print(
+            f"[{self.__class__.__name__}] Start moving the EEF to the reset approach pose."
+        )
+
+        arm_config = self.body_config_list[0]
+        approach_se3 = self.original_eef_se3.copy()
+        approach_se3.translation[2] += self.reset_approach_z_offset
+        self.reset_arm_manager.set_command_eef_pose(approach_se3)
+
+        action = self.init_qpos.copy()
+        action[arm_config.arm_joint_idxes] = self.reset_arm_manager.arm_joint_pos
+        self._set_action(
+            action,
+            duration=2.0,
+            joint_vel_limit_scale=0.1,
+            wait=True,
+        )
+        obs = self._get_obs()
+
+        print(
+            f"[{self.__class__.__name__}] Finish moving the EEF to the reset approach pose."
+        )
+        return obs
+
     def _get_obs(self):
         obs = super()._get_obs()
 
         arm_config = self.body_config_list[0]
-        arm_joint_pos = obs["joint_pos"][arm_config.arm_joint_idxes]
-        measured_eef_z = self._get_eef_z(arm_joint_pos)
-        if measured_eef_z < self.original_eef_z - self.max_eef_z_drop:
+        joint_pos = obs["joint_pos"]
+        self.reset_arm_manager.set_command_joint_pos(
+            joint_pos[arm_config.arm_joint_idxes],
+            joint_pos[arm_config.gripper_joint_idxes],
+        )
+        measured_eef_z = self.reset_arm_manager.current_se3.translation[2]
+        original_eef_z = self.original_eef_se3.translation[2]
+        if measured_eef_z < original_eef_z - self.max_eef_z_drop:
             raise RuntimeError(
                 f"[{self.__class__.__name__}] Measured EEF z is below the planar constraint: "
-                f"original={self.original_eef_z:.6f} m, measured={measured_eef_z:.6f} m"
+                f"original={original_eef_z:.6f} m, measured={measured_eef_z:.6f} m"
             )
 
         return obs
-
-    def _get_eef_z(self, arm_joint_pos):
-        pin.forwardKinematics(
-            self.eef_pin_model,
-            self.eef_pin_data,
-            arm_joint_pos,
-        )
-        return self.eef_pin_data.oMi[
-            self.body_config_list[0].ik_eef_joint_id
-        ].translation[2]
