@@ -149,6 +149,10 @@ register(
     id="robo_manip_baselines/RealXarm7DemoEnv-v0",
     entry_point="robo_manip_baselines.envs.real.xarm7:RealXarm7DemoEnv",
 )
+register(
+    id="robo_manip_baselines/RealXarm7ArmOnlyDemoEnv-v0",
+    entry_point="robo_manip_baselines.envs.real.xarm7:RealXarm7ArmOnlyDemoEnv",
+)
 
 ## xArm7-Dual
 register(
