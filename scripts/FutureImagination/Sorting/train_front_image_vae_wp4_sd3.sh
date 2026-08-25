@@ -58,6 +58,13 @@ python robo_manip_baselines/policy/wrench_predictor4/EvalWrenchPredictor4ImageFe
   "$validation_dataset_dir" \
   --material_object_ids 0 1 2
 
+
+
+python robo_manip_baselines/misc/futureimagination/MakeSD3LatentAEReconstructionVideos.py \
+  "$train_dataset_dir" \
+  "$sd3_ae_output_dir/final_model" \
+  --camera_name front
+
 python robo_manip_baselines/misc/futureimagination/MakeSD3LatentAEReconstructionVideos.py \
   "$validation_dataset_dir" \
   "$sd3_ae_output_dir/final_model" \
