@@ -2,17 +2,17 @@
 set -e
 
 # Run from the repository root with the virtual environment activated.
-train_dataset_dir=robo_manip_baselines/dataset/0825_DatasetSorting_20260825_134504/training
-validation_dataset_dir=robo_manip_baselines/dataset/0825_DatasetSorting_20260825_134504/validation
-vae_output_dir=robo_manip_baselines/checkpoint/ImageVAE/0825_DatasetSorting_20260825_front_9
-wp4_checkpoint_dir=robo_manip_baselines/checkpoint/WrenchPredictor4/0825_DatasetSorting_20260825_front_image_vae_9_joint_pos
+train_dataset_dir=robo_manip_baselines/dataset/0826_DatasetSorting/training
+validation_dataset_dir=robo_manip_baselines/dataset/0826_DatasetSorting/validation
+vae_output_dir=robo_manip_baselines/checkpoint/ImageVAE/0826_DatasetSorting_front_9
+wp4_checkpoint_dir=robo_manip_baselines/checkpoint/WrenchPredictor4/0826_DatasetSorting_front_image_vae_9_joint_pos
 
 python robo_manip_baselines/misc/futureimagination/TrainImageVAE.py \
   --train_dataset_dir "$train_dataset_dir" \
   --validation_dataset_dir "$validation_dataset_dir" \
   --output_dir "$vae_output_dir" \
   --camera_name front \
-  --latent_dim 64
+  --latent_dim 9
 
 python robo_manip_baselines/misc/futureimagination/AddImageVAEFeature.py \
   "$train_dataset_dir" \
