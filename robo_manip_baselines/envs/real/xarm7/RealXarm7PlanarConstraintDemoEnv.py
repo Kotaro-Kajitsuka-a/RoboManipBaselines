@@ -39,6 +39,14 @@ class RealXarm7PlanarConstraintDemoEnv(RealXarm7FixedGripperDemoEnv):
     reset_approach_z_offset = 0.05  # [m]
     reset_joint_pos_tolerance = np.deg2rad(0.1)  # [rad]
 
+    fixed_gripper_joint_pos = np.array([0.0], dtype=np.float64)
+    fixed_gripper_init_qpos = np.concatenate(
+        [
+            np.deg2rad([1.1, 17.8, -1.4, 23.5, -2.4, 5.6, 1.3]),
+            fixed_gripper_joint_pos,
+        ]
+    )
+
     def __init__(
         self,
         **kwargs,
