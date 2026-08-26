@@ -2,10 +2,10 @@
   set -e
 
   # Add PB labels to copies of the new dataset's training split.
-  source_dataset=robo_manip_baselines/dataset/0825_DatasetSorting_20260825_134504/training/
-  online_dataset=robo_manip_baselines/dataset/0825_DatasetSorting_20260825_134504_FrontScratchVAE9_OnlinePB/training/
-  constant_dataset=robo_manip_baselines/dataset/0825_DatasetSorting_20260825_134504_FrontScratchVAE9_ConstantPB/training/
-  wp4_checkpoint=robo_manip_baselines/checkpoint/WrenchPredictor4/0825_DatasetSorting_20260825_front_image_vae_9_joint_pos/policy_best.ckpt
+  source_dataset=robo_manip_baselines/dataset/0826_DatasetSorting/training/
+  online_dataset=robo_manip_baselines/dataset/0826_DatasetSorting_FrontScratchVAE9_OnlinePB/training/
+  constant_dataset=robo_manip_baselines/dataset/0826_DatasetSorting_FrontScratchVAE9_ConstantPB/training/
+  wp4_checkpoint=robo_manip_baselines/checkpoint/WrenchPredictor4/0826_DatasetSorting_front_image_vae_9_joint_pos/policy_best.ckpt
 
   mkdir -p "$online_dataset" "$constant_dataset"
   cp -aL "$source_dataset/." "$online_dataset/"
@@ -15,7 +15,7 @@
     "$online_dataset" \
     1 \
     --checkpoint "$wp4_checkpoint" \
-    --lr 6e-3 \
+    --lr 8e-3 \
     --wrench_loss_weight 0.0 \
     --overwrite
 
@@ -38,8 +38,8 @@
 
   # The following is labeling for the validation data.
 
-  source_validation_dataset=robo_manip_baselines/dataset/0825_DatasetSorting_20260825_134504/validation/
-  online_validation_dataset=robo_manip_baselines/dataset/0825_DatasetSorting_20260825_134504_FrontScratchVAE9_OnlinePB/validation/
+  source_validation_dataset=robo_manip_baselines/dataset/0826_DatasetSorting/validation/
+  online_validation_dataset=robo_manip_baselines/dataset/0826_DatasetSorting_FrontScratchVAE9_OnlinePB/validation/
 
   mkdir -p "$online_validation_dataset"
   cp -aL "$source_validation_dataset/." "$online_validation_dataset/"
@@ -48,7 +48,7 @@
     "$online_validation_dataset" \
     1 \
     --checkpoint "$wp4_checkpoint" \
-    --lr 6e-3 \
+    --lr 8e-3 \
     --wrench_loss_weight 0.0 \
     --overwrite
 
