@@ -9,6 +9,12 @@ from .RealXarm7EnvBase import RealXarm7EnvBase
 
 class RealXarm7FixedGripperDemoEnv(RealXarm7EnvBase):
     fixed_gripper_joint_pos = np.array([0.0], dtype=np.float64)
+    fixed_gripper_init_qpos = np.concatenate(
+        [
+            np.deg2rad([0.0, -30.0, 0.0, 45.0, 0.0, 75.0, 0.0]),
+            fixed_gripper_joint_pos,
+        ]
+    )
 
     def __init__(
         self,
@@ -16,12 +22,7 @@ class RealXarm7FixedGripperDemoEnv(RealXarm7EnvBase):
     ):
         RealXarm7EnvBase.__init__(
             self,
-            init_qpos=np.concatenate(
-                [
-                    np.deg2rad([0.0, -30.0, 0.0, 45.0, 0.0, 75.0, 0.0]),
-                    self.fixed_gripper_joint_pos,
-                ]
-            ),
+            init_qpos=self.fixed_gripper_init_qpos,
             **kwargs,
         )
 
