@@ -8,7 +8,7 @@ from .RealXarm7EnvBase import RealXarm7EnvBase
 
 
 class RealXarm7FixedGripperDemoEnv(RealXarm7EnvBase):
-    fixed_gripper_joint_pos = np.array([119.0], dtype=np.float64)
+    fixed_gripper_joint_pos = np.array([0.0], dtype=np.float64)
 
     def __init__(
         self,
