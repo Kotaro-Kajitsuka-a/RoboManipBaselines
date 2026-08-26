@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -e
 
-# Run after train_wp4.sh. Keep the source dataset intact while adding PB labels
-# to independent copies.
+# Run after train_left_image_vae_wp4.sh. Keep the source dataset intact while
+# adding PB labels to independent copies.
 source_dataset=robo_manip_baselines/dataset/LiftingAB_B_only
 online_dataset=robo_manip_baselines/dataset/LiftingAB_B_only_LeftScratchVAE9_Wp4JointPos_DpEefPose_AdamOnlinePB
 constant_dataset=robo_manip_baselines/dataset/LiftingAB_B_only_LeftScratchVAE9_Wp4JointPos_DpEefPose_ConstantPB

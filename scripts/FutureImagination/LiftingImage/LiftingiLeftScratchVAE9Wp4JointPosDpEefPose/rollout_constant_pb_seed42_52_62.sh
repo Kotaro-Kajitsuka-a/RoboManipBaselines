@@ -5,7 +5,7 @@ eval_timestamp=$(date +%Y%m%d_%H%M%S)
 eval_dir="robo_manip_baselines/dataset/tests/FutureImagination/LiftingAB_B_only_LeftScratchVAE9_Wp4JointPos_DpEefPose/DP_constant_pb_adam_eval_${eval_timestamp}"
 rmb_dir="$eval_dir/rmb"
 wp4_checkpoint=robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only_left_image_vae_9_joint_pos/policy_best.ckpt
-image_vae_checkpoint=robo_manip_baselines/checkpoint/ImageVAE/LiftingAB_B_only_9/final_model
+image_vae_checkpoint=robo_manip_baselines/checkpoint/ImageVAE/LiftingAB_B_only_left_9/final_model
 mkdir -p "$rmb_dir"
 rollout_start_marker="$eval_dir/.rollout_start"
 touch "$rollout_start_marker"
