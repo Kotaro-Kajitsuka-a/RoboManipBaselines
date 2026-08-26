@@ -47,7 +47,6 @@ class RealXarm7PlanarConstraintDemoEnv(RealXarm7FixedGripperDemoEnv):
         ]
     )
 
-
     def __init__(
         self,
         **kwargs,
