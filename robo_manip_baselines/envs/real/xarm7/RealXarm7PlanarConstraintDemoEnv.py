@@ -50,6 +50,8 @@ class RealXarm7PlanarConstraintDemoEnv(RealXarm7FixedGripperDemoEnv):
         self.reset_arm_manager = ArmManager(self, arm_config)
         self.init_eef_se3 = self.reset_arm_manager.current_se3.copy()
 
+        self.xarm_api.set_collision_sensitivity(5)
+
     def _reset_robot(self):
         print(
             f"[{self.__class__.__name__}] Start moving the robot to the reset position."

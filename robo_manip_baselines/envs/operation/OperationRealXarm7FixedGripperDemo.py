@@ -6,7 +6,7 @@ from robo_manip_baselines.common import GraspPhaseBase
 
 class GraspPhase(GraspPhaseBase):
     def set_target(self):
-        self.gripper_joint_pos = np.array([119.0])
+        self.gripper_joint_pos = np.array([0.0])
         self.duration = 0.5  # [s]
 
 
