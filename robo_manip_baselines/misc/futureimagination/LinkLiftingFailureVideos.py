@@ -6,14 +6,17 @@ import subprocess
 import sys
 from pathlib import Path
 
+from robo_manip_baselines.common import DataKey, RmbData
+
 SEED_PATTERN = re.compile(r"(?:^|[/_])(?:train)?seed(\d+)(?:[/_]|$)")
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Create symlinks to the left-camera RGB videos and online-PB plots "
-            "of failed Lifting episodes listed by AnalyzeLiftingSuccess.py."
+            "Create symlinks to the left-camera RGB videos of failed Lifting "
+            "episodes listed by AnalyzeLiftingSuccess.py. Also create online-PB "
+            "plots for episodes that contain a material-property representation."
         )
     )
     parser.add_argument(
@@ -50,6 +53,11 @@ def get_seed(episode_path: Path) -> int:
     return int(match.group(1))
 
 
+def has_material_property(episode_path: Path) -> bool:
+    with RmbData(str(episode_path)) as rmb_data:
+        return DataKey.MATERIAL_PROPERTY in rmb_data
+
+
 def main() -> None:
     args = parse_args()
     assert args.per_episode_csv.is_file(), args.per_episode_csv
@@ -70,6 +78,7 @@ def main() -> None:
     created_count = 0
     existing_count = 0
     plot_count = 0
+    skipped_plot_count = 0
     for row in failure_rows:
         episode_path = Path(row["episode_path"]).resolve()
         video_path = episode_path / f"{args.camera_name}_rgb_image.rmb.mp4"
@@ -91,23 +100,27 @@ def main() -> None:
             link_path.symlink_to(relative_target)
             created_count += 1
 
-        plot_path = link_path.with_suffix(".png")
-        subprocess.run(
-            [
-                sys.executable,
-                str(Path(__file__).with_name("PlotOnlinePbDataset.py")),
-                str(episode_path),
-                "--output",
-                str(plot_path),
-            ],
-            check=True,
-        )
-        plot_count += 1
+        if has_material_property(episode_path):
+            plot_path = link_path.with_suffix(".png")
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(Path(__file__).with_name("PlotOnlinePbDataset.py")),
+                    str(episode_path),
+                    "--output",
+                    str(plot_path),
+                ],
+                check=True,
+            )
+            plot_count += 1
+        else:
+            skipped_plot_count += 1
 
     print(f"Failure episodes: {len(failure_rows)} / {len(rows)}")
     print(f"Created symlinks: {created_count}")
     print(f"Existing symlinks: {existing_count}")
     print(f"Generated online PB plots: {plot_count}")
+    print(f"Skipped online PB plots without material property: {skipped_plot_count}")
     print(args.output_dir.resolve())
 
 
