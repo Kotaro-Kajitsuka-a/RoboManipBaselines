@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-# Run after train_left_image_vae_wp4.sh.
+# Use the existing left-camera ImageVAE 9D and WP4 policy_best.ckpt.
 source_dataset=robo_manip_baselines/dataset/DatasetMujocoUR5eLiftingi/validation
 online_dataset=robo_manip_baselines/dataset/DatasetMujocoUR5eLiftingi_LeftScratchVAE9_Validation_OnlinePB
 wp4_checkpoint=robo_manip_baselines/checkpoint/WrenchPredictor4/DatasetMujocoUR5eLiftingi_left_image_vae_9_joint_pos/policy_best.ckpt

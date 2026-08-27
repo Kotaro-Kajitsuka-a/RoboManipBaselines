@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 set -e
 
-# Run from the repository root after train_hand_image_vae_wp4.sh. Keep the
-# original DatasetMujocoUR5eLiftingi training split untouched and prepare
-# independent copies for the proposed and oracle-PB training methods.
+# Run from the repository root with the existing hand-camera ImageVAE 9D and
+# WP4 policy_best.ckpt. Keep the original DatasetMujocoUR5eLiftingi training
+# split untouched and prepare independent copies for the proposed and
+# oracle-PB training methods.
 mkdir -p \
   robo_manip_baselines/dataset/DatasetMujocoUR5eLiftingi_Image_OnlinePB \
   robo_manip_baselines/dataset/DatasetMujocoUR5eLiftingi_Image_ConstantPB

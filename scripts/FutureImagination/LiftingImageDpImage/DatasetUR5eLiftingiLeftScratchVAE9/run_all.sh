@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -e
 
-# Run the complete training and rollout pipeline from the repository root.
-bash scripts/FutureImagination/LiftingImage/DatasetUR5eLiftingiLeftScratchVAE9/train_left_image_vae_wp4.sh
+# Run the DP training and rollout pipeline with the existing left-camera
+# ImageVAE 9D and WP4 checkpoints.
 bash scripts/FutureImagination/LiftingImage/DatasetUR5eLiftingiLeftScratchVAE9/prepare_datasets.sh
 bash scripts/FutureImagination/LiftingImage/DatasetUR5eLiftingiLeftScratchVAE9/train_baseline_seed42_52_62.sh
 bash scripts/FutureImagination/LiftingImage/DatasetUR5eLiftingiLeftScratchVAE9/train_DP_online_pb_seed42_52_62.sh

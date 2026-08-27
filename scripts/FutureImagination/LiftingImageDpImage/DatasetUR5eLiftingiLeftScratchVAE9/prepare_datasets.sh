@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -e
 
-# Run after train_left_image_vae_wp4.sh. Keep the source training split intact.
+# Use the existing left-camera ImageVAE 9D and WP4 policy_best.ckpt. Keep the
+# source training split intact.
 source_dataset=robo_manip_baselines/dataset/DatasetMujocoUR5eLiftingi/training
 online_dataset=robo_manip_baselines/dataset/DatasetMujocoUR5eLiftingi_LeftScratchVAE9_OnlinePB
 constant_dataset=robo_manip_baselines/dataset/DatasetMujocoUR5eLiftingi_LeftScratchVAE9_ConstantPB

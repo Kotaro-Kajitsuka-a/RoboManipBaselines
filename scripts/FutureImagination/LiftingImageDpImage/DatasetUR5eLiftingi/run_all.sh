@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 set -e
 
-# Run the complete hand-camera ImageVAE 9D, WP4, DP training, and rollout
-# pipeline from the repository root with the virtual environment activated.
-bash scripts/FutureImagination/LiftingImage/DatasetUR5eLiftingi/train_hand_image_vae_wp4.sh
+# Run the DP training and rollout pipeline with the existing hand-camera
+# ImageVAE 9D and WP4 checkpoints.
 bash scripts/FutureImagination/LiftingImage/DatasetUR5eLiftingi/prepare_datasets.sh
 bash scripts/FutureImagination/LiftingImage/DatasetUR5eLiftingi/train_baseline_seed42_52_62.sh
 bash scripts/FutureImagination/LiftingImage/DatasetUR5eLiftingi/train_DP_online_pb_seed42_52_62.sh
