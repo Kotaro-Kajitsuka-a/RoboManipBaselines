@@ -22,7 +22,7 @@ for train_seed in 42 52 62; do
     --wp4_checkpoint "$wp4_checkpoint" \
     --image_vae_checkpoint "$image_vae_checkpoint" \
     --image_vae_camera_name left \
-    --online_pb_lr 6e-3 \
+    --online_pb_lr 8e-3 \
     --wrench_loss_weight 0.0 \
     --seed 42 \
     --world_idx_list {70..79} \
@@ -40,7 +40,7 @@ for train_seed in 42 52 62; do
     --wp4_checkpoint "$wp4_checkpoint" \
     --image_vae_checkpoint "$image_vae_checkpoint" \
     --image_vae_camera_name left \
-    --online_pb_lr 6e-3 \
+    --online_pb_lr 8e-3 \
     --wrench_loss_weight 0.0 \
     --seed 42 \
     --world_idx_list {170..179} \
@@ -58,7 +58,7 @@ for train_seed in 42 52 62; do
     --wp4_checkpoint "$wp4_checkpoint" \
     --image_vae_checkpoint "$image_vae_checkpoint" \
     --image_vae_camera_name left \
-    --online_pb_lr 6e-3 \
+    --online_pb_lr 8e-3 \
     --wrench_loss_weight 0.0 \
     --seed 42 \
     --world_idx_list {270..279} \
@@ -76,7 +76,7 @@ for train_seed in 42 52 62; do
     --wp4_checkpoint "$wp4_checkpoint" \
     --image_vae_checkpoint "$image_vae_checkpoint" \
     --image_vae_camera_name left \
-    --online_pb_lr 6e-3 \
+    --online_pb_lr 8e-3 \
     --wrench_loss_weight 0.0 \
     --seed 42 \
     --world_idx_list {470..479} \
@@ -94,7 +94,7 @@ for train_seed in 42 52 62; do
     --wp4_checkpoint "$wp4_checkpoint" \
     --image_vae_checkpoint "$image_vae_checkpoint" \
     --image_vae_camera_name left \
-    --online_pb_lr 6e-3 \
+    --online_pb_lr 8e-3 \
     --wrench_loss_weight 0.0 \
     --seed 42 \
     --world_idx_list {570..579} \
@@ -112,7 +112,7 @@ for train_seed in 42 52 62; do
     --wp4_checkpoint "$wp4_checkpoint" \
     --image_vae_checkpoint "$image_vae_checkpoint" \
     --image_vae_camera_name left \
-    --online_pb_lr 6e-3 \
+    --online_pb_lr 8e-3 \
     --wrench_loss_weight 0.0 \
     --seed 42 \
     --world_idx_list {670..679} \
@@ -130,7 +130,7 @@ for train_seed in 42 52 62; do
     --wp4_checkpoint "$wp4_checkpoint" \
     --image_vae_checkpoint "$image_vae_checkpoint" \
     --image_vae_camera_name left \
-    --online_pb_lr 6e-3 \
+    --online_pb_lr 8e-3 \
     --wrench_loss_weight 0.0 \
     --seed 42 \
     --world_idx_list {770..779} \
