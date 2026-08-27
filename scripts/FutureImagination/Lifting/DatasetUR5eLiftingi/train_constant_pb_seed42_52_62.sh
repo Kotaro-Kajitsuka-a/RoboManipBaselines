@@ -1,20 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-# Run from the repository root.
-#
-# Prepare the oracle constant-PB dataset from the new DatasetMujocoUR5eLiftingi
-# training split. The copied material_property trajectories are replaced by
-# the trained PB of the corresponding object.
-mkdir -p robo_manip_baselines/dataset/DatasetMujocoUR5eLiftingi_EefPose_ConstantPB
-cp -aL \
-  robo_manip_baselines/dataset/DatasetMujocoUR5eLiftingi/training/. \
-  robo_manip_baselines/dataset/DatasetMujocoUR5eLiftingi_EefPose_ConstantPB/
-
-python robo_manip_baselines/policy/wrench_predictor4_online/AddConstantPbToDataset.py \
-  robo_manip_baselines/dataset/DatasetMujocoUR5eLiftingi_EefPose_ConstantPB \
-  --checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/DatasetMujocoUR5eLiftingi_EefPose/policy_best.ckpt \
-  --overwrite
+# Run after prepare_datasets.sh.
 
 # Train seed 42.
 python robo_manip_baselines/bin/Train.py DiffusionPolicy \

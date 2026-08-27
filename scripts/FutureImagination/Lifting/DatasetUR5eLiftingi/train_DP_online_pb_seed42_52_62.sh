@@ -1,20 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-# Keep the original training split untouched and add the causal online-PB
-# trajectories to an independent copy used by Diffusion Policy.
-mkdir -p robo_manip_baselines/dataset/DatasetMujocoUR5eLiftingi_EefPose_OnlinePB
-cp -aL \
-  robo_manip_baselines/dataset/DatasetMujocoUR5eLiftingi/training/. \
-  robo_manip_baselines/dataset/DatasetMujocoUR5eLiftingi_EefPose_OnlinePB/
-
-python robo_manip_baselines/policy/wrench_predictor4_online/AddOnlinePbToDataset.py \
-  robo_manip_baselines/dataset/DatasetMujocoUR5eLiftingi_EefPose_OnlinePB \
-  0 \
-  --checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/DatasetMujocoUR5eLiftingi_EefPose/policy_best.ckpt \
-  --lr 6e-3 \
-  --wrench_loss_weight 0.0 \
-  --overwrite
+# Run after prepare_datasets.sh.
 
 # Train seed 42.
 python robo_manip_baselines/bin/Train.py DiffusionPolicy \
