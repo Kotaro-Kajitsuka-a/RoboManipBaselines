@@ -6,7 +6,7 @@ set -e
 # Train seed 42.
 python robo_manip_baselines/bin/Train.py DiffusionPolicy \
   --dataset_dir robo_manip_baselines/dataset/DatasetMujocoUR5eLiftingi_EefPose_ConstantPB \
-  --checkpoint_dir robo_manip_baselines/checkpoint/DiffusionPolicy/DatasetMujocoUR5eLiftingi_EefPose_ConstantPB_seed42 \
+  --checkpoint_dir robo_manip_baselines/checkpoint/DiffusionPolicy/DpImageLeft/DatasetMujocoUR5eLiftingi_EefPose_ConstantPB_seed42 \
   --camera_names left \
   --scheduler ddim \
   --state_keys measured_eef_pose measured_gripper_joint_pos measured_tblock_pose material_property \
@@ -17,7 +17,7 @@ python robo_manip_baselines/bin/Train.py DiffusionPolicy \
 # Train seed 52.
 python robo_manip_baselines/bin/Train.py DiffusionPolicy \
   --dataset_dir robo_manip_baselines/dataset/DatasetMujocoUR5eLiftingi_EefPose_ConstantPB \
-  --checkpoint_dir robo_manip_baselines/checkpoint/DiffusionPolicy/DatasetMujocoUR5eLiftingi_EefPose_ConstantPB_seed52 \
+  --checkpoint_dir robo_manip_baselines/checkpoint/DiffusionPolicy/DpImageLeft/DatasetMujocoUR5eLiftingi_EefPose_ConstantPB_seed52 \
   --camera_names left \
   --scheduler ddim \
   --state_keys measured_eef_pose measured_gripper_joint_pos measured_tblock_pose material_property \
@@ -29,7 +29,7 @@ python robo_manip_baselines/bin/Train.py DiffusionPolicy \
 # Train seed 62.
 python robo_manip_baselines/bin/Train.py DiffusionPolicy \
   --dataset_dir robo_manip_baselines/dataset/DatasetMujocoUR5eLiftingi_EefPose_ConstantPB \
-  --checkpoint_dir robo_manip_baselines/checkpoint/DiffusionPolicy/DatasetMujocoUR5eLiftingi_EefPose_ConstantPB_seed62 \
+  --checkpoint_dir robo_manip_baselines/checkpoint/DiffusionPolicy/DpImageLeft/DatasetMujocoUR5eLiftingi_EefPose_ConstantPB_seed62 \
   --camera_names left \
   --scheduler ddim \
   --state_keys measured_eef_pose measured_gripper_joint_pos measured_tblock_pose material_property \

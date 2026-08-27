@@ -14,7 +14,7 @@ touch "$rollout_start_marker"
 pids=()
 for train_seed in 42 52 62; do
   (
-  dp_checkpoint="robo_manip_baselines/checkpoint/DiffusionPolicy/LiftingAB_B_only_LeftScratchVAE9_Wp4JointPos_DpEefPose_ConstantPB_seed${train_seed}/policy_last.ckpt"
+  dp_checkpoint="robo_manip_baselines/checkpoint/DiffusionPolicy/DpImageLeft/LiftingAB_B_only_LeftScratchVAE9_Wp4JointPos_DpEefPose_ConstantPB_seed${train_seed}/policy_last.ckpt"
 
   python robo_manip_baselines/bin/Rollout.py \
     DiffusionPolicyOnlinePb MujocoUR5eLiftingi_I0 \

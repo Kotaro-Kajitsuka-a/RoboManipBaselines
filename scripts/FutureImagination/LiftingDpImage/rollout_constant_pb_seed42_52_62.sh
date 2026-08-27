@@ -17,7 +17,7 @@ for train_seed in 42 52 62; do
   python robo_manip_baselines/bin/Rollout.py \
     DiffusionPolicyOnlinePb MujocoUR5eLiftingi_I0 \
     --demo_name "MujocoUR5eLiftingi_I0_constant_pb_trainseed${train_seed}" \
-    --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/LiftingAB_B_only_ConstantPB_seed${train_seed}/policy_last.ckpt" \
+    --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/DpImageLeft/LiftingAB_B_only_ConstantPB_seed${train_seed}/policy_last.ckpt" \
     --wp4_checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only/policy_best.ckpt \
     --wrench_loss_weight 0.0 \
     --seed 42 \
@@ -32,7 +32,7 @@ for train_seed in 42 52 62; do
   python robo_manip_baselines/bin/Rollout.py \
     DiffusionPolicyOnlinePb MujocoUR5eLiftingi_I1 \
     --demo_name "MujocoUR5eLiftingi_I1_constant_pb_trainseed${train_seed}" \
-    --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/LiftingAB_B_only_ConstantPB_seed${train_seed}/policy_last.ckpt" \
+    --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/DpImageLeft/LiftingAB_B_only_ConstantPB_seed${train_seed}/policy_last.ckpt" \
     --wp4_checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only/policy_best.ckpt \
     --wrench_loss_weight 0.0 \
     --seed 42 \
@@ -47,7 +47,7 @@ for train_seed in 42 52 62; do
   python robo_manip_baselines/bin/Rollout.py \
     DiffusionPolicyOnlinePb MujocoUR5eLiftingi_I2 \
     --demo_name "MujocoUR5eLiftingi_I2_constant_pb_trainseed${train_seed}" \
-    --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/LiftingAB_B_only_ConstantPB_seed${train_seed}/policy_last.ckpt" \
+    --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/DpImageLeft/LiftingAB_B_only_ConstantPB_seed${train_seed}/policy_last.ckpt" \
     --wp4_checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only/policy_best.ckpt \
     --wrench_loss_weight 0.0 \
     --seed 42 \
@@ -62,7 +62,7 @@ for train_seed in 42 52 62; do
   python robo_manip_baselines/bin/Rollout.py \
     DiffusionPolicyOnlinePb MujocoUR5eLiftingi_I4 \
     --demo_name "MujocoUR5eLiftingi_I4_constant_pb_trainseed${train_seed}" \
-    --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/LiftingAB_B_only_ConstantPB_seed${train_seed}/policy_last.ckpt" \
+    --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/DpImageLeft/LiftingAB_B_only_ConstantPB_seed${train_seed}/policy_last.ckpt" \
     --wp4_checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only/policy_best.ckpt \
     --wrench_loss_weight 0.0 \
     --seed 42 \
@@ -77,7 +77,7 @@ for train_seed in 42 52 62; do
   python robo_manip_baselines/bin/Rollout.py \
     DiffusionPolicyOnlinePb MujocoUR5eLiftingi_I5 \
     --demo_name "MujocoUR5eLiftingi_I5_constant_pb_trainseed${train_seed}" \
-    --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/LiftingAB_B_only_ConstantPB_seed${train_seed}/policy_last.ckpt" \
+    --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/DpImageLeft/LiftingAB_B_only_ConstantPB_seed${train_seed}/policy_last.ckpt" \
     --wp4_checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only/policy_best.ckpt \
     --wrench_loss_weight 0.0 \
     --seed 42 \
@@ -92,7 +92,7 @@ for train_seed in 42 52 62; do
   python robo_manip_baselines/bin/Rollout.py \
     DiffusionPolicyOnlinePb MujocoUR5eLiftingi_I6 \
     --demo_name "MujocoUR5eLiftingi_I6_constant_pb_trainseed${train_seed}" \
-    --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/LiftingAB_B_only_ConstantPB_seed${train_seed}/policy_last.ckpt" \
+    --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/DpImageLeft/LiftingAB_B_only_ConstantPB_seed${train_seed}/policy_last.ckpt" \
     --wp4_checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only/policy_best.ckpt \
     --wrench_loss_weight 0.0 \
     --seed 42 \
@@ -107,7 +107,7 @@ for train_seed in 42 52 62; do
   python robo_manip_baselines/bin/Rollout.py \
     DiffusionPolicyOnlinePb MujocoUR5eLiftingi_I7 \
     --demo_name "MujocoUR5eLiftingi_I7_constant_pb_trainseed${train_seed}" \
-    --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/LiftingAB_B_only_ConstantPB_seed${train_seed}/policy_last.ckpt" \
+    --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/DpImageLeft/LiftingAB_B_only_ConstantPB_seed${train_seed}/policy_last.ckpt" \
     --wp4_checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only/policy_best.ckpt \
     --wrench_loss_weight 0.0 \
     --seed 42 \

@@ -3,7 +3,7 @@ set -e
 
 # Run the complete experiment except the baseline with the existing left-camera
 # VAE 9D and joint-position WP4 checkpoints.
-script_dir=scripts/FutureImagination/LiftingImage/LiftingiLeftScratchVAE9Wp4JointPosDpEefPose
+script_dir=scripts/FutureImagination/LiftingImageDpImage/LiftingiLeftScratchVAE9Wp4JointPosDpEefPose
 
 bash "$script_dir/check_required_files.sh"
 bash "$script_dir/prepare_datasets.sh"

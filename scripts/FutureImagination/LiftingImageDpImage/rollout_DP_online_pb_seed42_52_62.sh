@@ -15,7 +15,7 @@ for train_seed in 42 52 62; do
   python robo_manip_baselines/bin/Rollout.py \
     DiffusionPolicyOnlinePb MujocoUR5eLiftingi_I0 \
     --demo_name "MujocoUR5eLiftingi_I0_image_online_pb_trainseed${train_seed}" \
-    --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/LiftingImageAB_B_only_Online_seed${train_seed}/policy_last.ckpt" \
+    --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/DpImageLeft/LiftingImageAB_B_only_Online_seed${train_seed}/policy_last.ckpt" \
     --wp4_checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only_hand_image_vae_9/policy_best.ckpt \
     --image_vae_checkpoint robo_manip_baselines/checkpoint/ImageVAE/LiftingAB_B_only_hand_9/final_model \
     --online_pb_lr 6e-3 \
@@ -32,7 +32,7 @@ for train_seed in 42 52 62; do
   python robo_manip_baselines/bin/Rollout.py \
     DiffusionPolicyOnlinePb MujocoUR5eLiftingi_I1 \
     --demo_name "MujocoUR5eLiftingi_I1_image_online_pb_trainseed${train_seed}" \
-    --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/LiftingImageAB_B_only_Online_seed${train_seed}/policy_last.ckpt" \
+    --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/DpImageLeft/LiftingImageAB_B_only_Online_seed${train_seed}/policy_last.ckpt" \
     --wp4_checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only_hand_image_vae_9/policy_best.ckpt \
     --image_vae_checkpoint robo_manip_baselines/checkpoint/ImageVAE/LiftingAB_B_only_hand_9/final_model \
     --online_pb_lr 6e-3 \
@@ -49,7 +49,7 @@ for train_seed in 42 52 62; do
   python robo_manip_baselines/bin/Rollout.py \
     DiffusionPolicyOnlinePb MujocoUR5eLiftingi_I2 \
     --demo_name "MujocoUR5eLiftingi_I2_image_online_pb_trainseed${train_seed}" \
-    --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/LiftingImageAB_B_only_Online_seed${train_seed}/policy_last.ckpt" \
+    --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/DpImageLeft/LiftingImageAB_B_only_Online_seed${train_seed}/policy_last.ckpt" \
     --wp4_checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only_hand_image_vae_9/policy_best.ckpt \
     --image_vae_checkpoint robo_manip_baselines/checkpoint/ImageVAE/LiftingAB_B_only_hand_9/final_model \
     --online_pb_lr 6e-3 \
@@ -66,7 +66,7 @@ for train_seed in 42 52 62; do
   python robo_manip_baselines/bin/Rollout.py \
     DiffusionPolicyOnlinePb MujocoUR5eLiftingi_I4 \
     --demo_name "MujocoUR5eLiftingi_I4_image_online_pb_trainseed${train_seed}" \
-    --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/LiftingImageAB_B_only_Online_seed${train_seed}/policy_last.ckpt" \
+    --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/DpImageLeft/LiftingImageAB_B_only_Online_seed${train_seed}/policy_last.ckpt" \
     --wp4_checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only_hand_image_vae_9/policy_best.ckpt \
     --image_vae_checkpoint robo_manip_baselines/checkpoint/ImageVAE/LiftingAB_B_only_hand_9/final_model \
     --online_pb_lr 6e-3 \
@@ -83,7 +83,7 @@ for train_seed in 42 52 62; do
   python robo_manip_baselines/bin/Rollout.py \
     DiffusionPolicyOnlinePb MujocoUR5eLiftingi_I5 \
     --demo_name "MujocoUR5eLiftingi_I5_image_online_pb_trainseed${train_seed}" \
-    --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/LiftingImageAB_B_only_Online_seed${train_seed}/policy_last.ckpt" \
+    --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/DpImageLeft/LiftingImageAB_B_only_Online_seed${train_seed}/policy_last.ckpt" \
     --wp4_checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only_hand_image_vae_9/policy_best.ckpt \
     --image_vae_checkpoint robo_manip_baselines/checkpoint/ImageVAE/LiftingAB_B_only_hand_9/final_model \
     --online_pb_lr 6e-3 \
@@ -100,7 +100,7 @@ for train_seed in 42 52 62; do
   python robo_manip_baselines/bin/Rollout.py \
     DiffusionPolicyOnlinePb MujocoUR5eLiftingi_I6 \
     --demo_name "MujocoUR5eLiftingi_I6_image_online_pb_trainseed${train_seed}" \
-    --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/LiftingImageAB_B_only_Online_seed${train_seed}/policy_last.ckpt" \
+    --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/DpImageLeft/LiftingImageAB_B_only_Online_seed${train_seed}/policy_last.ckpt" \
     --wp4_checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only_hand_image_vae_9/policy_best.ckpt \
     --image_vae_checkpoint robo_manip_baselines/checkpoint/ImageVAE/LiftingAB_B_only_hand_9/final_model \
     --online_pb_lr 6e-3 \
@@ -117,7 +117,7 @@ for train_seed in 42 52 62; do
   python robo_manip_baselines/bin/Rollout.py \
     DiffusionPolicyOnlinePb MujocoUR5eLiftingi_I7 \
     --demo_name "MujocoUR5eLiftingi_I7_image_online_pb_trainseed${train_seed}" \
-    --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/LiftingImageAB_B_only_Online_seed${train_seed}/policy_last.ckpt" \
+    --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/DpImageLeft/LiftingImageAB_B_only_Online_seed${train_seed}/policy_last.ckpt" \
     --wp4_checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/LiftingAB_B_only_hand_image_vae_9/policy_best.ckpt \
     --image_vae_checkpoint robo_manip_baselines/checkpoint/ImageVAE/LiftingAB_B_only_hand_9/final_model \
     --online_pb_lr 6e-3 \

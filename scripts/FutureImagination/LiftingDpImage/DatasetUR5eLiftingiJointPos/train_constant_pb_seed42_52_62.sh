@@ -19,9 +19,9 @@ python robo_manip_baselines/policy/wrench_predictor4_online/AddConstantPbToDatas
 # Train seed 42.
 python robo_manip_baselines/bin/Train.py DiffusionPolicy \
   --dataset_dir robo_manip_baselines/dataset/DatasetMujocoUR5eLiftingi_JointPos_ConstantPB \
-  --checkpoint_dir robo_manip_baselines/checkpoint/DiffusionPolicy/DatasetMujocoUR5eLiftingi_JointPos_ConstantPB_seed42 \
-   --camera_names left \
-    --scheduler ddim \
+  --checkpoint_dir robo_manip_baselines/checkpoint/DiffusionPolicy/DpImageLeft/DatasetMujocoUR5eLiftingi_JointPos_ConstantPB_seed42 \
+  --camera_names left \
+  --scheduler ddim \
   --state_keys measured_joint_pos measured_tblock_pose material_property \
   --action_keys command_joint_pos \
   --train_ratio 1.0 \
@@ -30,9 +30,9 @@ python robo_manip_baselines/bin/Train.py DiffusionPolicy \
 # Train seed 52.
 python robo_manip_baselines/bin/Train.py DiffusionPolicy \
   --dataset_dir robo_manip_baselines/dataset/DatasetMujocoUR5eLiftingi_JointPos_ConstantPB \
-  --checkpoint_dir robo_manip_baselines/checkpoint/DiffusionPolicy/DatasetMujocoUR5eLiftingi_JointPos_ConstantPB_seed52 \
-   --camera_names left \
-    --scheduler ddim \
+  --checkpoint_dir robo_manip_baselines/checkpoint/DiffusionPolicy/DpImageLeft/DatasetMujocoUR5eLiftingi_JointPos_ConstantPB_seed52 \
+  --camera_names left \
+  --scheduler ddim \
   --state_keys measured_joint_pos measured_tblock_pose material_property \
   --action_keys command_joint_pos \
   --train_ratio 1.0 \
@@ -42,9 +42,9 @@ python robo_manip_baselines/bin/Train.py DiffusionPolicy \
 # Train seed 62.
 python robo_manip_baselines/bin/Train.py DiffusionPolicy \
   --dataset_dir robo_manip_baselines/dataset/DatasetMujocoUR5eLiftingi_JointPos_ConstantPB \
-  --checkpoint_dir robo_manip_baselines/checkpoint/DiffusionPolicy/DatasetMujocoUR5eLiftingi_JointPos_ConstantPB_seed62 \
-   --camera_names left \
-    --scheduler ddim \
+  --checkpoint_dir robo_manip_baselines/checkpoint/DiffusionPolicy/DpImageLeft/DatasetMujocoUR5eLiftingi_JointPos_ConstantPB_seed62 \
+  --camera_names left \
+  --scheduler ddim \
   --state_keys measured_joint_pos measured_tblock_pose material_property \
   --action_keys command_joint_pos \
   --train_ratio 1.0 \
