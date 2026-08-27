@@ -2,6 +2,7 @@
 *.pyc
 
 venv*
+.venv_robo_diff_FI/
 .python-version*
 
 robo_manip_baselines.egg-info

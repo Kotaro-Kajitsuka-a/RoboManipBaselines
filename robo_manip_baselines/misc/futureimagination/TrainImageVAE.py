@@ -11,6 +11,8 @@ from tqdm import tqdm
 
 from robo_manip_baselines.common import DataKey, RmbData, find_rmb_files
 from robo_manip_baselines.misc.futureimagination.ImageVAE import (
+    ARCHITECTURE_BASELINE,
+    ARCHITECTURES,
     IMAGE_HEIGHT,
     IMAGE_WIDTH,
     create_image_vae,
@@ -41,6 +43,13 @@ def parse_args():
     parser.add_argument("--output_dir", type=Path, required=True)
     parser.add_argument("--camera_name", required=True)
     parser.add_argument("--latent_dim", type=int, required=True)
+    parser.add_argument(
+        "--architecture",
+        choices=ARCHITECTURES,
+        default=ARCHITECTURE_BASELINE,
+    )
+    parser.add_argument("--num_epochs", type=int, default=100)
+    parser.add_argument("--seed", type=int, default=42)
     return parser.parse_args()
 
 
@@ -51,15 +60,21 @@ def main():
     rgb_image_key = DataKey.get_rgb_image_key(args.camera_name)
     train_dataset = RmbImageDataset(args.train_dataset_dir, rgb_image_key)
     validation_dataset = RmbImageDataset(args.validation_dataset_dir, rgb_image_key)
-    model = create_image_vae(args.latent_dim)
+    model = create_image_vae(
+        args.latent_dim,
+        args.architecture,
+    )
+    print(f"Architecture: {args.architecture}")
+    print(f"Seed: {args.seed}")
+    print(f"Trainable parameters: {sum(p.numel() for p in model.parameters()):,}")
     training_config = BaseTrainerConfig(
         output_dir=str(args.output_dir),
-        num_epochs=100,
+        num_epochs=args.num_epochs,
         learning_rate=1e-3,
         per_device_train_batch_size=64,
         per_device_eval_batch_size=64,
         steps_saving=10,
-        seed=42,
+        seed=args.seed,
         amp=True,
     )
     pipeline = TrainingPipeline(model, training_config)
