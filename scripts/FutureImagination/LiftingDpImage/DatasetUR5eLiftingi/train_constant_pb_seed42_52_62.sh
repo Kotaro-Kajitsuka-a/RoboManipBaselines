@@ -1,27 +1,14 @@
 #!/usr/bin/env bash
 set -e
 
-# Run from the repository root.
-#
-# Prepare the oracle constant-PB dataset from the new DatasetMujocoUR5eLiftingi
-# training split. The copied material_property trajectories are replaced by
-# the trained PB of the corresponding object.
-mkdir -p robo_manip_baselines/dataset/DatasetMujocoUR5eLiftingi_EefPose_ConstantPB
-cp -aL \
-  robo_manip_baselines/dataset/DatasetMujocoUR5eLiftingi/training/. \
-  robo_manip_baselines/dataset/DatasetMujocoUR5eLiftingi_EefPose_ConstantPB/
-
-python robo_manip_baselines/policy/wrench_predictor4_online/AddConstantPbToDataset.py \
-  robo_manip_baselines/dataset/DatasetMujocoUR5eLiftingi_EefPose_ConstantPB \
-  --checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/DatasetMujocoUR5eLiftingi_EefPose/policy_best.ckpt \
-  --overwrite
+# Run after prepare_datasets.sh.
 
 # Train seed 42.
 python robo_manip_baselines/bin/Train.py DiffusionPolicy \
   --dataset_dir robo_manip_baselines/dataset/DatasetMujocoUR5eLiftingi_EefPose_ConstantPB \
   --checkpoint_dir robo_manip_baselines/checkpoint/DiffusionPolicy/DatasetMujocoUR5eLiftingi_EefPose_ConstantPB_seed42 \
-   --camera_names left \
-    --scheduler ddim \
+  --camera_names left \
+  --scheduler ddim \
   --state_keys measured_eef_pose measured_gripper_joint_pos measured_tblock_pose material_property \
   --action_keys command_eef_pose command_gripper_joint_pos \
   --train_ratio 1.0 \
@@ -31,8 +18,8 @@ python robo_manip_baselines/bin/Train.py DiffusionPolicy \
 python robo_manip_baselines/bin/Train.py DiffusionPolicy \
   --dataset_dir robo_manip_baselines/dataset/DatasetMujocoUR5eLiftingi_EefPose_ConstantPB \
   --checkpoint_dir robo_manip_baselines/checkpoint/DiffusionPolicy/DatasetMujocoUR5eLiftingi_EefPose_ConstantPB_seed52 \
-   --camera_names left \
-    --scheduler ddim \
+  --camera_names left \
+  --scheduler ddim \
   --state_keys measured_eef_pose measured_gripper_joint_pos measured_tblock_pose material_property \
   --action_keys command_eef_pose command_gripper_joint_pos \
   --train_ratio 1.0 \
@@ -43,8 +30,8 @@ python robo_manip_baselines/bin/Train.py DiffusionPolicy \
 python robo_manip_baselines/bin/Train.py DiffusionPolicy \
   --dataset_dir robo_manip_baselines/dataset/DatasetMujocoUR5eLiftingi_EefPose_ConstantPB \
   --checkpoint_dir robo_manip_baselines/checkpoint/DiffusionPolicy/DatasetMujocoUR5eLiftingi_EefPose_ConstantPB_seed62 \
-   --camera_names left \
-    --scheduler ddim \
+  --camera_names left \
+  --scheduler ddim \
   --state_keys measured_eef_pose measured_gripper_joint_pos measured_tblock_pose material_property \
   --action_keys command_eef_pose command_gripper_joint_pos \
   --train_ratio 1.0 \
