@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -e
+
+# Run the MomentumSGD Online-PB training and rollout pipeline from the repository root.
+# Reuse the constant-PB DP checkpoints trained by the standard pipeline.
+bash scripts/FutureImagination/LiftingImage/DatasetUR5eLiftingiLeftScratchVAE9Wp4JointPosDpEefPoseSGD/prepare_datasets.sh
+bash scripts/FutureImagination/LiftingImage/DatasetUR5eLiftingiLeftScratchVAE9Wp4JointPosDpEefPoseSGD/train_DP_online_pb_seed42_52_62.sh
+bash scripts/FutureImagination/LiftingImage/DatasetUR5eLiftingiLeftScratchVAE9Wp4JointPosDpEefPoseSGD/rollout_DP_online_pb_seed42_52_62.sh
+bash scripts/FutureImagination/LiftingImage/DatasetUR5eLiftingiLeftScratchVAE9Wp4JointPosDpEefPoseSGD/rollout_constant_pb_seed42_52_62.sh

@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -e
+
+# Run the complete training and rollout pipeline from the repository root.
+bash scripts/FutureImagination/LiftingImage/DatasetUR5eLiftingiLeftScratchVAE9Wp4JointPosDpEefPose/prepare_datasets.sh
+bash scripts/FutureImagination/LiftingImage/DatasetUR5eLiftingiLeftScratchVAE9Wp4JointPosDpEefPose/train_DP_online_pb_seed42_52_62.sh
+bash scripts/FutureImagination/LiftingImage/DatasetUR5eLiftingiLeftScratchVAE9Wp4JointPosDpEefPose/train_constant_pb_seed42_52_62.sh
+bash scripts/FutureImagination/LiftingImage/DatasetUR5eLiftingiLeftScratchVAE9Wp4JointPosDpEefPose/rollout_DP_online_pb_seed42_52_62.sh
+bash scripts/FutureImagination/LiftingImage/DatasetUR5eLiftingiLeftScratchVAE9Wp4JointPosDpEefPose/rollout_constant_pb_seed42_52_62.sh

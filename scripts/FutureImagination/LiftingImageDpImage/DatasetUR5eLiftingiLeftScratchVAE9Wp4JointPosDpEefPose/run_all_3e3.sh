@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -e
+
+# Run the complete 3e-3 training and rollout pipeline from the repository root.
+# Reuse the constant-PB DP checkpoints trained by the standard pipeline.
+bash scripts/FutureImagination/LiftingImage/DatasetUR5eLiftingiLeftScratchVAE9Wp4JointPosDpEefPose/prepare_datasets_3e3.sh
+bash scripts/FutureImagination/LiftingImage/DatasetUR5eLiftingiLeftScratchVAE9Wp4JointPosDpEefPose/train_DP_online_pb_seed42_52_62_3e3.sh
+bash scripts/FutureImagination/LiftingImage/DatasetUR5eLiftingiLeftScratchVAE9Wp4JointPosDpEefPose/rollout_DP_online_pb_seed42_52_62_3e3.sh
+bash scripts/FutureImagination/LiftingImage/DatasetUR5eLiftingiLeftScratchVAE9Wp4JointPosDpEefPose/rollout_constant_pb_seed42_52_62_3e3.sh
