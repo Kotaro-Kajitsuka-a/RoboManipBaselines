@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-# State-based Diffusion Policy trained with causal PB trajectories identified
+# Image-based Diffusion Policy trained with causal PB trajectories identified
 # from hand-camera VAE 9D prediction errors at learning rate 6e-3.
 python robo_manip_baselines/bin/Train.py DiffusionPolicy \
   --dataset_dir robo_manip_baselines/dataset/LiftingImageAB_B_only_OnlinePB \

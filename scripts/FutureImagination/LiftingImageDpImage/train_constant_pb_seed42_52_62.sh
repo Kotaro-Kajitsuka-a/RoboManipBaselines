@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-# State-based Diffusion Policy trained with the oracle constant PB of each
+# Image-based Diffusion Policy trained with the oracle constant PB of each
 # training object. Evaluation still identifies PB online from hand VAE 9D.
 python robo_manip_baselines/bin/Train.py DiffusionPolicy \
   --dataset_dir robo_manip_baselines/dataset/LiftingImageAB_B_only_ConstantPB \
