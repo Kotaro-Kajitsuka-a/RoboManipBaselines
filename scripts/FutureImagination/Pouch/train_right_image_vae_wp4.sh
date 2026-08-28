@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 set -e
 
-# Run from the repository root with the virtual environment activated.
+# Train the default scratch VAE 9D and joint-position WP4 from right images.
 train_dataset_dir=robo_manip_baselines/dataset/0827_DatasetPouch/training
 validation_dataset_dir=robo_manip_baselines/dataset/0827_DatasetPouch/validation
 vae_output_dir=robo_manip_baselines/checkpoint/ImageVAE/0827_DatasetPouch_right_9
-wp4_checkpoint_dir=robo_manip_baselines/checkpoint/WrenchPredictor4/0827_DatasetPouch_image_vae_9_joint_pos
+wp4_checkpoint_dir=robo_manip_baselines/checkpoint/WrenchPredictor4/0827_DatasetPouch_right_image_vae_9_joint_pos
 
 python robo_manip_baselines/misc/futureimagination/TrainImageVAE.py \
   --train_dataset_dir "$train_dataset_dir" \
