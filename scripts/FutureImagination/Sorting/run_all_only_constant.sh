@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
 set -e
 
-# Run the complete training pipeline except the online-PB method.
+# Run the constant-PB pipeline, including its VAE and WP4 prerequisites.
 script_dir=scripts/FutureImagination/Sorting
 source_training_dataset=robo_manip_baselines/dataset/0826_DatasetSorting/training
-constant_training_dataset=robo_manip_baselines/dataset/0826_DatasetSorting_FrontLarge3Z16_Wp4JointPos_ConstantPB/training
-wp4_checkpoint=robo_manip_baselines/checkpoint/WrenchPredictor4/0826_DatasetSorting_front_image_vae_large3_z16_joint_pos/policy_best.ckpt
+constant_training_dataset=robo_manip_baselines/dataset/0826_DatasetSorting_FrontVAE9_Wp4JointPos_ConstantPB/training
+wp4_checkpoint=robo_manip_baselines/checkpoint/WrenchPredictor4/0826_DatasetSorting_front_image_vae_9_joint_pos/policy_best.ckpt
 
-bash "$script_dir/train_front_image_vae_large3_z16.sh"
-bash "$script_dir/train_baseline_seed42_52_62.sh"
+bash "$script_dir/train_front_image_vae_wp4.sh"
 
 mkdir -p "$constant_training_dataset"
 cp -aL "$source_training_dataset/." "$constant_training_dataset/"

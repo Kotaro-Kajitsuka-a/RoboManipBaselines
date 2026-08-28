@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-# Train the selected large3-z16 Sorting VAE and joint-position WP4.
+# Train the selected large3-z16 Pouch VAE and joint-position WP4.
 train_dataset_dir=robo_manip_baselines/dataset/0827_DatasetPouch/training
 validation_dataset_dir=robo_manip_baselines/dataset/0827_DatasetPouch/validation
 vae_output_dir=robo_manip_baselines/checkpoint/ImageVAE/0827_DatasetPouch_right_large3_z16
@@ -41,6 +41,11 @@ python robo_manip_baselines/bin/Train.py WrenchPredictor4 \
   --pb_dim 1 \
   --wrench_loss_weight 0.0 \
   --num_epochs 500
+
+python robo_manip_baselines/policy/wrench_predictor4/EvalWrenchPredictor4ImageFeatureSweepDir.py \
+  "$wp4_checkpoint_dir/policy_best.ckpt" \
+  "$validation_dataset_dir" \
+  --material_object_ids 0 1 2
 
 python robo_manip_baselines/misc/futureimagination/MakeReconstructionVideos.py \
   "$train_dataset_dir" \

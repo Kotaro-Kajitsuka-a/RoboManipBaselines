@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-# Run from the repository root with the virtual environment activated.
+# Train the baseline front-camera VAE and joint-position WP4.
 train_dataset_dir=robo_manip_baselines/dataset/0826_DatasetSorting/training
 validation_dataset_dir=robo_manip_baselines/dataset/0826_DatasetSorting/validation
 vae_output_dir=robo_manip_baselines/checkpoint/ImageVAE/0826_DatasetSorting_front_9
