@@ -41,3 +41,13 @@ python robo_manip_baselines/bin/Train.py WrenchPredictor4 \
   --pb_dim 1 \
   --wrench_loss_weight 0.0 \
   --num_epochs 500
+
+python robo_manip_baselines/misc/futureimagination/MakeReconstructionVideos.py \
+  "$train_dataset_dir" \
+  "$vae_output_dir/final_model" \
+  --camera_name right
+
+python robo_manip_baselines/misc/futureimagination/MakeReconstructionVideos.py \
+  "$validation_dataset_dir" \
+  "$vae_output_dir/final_model" \
+  --camera_name right

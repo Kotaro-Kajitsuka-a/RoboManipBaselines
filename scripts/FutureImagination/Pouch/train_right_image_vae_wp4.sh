@@ -43,3 +43,13 @@ python robo_manip_baselines/policy/wrench_predictor4/EvalWrenchPredictor4ImageFe
   "$wp4_checkpoint_dir/policy_best.ckpt" \
   "$validation_dataset_dir" \
   --material_object_ids 0 1 2
+
+python robo_manip_baselines/misc/futureimagination/MakeReconstructionVideos.py \
+  "$train_dataset_dir" \
+  "$vae_output_dir/final_model" \
+  --camera_name right
+
+python robo_manip_baselines/misc/futureimagination/MakeReconstructionVideos.py \
+  "$validation_dataset_dir" \
+  "$vae_output_dir/final_model" \
+  --camera_name right
