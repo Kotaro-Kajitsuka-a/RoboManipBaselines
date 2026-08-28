@@ -1,4 +1,14 @@
-#!/usr/bin/env bash
+#!/bin/sh
+#PBS -q rt_HG
+#PBS -l select=1
+#PBS -l walltime=30:00:00
+#PBS -P gag51454
+
+source ~/miniconda3/bin/activate
+conda activate robo_diff_FI
+
+cd ~/projects/ForceImagination/RoboManipBaselines/
+
 set -e
 
 # Train with each episode's learned constant PB using seed 62.
