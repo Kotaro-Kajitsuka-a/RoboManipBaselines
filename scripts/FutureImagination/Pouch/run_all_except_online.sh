@@ -8,7 +8,6 @@ constant_training_dataset=robo_manip_baselines/dataset/0827_DatasetPouch_RightVA
 wp4_checkpoint=robo_manip_baselines/checkpoint/WrenchPredictor4/0827_DatasetPouch_right_image_vae_9_joint_pos/policy_best.ckpt
 
 bash "$script_dir/train_right_image_vae_wp4.sh"
-bash "$script_dir/train_baseline_seed42_52_62.sh"
 
 mkdir -p "$constant_training_dataset"
 cp -aL "$source_training_dataset/." "$constant_training_dataset/"
@@ -18,4 +17,5 @@ python robo_manip_baselines/policy/wrench_predictor4_online/AddConstantPbToDatas
   --checkpoint "$wp4_checkpoint" \
   --overwrite
 
+bash "$script_dir/train_baseline_seed42_52_62.sh"
 bash "$script_dir/train_constant_pb_seed42_52_62.sh"

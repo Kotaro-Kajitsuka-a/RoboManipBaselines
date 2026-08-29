@@ -9,7 +9,12 @@ from pythae.trainers import BaseTrainerConfig
 from torch.utils.data import Dataset
 from tqdm import tqdm
 
-from robo_manip_baselines.common import DataKey, RmbData, find_rmb_files
+from robo_manip_baselines.common import (
+    DataKey,
+    RmbData,
+    find_rmb_files,
+    set_random_seed,
+)
 from robo_manip_baselines.misc.futureimagination.ImageVAE import (
     ARCHITECTURE_BASELINE,
     ARCHITECTURES,
@@ -56,6 +61,7 @@ def parse_args():
 def main():
     args = parse_args()
     assert torch.cuda.is_available(), "Image VAE training requires a CUDA GPU."
+    set_random_seed(args.seed)
 
     rgb_image_key = DataKey.get_rgb_image_key(args.camera_name)
     train_dataset = RmbImageDataset(args.train_dataset_dir, rgb_image_key)
