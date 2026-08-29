@@ -37,6 +37,7 @@ class PlanarConstraintArmManager(ArmManager):
 class RealXarm7PlanarConstraintDemoEnv(RealXarm7FixedGripperDemoEnv):
     max_eef_z_drop = 0.005  # [m]
     reset_approach_z_offset = 0.05  # [m]
+    reset_eef_pos_tolerance = 0.01  # [m]
     reset_joint_pos_tolerance = np.deg2rad(0.1)  # [rad]
 
     fixed_gripper_joint_pos = np.array([0.0], dtype=np.float64)
@@ -70,7 +71,7 @@ class RealXarm7PlanarConstraintDemoEnv(RealXarm7FixedGripperDemoEnv):
         arm_joint_pos = obs["joint_pos"][arm_config.arm_joint_idxes]
         arm_joint_pos_error = arm_config.init_arm_joint_pos - arm_joint_pos
         if np.max(np.abs(arm_joint_pos_error)) > self.reset_joint_pos_tolerance:
-            obs = self._move_eef_to_reset_approach_pose()
+            obs = self._move_eef_to_reset_approach_pose(obs)
 
         while True:
             arm_joint_pos = obs["joint_pos"][arm_config.arm_joint_idxes]
@@ -90,7 +91,7 @@ class RealXarm7PlanarConstraintDemoEnv(RealXarm7FixedGripperDemoEnv):
             f"[{self.__class__.__name__}] Finish moving the robot to the reset position."
         )
 
-    def _move_eef_to_reset_approach_pose(self):
+    def _move_eef_to_reset_approach_pose(self, obs):
         print(
             f"[{self.__class__.__name__}] Start moving the EEF to the reset approach pose."
         )
@@ -98,17 +99,25 @@ class RealXarm7PlanarConstraintDemoEnv(RealXarm7FixedGripperDemoEnv):
         arm_config = self.body_config_list[0]
         approach_se3 = self.init_eef_se3.copy()
         approach_se3.translation[2] += self.reset_approach_z_offset
-        self.reset_arm_manager.set_command_eef_pose(approach_se3)
 
-        action = self.init_qpos.copy()
-        action[arm_config.arm_joint_idxes] = self.reset_arm_manager.arm_joint_pos
-        self._set_action(
-            action,
-            duration=2.0,
-            joint_vel_limit_scale=0.1,
-            wait=True,
-        )
-        obs = self._get_obs()
+        while True:
+            eef_pos_error = (
+                approach_se3.translation
+                - self.reset_arm_manager.current_se3.translation
+            )
+            if np.linalg.norm(eef_pos_error) <= self.reset_eef_pos_tolerance:
+                break
+
+            self.reset_arm_manager.set_command_eef_pose(approach_se3)
+            action = self.init_qpos.copy()
+            action[arm_config.arm_joint_idxes] = self.reset_arm_manager.arm_joint_pos
+            self._set_action(
+                action,
+                duration=self.dt,
+                joint_vel_limit_scale=0.1,
+                wait=True,
+            )
+            obs = self._get_obs()
 
         print(
             f"[{self.__class__.__name__}] Finish moving the EEF to the reset approach pose."
