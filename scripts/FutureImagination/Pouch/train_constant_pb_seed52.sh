@@ -11,9 +11,9 @@ cd ~/projects/ForceImagination/RoboManipBaselines/
 
 set -e
 
-# Train with each episode's learned constant PB using seed 52.
-dataset_dir=robo_manip_baselines/dataset/0827_DatasetPouch_RightVAE9_Wp4JointPos_ConstantPB/training
-checkpoint_dir=robo_manip_baselines/checkpoint/DiffusionPolicy/DpImageRight/0827_DatasetPouch_RightVAE9_Wp4JointPos_EefPose_ConstantPB_seed52
+# Train with each episode's beta=2 WP4 constant PB using seed 52.
+dataset_dir=robo_manip_baselines/dataset/0827_DatasetPouch_RightVAE9Beta2_Wp4JointPos_ConstantPB/training
+checkpoint_dir=robo_manip_baselines/checkpoint/DiffusionPolicy/DpImageRight/0827_DatasetPouch_RightVAE9Beta2_Wp4JointPos_EefPose_ConstantPB_seed52
 
 python robo_manip_baselines/bin/Train.py DiffusionPolicy \
   --dataset_dir "$dataset_dir" \

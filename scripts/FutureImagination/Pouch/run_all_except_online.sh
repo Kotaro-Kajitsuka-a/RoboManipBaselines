@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-# Run the VAE/WP4, PB-free Baseline, and Constant-PB training pipeline.
+# Run the adopted beta=2 VAE/WP4, PB-free Baseline, and Constant-PB pipeline.
 script_dir=scripts/FutureImagination/Pouch
 source_training_dataset=robo_manip_baselines/dataset/0827_DatasetPouch/training
 constant_training_dataset=robo_manip_baselines/dataset/0827_DatasetPouch_RightVAE9Beta2_Wp4JointPos_ConstantPB/training

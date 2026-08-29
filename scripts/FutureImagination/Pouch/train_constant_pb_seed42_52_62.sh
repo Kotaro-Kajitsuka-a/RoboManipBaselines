@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-# Run after prepare_datasets.sh. Each episode uses its object's learned PB.
+# Run after prepare_datasets.sh. Each episode uses its beta=2 WP4 constant PB.
 dataset_dir=robo_manip_baselines/dataset/0827_DatasetPouch_RightVAE9Beta2_Wp4JointPos_ConstantPB/training
 checkpoint_prefix=robo_manip_baselines/checkpoint/DiffusionPolicy/DpImageRight/0827_DatasetPouch_RightVAE9Beta2_Wp4JointPos_EefPose_ConstantPB
 

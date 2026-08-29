@@ -1,13 +1,26 @@
 #!/usr/bin/env bash
 set -e
 
-# Add constant and causal online PBs to copies of the Pouch dataset.
+# Recreate the adopted beta=2 VAE feature, then add beta=2 WP4 PBs to copies.
 source_training_dataset=robo_manip_baselines/dataset/0827_DatasetPouch/training
 source_validation_dataset=robo_manip_baselines/dataset/0827_DatasetPouch/validation
-online_training_dataset=robo_manip_baselines/dataset/0827_DatasetPouch_RightVAE9_Wp4JointPos_AdamOnlinePB/training
-online_validation_dataset=robo_manip_baselines/dataset/0827_DatasetPouch_RightVAE9_Wp4JointPos_AdamOnlinePB/validation
-constant_training_dataset=robo_manip_baselines/dataset/0827_DatasetPouch_RightVAE9_Wp4JointPos_ConstantPB/training
-wp4_checkpoint=robo_manip_baselines/checkpoint/WrenchPredictor4/0827_DatasetPouch_right_image_vae_9_joint_pos/policy_best.ckpt
+online_training_dataset=robo_manip_baselines/dataset/0827_DatasetPouch_RightVAE9Beta2_Wp4JointPos_AdamOnlinePB/training
+online_validation_dataset=robo_manip_baselines/dataset/0827_DatasetPouch_RightVAE9Beta2_Wp4JointPos_AdamOnlinePB/validation
+constant_training_dataset=robo_manip_baselines/dataset/0827_DatasetPouch_RightVAE9Beta2_Wp4JointPos_ConstantPB/training
+image_vae_checkpoint=robo_manip_baselines/checkpoint/ImageVAE/0827_DatasetPouch_right_9_beta2/final_model
+wp4_checkpoint=robo_manip_baselines/checkpoint/WrenchPredictor4/0827_DatasetPouch_right_image_vae_9_beta2_joint_pos/policy_best.ckpt
+
+python robo_manip_baselines/misc/futureimagination/AddImageVAEFeature.py \
+  "$source_training_dataset" \
+  --checkpoint "$image_vae_checkpoint" \
+  --camera_name right \
+  --overwrite
+
+python robo_manip_baselines/misc/futureimagination/AddImageVAEFeature.py \
+  "$source_validation_dataset" \
+  --checkpoint "$image_vae_checkpoint" \
+  --camera_name right \
+  --overwrite
 
 mkdir -p \
   "$online_training_dataset" \
