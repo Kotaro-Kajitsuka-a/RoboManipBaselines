@@ -300,3 +300,19 @@ python robo_manip_baselines/misc/futureimagination/MakePbSweepReconstructionVide
   robo_manip_baselines/dataset/LiftingAB_B_only_Validation/WrenchPredObject2/RolloutDiffusionPolicy_MujocoUR5eLiftingi_I2_DP500_I2_B_validation_20260803_061219/MujocoUR5eLiftingi_I2_DP500_I2_B_validation_world269_009.rmb \
   --checkpoint_name policy_epoch0050.ckpt \
   --output robo_manip_baselines/dataset/LiftingAB_B_only_Validation_PbReconstructionVideos/MujocoUR5eLiftingi_I2_DP500_I2_B_validation_world269_009_hand_wp5_sd3_epoch0050_pb_reconstruction.mp4
+
+
+
+## 平面拘束  Sorting   ################################################
+
+####Teleop#####
+python robo_manip_baselines/bin/Teleop.py RealXarm7PlanarConstraintDemo --config robo_manip_baselines/envs/configs/RealXarm7DemoEnvKajitsuka.yaml
+
+####Rollout###
+python ./robo_manip_baselines/bin/Rollout.py DiffusionPolicy RealXarm7PlanarConstraintDemo  \
+ --config ./robo_manip_baselines/envs/configs/RealXarm7DemoEnvKajitsukafront.yaml \
+  --checkpoint robo_manip_baselines/checkpoint/DiffusionPolicy/0826_Sorting/0826_DatasetSorting_EefPose_Baseline_seed42/policy_last.ckpt  \
+   --wait_before_start --skip_draw 50000 --save_rollout --world_idx_repeat_count 10 \
+   --auto_exit --max_duration 40.0
+
+######################################################################
