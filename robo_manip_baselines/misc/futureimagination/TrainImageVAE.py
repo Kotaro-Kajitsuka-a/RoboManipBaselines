@@ -55,12 +55,14 @@ def parse_args():
     )
     parser.add_argument("--num_epochs", type=int, default=100)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--beta", type=float, default=1.0)
     return parser.parse_args()
 
 
 def main():
     args = parse_args()
     assert torch.cuda.is_available(), "Image VAE training requires a CUDA GPU."
+    assert args.beta >= 0.0, args.beta
     set_random_seed(args.seed)
 
     rgb_image_key = DataKey.get_rgb_image_key(args.camera_name)
@@ -69,8 +71,11 @@ def main():
     model = create_image_vae(
         args.latent_dim,
         args.architecture,
+        args.beta,
     )
+    print(f"Model class: {type(model).__name__}")
     print(f"Architecture: {args.architecture}")
+    print(f"Beta: {args.beta}")
     print(f"Seed: {args.seed}")
     print(f"Trainable parameters: {sum(p.numel() for p in model.parameters()):,}")
     training_config = BaseTrainerConfig(

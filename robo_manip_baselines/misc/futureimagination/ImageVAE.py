@@ -1,4 +1,4 @@
-from pythae.models import VAE, VAEConfig
+from pythae.models import BetaVAE, BetaVAEConfig
 from pythae.models.base.base_utils import ModelOutput
 from pythae.models.nn import BaseDecoder, BaseEncoder
 from torch import nn
@@ -84,11 +84,13 @@ class LargeImageVAEDecoder(BaseDecoder):
 def create_image_vae(
     latent_dim=LATENT_DIM,
     architecture=ARCHITECTURE_BASELINE,
+    beta=1.0,
 ):
-    config = VAEConfig(
+    config = BetaVAEConfig(
         input_dim=(3, IMAGE_HEIGHT, IMAGE_WIDTH),
         latent_dim=latent_dim,
         reconstruction_loss="mse",
+        beta=beta,
     )
     if architecture == ARCHITECTURE_BASELINE:
         encoder = BaselineImageVAEEncoder(latent_dim)
@@ -98,4 +100,4 @@ def create_image_vae(
         decoder = LargeImageVAEDecoder(latent_dim)
     else:
         raise ValueError(f"Unknown ImageVAE architecture: {architecture}")
-    return VAE(model_config=config, encoder=encoder, decoder=decoder)
+    return BetaVAE(model_config=config, encoder=encoder, decoder=decoder)

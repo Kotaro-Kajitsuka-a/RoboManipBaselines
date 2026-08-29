@@ -2,8 +2,8 @@
 set -e
 
 # Run after prepare_datasets.sh. Each episode uses its object's learned PB.
-dataset_dir=robo_manip_baselines/dataset/0827_DatasetPouch_RightVAE9_Wp4JointPos_ConstantPB/training
-checkpoint_prefix=robo_manip_baselines/checkpoint/DiffusionPolicy/DpImageRight/0827_DatasetPouch_RightVAE9_Wp4JointPos_EefPose_ConstantPB
+dataset_dir=robo_manip_baselines/dataset/0827_DatasetPouch_RightVAE9Beta2_Wp4JointPos_ConstantPB/training
+checkpoint_prefix=robo_manip_baselines/checkpoint/DiffusionPolicy/DpImageRight/0827_DatasetPouch_RightVAE9Beta2_Wp4JointPos_EefPose_ConstantPB
 
 python robo_manip_baselines/bin/Train.py DiffusionPolicy \
   --dataset_dir "$dataset_dir" \
