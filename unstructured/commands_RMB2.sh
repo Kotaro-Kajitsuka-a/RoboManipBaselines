@@ -349,10 +349,21 @@ python ./robo_manip_baselines/bin/Rollout.py DiffusionPolicyOnlinePb \
   --config ./robo_manip_baselines/envs/configs/RealXarm7DemoEnvKajitsuka.yaml \
     --checkpoint robo_manip_baselines/checkpoint/DiffusionPolicy/0826_Sorting/0826_DatasetSorting_FrontVAE9_Wp4JointPos_EefPose_ConstantPB_seed42/policy_last.ckpt  \
        --wait_before_start --skip_draw 50000 --save_rollout --world_idx_repeat_count 10   \
-        --auto_exit --max_duration 40.0 \
+        --auto_exit --max_duration 32.0 \
         --wp4_checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/0826_DatasetSorting_front_image_vae_9_joint_pos/policy_best.ckpt  \
          --image_vae_checkpoint robo_manip_baselines/checkpoint/ImageVAE/0826_DatasetSorting_front_9/final_model/  \
          --image_vae_camera_name front  --initial_object_id 1  --online_pb_lr 8e-3 --wrench_loss_weight 0.0 \
          --demo_name Sorting_constant_normal
+
+python ./robo_manip_baselines/bin/Rollout.py DiffusionPolicyOnlinePb \
+  RealXarm7Demo  \
+     --config ./robo_manip_baselines/envs/configs/RealXarm7DemoEnvKajitsuka.yaml  \
+      --checkpoint robo_manip_baselines/checkpoint/DiffusionPolicy/Pouch/0827_DatasetPouch_RightVAE9Beta2_Wp4JointPos_EefPose_ConstantPB_seed42/policy_last.ckpt   \
+      --wait_before_start --skip_draw 50000 --save_rollout --world_idx_repeat_count 10   \
+      --auto_exit --max_duration 32.0     \
+      --wp4_checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/0827_DatasetPouch_right_image_vae_9_beta2_joint_pos/policy_best.ckpt     \
+      --image_vae_checkpoint robo_manip_baselines/checkpoint/ImageVAE/0827_DatasetPouch_right_9_beta2/final_model/       \
+      --image_vae_camera_name right  --initial_object_id 1  --online_pb_lr 8e-3 --wrench_loss_weight 0.0   \
+      --demo_name Pouch_constant_normal
 
 ###############################################
