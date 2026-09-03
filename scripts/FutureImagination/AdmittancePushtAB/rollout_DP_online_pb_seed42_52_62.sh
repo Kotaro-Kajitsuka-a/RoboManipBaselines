@@ -21,7 +21,7 @@ for train_seed in 42 52 62; do
     --wp4_checkpoint "$wp4_checkpoint" \
     --initial_object_id 0 \
     --online_pb_lr 2.5e-2 \
-    --wrench_loss_weight 0.01 \
+    --wrench_loss_weight 1.0 \
     --world_idx_list {70..79} \
     --seed 42 \
     --auto_exit \
@@ -38,7 +38,7 @@ for train_seed in 42 52 62; do
     --wp4_checkpoint "$wp4_checkpoint" \
     --initial_object_id 0 \
     --online_pb_lr 2.5e-2 \
-    --wrench_loss_weight 0.01 \
+    --wrench_loss_weight 1.0 \
     --world_idx_list {170..179} \
     --seed 42 \
     --auto_exit \
@@ -55,7 +55,7 @@ for train_seed in 42 52 62; do
     --wp4_checkpoint "$wp4_checkpoint" \
     --initial_object_id 0 \
     --online_pb_lr 2.5e-2 \
-    --wrench_loss_weight 0.01 \
+    --wrench_loss_weight 1.0 \
     --world_idx_list {270..279} \
     --seed 42 \
     --auto_exit \
@@ -72,7 +72,7 @@ for train_seed in 42 52 62; do
     --wp4_checkpoint "$wp4_checkpoint" \
     --initial_object_id 0 \
     --online_pb_lr 2.5e-2 \
-    --wrench_loss_weight 0.01 \
+    --wrench_loss_weight 1.0 \
     --world_idx_list {370..379} \
     --seed 42 \
     --auto_exit \

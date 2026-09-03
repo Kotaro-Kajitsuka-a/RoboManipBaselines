@@ -17,7 +17,7 @@ python robo_manip_baselines/policy/wrench_predictor4_online/AddOnlinePbToDataset
   0 \
   --checkpoint "$wp4_checkpoint" \
   --lr 2.5e-2 \
-  --wrench_loss_weight 0.01 \
+  --wrench_loss_weight 1.0 \
   --overwrite
 
 python robo_manip_baselines/policy/wrench_predictor4_online/AddConstantPbToDataset.py \

@@ -12,7 +12,7 @@ python robo_manip_baselines/bin/Train.py WrenchPredictor4 \
   --image_feature_key measured_tblock_pose \
   --wrench_source_key measured_eef_wrench \
   --pb_dim 2 \
-  --wrench_loss_weight 0.1 \
+  --wrench_loss_weight 1.0 \
   --num_epochs 500 \
   --train_ratio 1.0 \
   --val_ratio 0.01 \
