@@ -13,7 +13,7 @@ python robo_manip_baselines/bin/Train.py WrenchPredictor4 \
   --wrench_source_key measured_eef_wrench \
   --pb_dim 2 \
   --wrench_loss_weight 0.1 \
-  --num_epochs 1000 \
+  --num_epochs 500 \
   --train_ratio 1.0 \
   --val_ratio 0.01 \
   --seed 42
