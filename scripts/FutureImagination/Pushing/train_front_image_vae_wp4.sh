@@ -53,4 +53,4 @@ python robo_manip_baselines/bin/Train.py WrenchPredictor4 \
 python robo_manip_baselines/policy/wrench_predictor4/EvalWrenchPredictor4ImageFeatureSweepDir.py \
   "$wp4_checkpoint_dir/policy_best.ckpt" \
   "$validation_dataset_dir" \
-  --material_object_ids 0 1 2
+  --material_object_ids 0 1 2 3 4
