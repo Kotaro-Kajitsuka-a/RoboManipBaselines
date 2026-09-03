@@ -3,9 +3,9 @@ set -e
 
 # Run from the repository root.
 python robo_manip_baselines/bin/Train.py WrenchPredictor4 \
-  --dataset_dir robo_manip_baselines/dataset/DatasetAdmittancePushtAB/training \
-  --val_dataset_dir robo_manip_baselines/dataset/DatasetAdmittancePushtAB/validation \
-  --checkpoint_dir robo_manip_baselines/checkpoint/WrenchPredictor4/AdmittancePushtAB \
+  --dataset_dir robo_manip_baselines/dataset/DatasetAdmittancePushtPlaying/training \
+  --val_dataset_dir robo_manip_baselines/dataset/DatasetAdmittancePushtPlaying/validation \
+  --checkpoint_dir robo_manip_baselines/checkpoint/WrenchPredictor4/AdmittancePustPlaying \
   --camera_names \
   --state_keys measured_eef_pose \
   --action_keys command_eef_pose \
@@ -19,6 +19,6 @@ python robo_manip_baselines/bin/Train.py WrenchPredictor4 \
   --seed 42
 
 python robo_manip_baselines/policy/wrench_predictor4/EvalWrenchPredictor4SweepDir.py \
-  robo_manip_baselines/checkpoint/WrenchPredictor4/AdmittancePushtAB/policy_best.ckpt \
-  robo_manip_baselines/dataset/DatasetAdmittancePushtAB/validation \
+  robo_manip_baselines/checkpoint/WrenchPredictor4/AdmittancePustPlaying/policy_best.ckpt \
+  robo_manip_baselines/dataset/DatasetAdmittancePushtPlaying/validation \
   --material_object_ids 0 1 2 3
