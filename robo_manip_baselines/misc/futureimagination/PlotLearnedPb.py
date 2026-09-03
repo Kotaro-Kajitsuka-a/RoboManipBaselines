@@ -9,13 +9,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
-
-NUM_OBJECTS = 3
+DEFAULT_MATERIAL_OBJECT_IDS = (0, 1, 2)
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Plot the three learned one-dimensional PBs in a WP4 checkpoint."
+        description="Plot learned one-dimensional PBs in a WP4 checkpoint."
     )
     parser.add_argument(
         "checkpoint",
@@ -28,22 +27,35 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="output PNG path (default: next to the checkpoint)",
     )
+    parser.add_argument(
+        "--material_object_ids",
+        type=int,
+        nargs="+",
+        default=list(DEFAULT_MATERIAL_OBJECT_IDS),
+        help="trained PB object IDs shown in the plot",
+    )
     return parser.parse_args()
 
 
-def load_pb(checkpoint_path: Path) -> np.ndarray:
+def load_pb(
+    checkpoint_path: Path,
+    material_object_ids: list[int] | tuple[int, ...] | None = None,
+) -> np.ndarray:
     checkpoint_path = checkpoint_path.resolve()
     assert checkpoint_path.is_file(), checkpoint_path
 
     state_dict = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
     material_property = state_dict["material_property.weight"]
     assert material_property.ndim == 2, material_property.shape
-    assert material_property.shape[0] >= NUM_OBJECTS, material_property.shape
     assert material_property.shape[1] == 1, material_property.shape
 
-    # The lifting experiment uses object IDs 0, 1, and 2. WP4 may reserve
-    # additional, unused embedding rows through its num_objects setting.
-    return material_property[:NUM_OBJECTS, 0].detach().numpy()
+    if material_object_ids is None:
+        material_object_ids = DEFAULT_MATERIAL_OBJECT_IDS
+    assert len(material_object_ids) == len(set(material_object_ids))
+    assert all(
+        0 <= object_id < material_property.shape[0] for object_id in material_object_ids
+    )
+    return material_property[list(material_object_ids), 0].detach().numpy()
 
 
 def get_default_output_path(checkpoint_path: Path) -> Path:
@@ -52,8 +64,16 @@ def get_default_output_path(checkpoint_path: Path) -> Path:
     )
 
 
-def save_plot(pb: np.ndarray, output_path: Path) -> None:
-    colors = plt.cm.tab10(np.arange(NUM_OBJECTS))
+def save_plot(
+    pb: np.ndarray,
+    output_path: Path,
+    material_object_ids: list[int] | tuple[int, ...] | None = None,
+) -> None:
+    if material_object_ids is None:
+        material_object_ids = DEFAULT_MATERIAL_OBJECT_IDS
+    assert len(pb) == len(material_object_ids), (pb.shape, material_object_ids)
+
+    colors = plt.cm.tab10(np.arange(len(material_object_ids)))
     value_range = float(np.ptp(pb))
     padding = max(value_range * 0.2, 0.05)
 
@@ -61,8 +81,10 @@ def save_plot(pb: np.ndarray, output_path: Path) -> None:
     figure, axis = plt.subplots(figsize=(10, 3.2))
     axis.axhline(0.0, color="0.45", linewidth=1.5)
 
-    for object_id, value in enumerate(pb):
-        axis.scatter(value, 0.0, s=110, color=colors[object_id], zorder=2)
+    for color_idx, (object_id, value) in enumerate(
+        zip(material_object_ids, pb, strict=True)
+    ):
+        axis.scatter(value, 0.0, s=110, color=colors[color_idx], zorder=2)
         axis.annotate(
             f"WrenchPredObject{object_id}\nPB={value:.4f}",
             (value, 0.0),
@@ -70,7 +92,7 @@ def save_plot(pb: np.ndarray, output_path: Path) -> None:
             textcoords="offset points",
             ha="center",
             va="bottom",
-            color=colors[object_id],
+            color=colors[color_idx],
         )
 
     axis.set_xlim(float(pb.min()) - padding, float(pb.max()) + padding)
@@ -86,14 +108,14 @@ def save_plot(pb: np.ndarray, output_path: Path) -> None:
 
 def main() -> None:
     args = parse_args()
-    pb = load_pb(args.checkpoint)
+    pb = load_pb(args.checkpoint, args.material_object_ids)
     output_path = args.output
     if output_path is None:
         output_path = get_default_output_path(args.checkpoint)
 
-    save_plot(pb, output_path)
+    save_plot(pb, output_path, args.material_object_ids)
 
-    for object_id, value in enumerate(pb):
+    for object_id, value in zip(args.material_object_ids, pb, strict=True):
         print(f"WrenchPredObject{object_id}: {value:.6f}")
     print(output_path.resolve())
 

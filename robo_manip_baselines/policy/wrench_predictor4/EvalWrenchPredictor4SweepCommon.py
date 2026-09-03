@@ -5,11 +5,10 @@ import os
 import pickle
 from pathlib import Path
 
+import matplotlib
 import numpy as np
 import torch
 from torch.utils.data import DataLoader
-
-import matplotlib
 
 matplotlib.use("agg")
 import matplotlib.pyplot as plt
@@ -28,7 +27,6 @@ from robo_manip_baselines.policy.wrench_predictor4.WrenchPredictor4Dataset impor
 from robo_manip_baselines.policy.wrench_predictor4.WrenchPredictor4Model import (
     WrenchPredictor4Model,
 )
-
 
 DEFAULT_MAX_MATERIAL_OBJECT_ID = 4
 WRENCH_LABELS = ["Fx", "Fy", "Fz", "Nx", "Ny", "Nz"]
@@ -241,20 +239,27 @@ class EvalWrenchPredictor4SweepBase:
                 load_pb,
                 save_plot,
             )
+
+            material_object_ids = [
+                self.object_key_to_id[object_key]
+                for object_key in self.material_object_keys
+            ]
+            pb = load_pb(checkpoint_path, material_object_ids)
+            save_plot(pb, output_path, material_object_ids)
         elif pb_dim == 2:
             from robo_manip_baselines.misc.futureimagination.PlotLearnedPb2d import (
                 load_pb,
                 save_plot,
             )
+
+            pb = load_pb(checkpoint_path)
+            save_plot(pb, output_path)
         else:
             print(
                 f"[{self.__class__.__name__}] Skip learned PB plot: "
                 f"unsupported pb_dim={pb_dim}"
             )
             return
-
-        pb = load_pb(checkpoint_path)
-        save_plot(pb, output_path)
         print(f"[{self.__class__.__name__}] Save learned PB plot: {output_path}")
 
     def setup_model_meta_info(self):
