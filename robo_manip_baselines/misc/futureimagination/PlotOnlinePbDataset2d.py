@@ -11,7 +11,7 @@ import torch
 
 from robo_manip_baselines.common import DataKey, RmbData, find_rmb_files
 
-NUM_OBJECTS = 5
+DEFAULT_NUM_OBJECTS = 5
 
 
 def parse_args() -> argparse.Namespace:
@@ -29,6 +29,13 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=None,
         help="output PNG path",
+    )
+    parser.add_argument(
+        "--material_object_ids",
+        type=int,
+        nargs="+",
+        default=None,
+        help="trained PB object IDs shown as references",
     )
     return parser.parse_args()
 
@@ -62,14 +69,22 @@ def get_source_checkpoint(episodes: list[dict]) -> Path:
     return source_checkpoint
 
 
-def load_reference_pb(checkpoint_path: Path) -> np.ndarray:
+def load_reference_pb(
+    checkpoint_path: Path,
+    material_object_ids: list[int] | None,
+) -> tuple[np.ndarray, list[int]]:
     assert checkpoint_path.is_file(), checkpoint_path
     state_dict = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
     reference_pb = state_dict["material_property.weight"]
     assert reference_pb.ndim == 2, reference_pb.shape
-    assert reference_pb.shape[0] >= NUM_OBJECTS, reference_pb.shape
     assert reference_pb.shape[1] == 2, reference_pb.shape
-    return reference_pb[:NUM_OBJECTS].detach().numpy()
+    if material_object_ids is None:
+        material_object_ids = list(range(DEFAULT_NUM_OBJECTS))
+    assert len(material_object_ids) == len(set(material_object_ids))
+    assert all(
+        0 <= object_id < reference_pb.shape[0] for object_id in material_object_ids
+    )
+    return reference_pb[material_object_ids].detach().numpy(), material_object_ids
 
 
 def get_mean_trajectory(episodes: list[dict]) -> np.ndarray:
@@ -85,9 +100,10 @@ def get_default_output_path(dataset_path: Path) -> Path:
 def save_plot(
     episodes: list[dict],
     reference_pb: np.ndarray,
+    material_object_ids: list[int],
     output_path: Path,
 ) -> None:
-    colors = plt.cm.tab10(np.arange(NUM_OBJECTS))
+    colors = plt.cm.tab10(np.arange(len(material_object_ids)))
     all_pb = np.concatenate(
         [reference_pb] + [episode["plot_pb"] for episode in episodes],
         axis=0,
@@ -132,14 +148,16 @@ def save_plot(
         label=f"mean trajectory (all {len(episodes)} episodes)",
     )
 
-    for object_id, value in enumerate(reference_pb):
+    for color_idx, (object_id, value) in enumerate(
+        zip(material_object_ids, reference_pb, strict=True)
+    ):
         x_offset = -8 if value[0] >= label_x_center else 8
         y_offset = 8 if object_id in (1, 2, 4) else -8
         axis.scatter(
             value[0],
             value[1],
             s=140,
-            color=colors[object_id],
+            color=colors[color_idx],
             edgecolors="black",
             linewidths=0.8,
             zorder=4,
@@ -151,7 +169,7 @@ def save_plot(
             textcoords="offset points",
             ha="left" if x_offset > 0 else "right",
             va="bottom" if y_offset > 0 else "top",
-            color=colors[object_id],
+            color=colors[color_idx],
             fontweight="bold",
         )
 
@@ -175,7 +193,10 @@ def main() -> None:
 
     episodes = [load_episode(filename) for filename in filenames]
     source_checkpoint = get_source_checkpoint(episodes)
-    reference_pb = load_reference_pb(source_checkpoint)
+    reference_pb, material_object_ids = load_reference_pb(
+        source_checkpoint,
+        args.material_object_ids,
+    )
 
     output_path = args.output
     if output_path is None:
@@ -183,6 +204,7 @@ def main() -> None:
     save_plot(
         episodes,
         reference_pb,
+        material_object_ids,
         output_path,
     )
 
