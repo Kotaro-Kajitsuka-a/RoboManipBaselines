@@ -7,7 +7,7 @@ from .RealXarm7FixedGripperDemoEnv import RealXarm7FixedGripperDemoEnv
 
 
 class PlanarConstraintArmManager(ArmManager):
-    max_eef_speed = 0.10  # [m/s]
+    max_eef_speed = 0.12  # [m/s]
 
     def set_command_joint_pos(self, arm_joint_pos, gripper_joint_pos):
         raise RuntimeError(
@@ -40,10 +40,10 @@ class RealXarm7PlanarConstraintDemoEnv(RealXarm7FixedGripperDemoEnv):
     reset_eef_pos_tolerance = 0.01  # [m]
     reset_joint_pos_tolerance = np.deg2rad(0.1)  # [rad]
 
-    fixed_gripper_joint_pos = np.array([0.0], dtype=np.float64)
+    fixed_gripper_joint_pos = np.array([119.0], dtype=np.float64)
     fixed_gripper_init_qpos = np.concatenate(
         [
-            np.deg2rad([1.1, 17.8, -1.4, 23.5, -2.4, 5.6, 1.3]),
+            np.deg2rad([-0.4, -0.9, 0.1, 21.5, -1.6, 22.4, 0.7]),
             fixed_gripper_joint_pos,
         ]
     )
