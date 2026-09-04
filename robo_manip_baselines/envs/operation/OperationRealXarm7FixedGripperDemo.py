@@ -1,11 +1,12 @@
 import gymnasium as gym
+import numpy as np
 
 from robo_manip_baselines.common import GraspPhaseBase
 
 
 class GraspPhase(GraspPhaseBase):
     def set_target(self):
-        self.gripper_joint_pos = self.op.env.unwrapped.fixed_gripper_joint_pos.copy()
+        self.gripper_joint_pos = np.array([119.0])
         self.duration = 0.5  # [s]
 
 
