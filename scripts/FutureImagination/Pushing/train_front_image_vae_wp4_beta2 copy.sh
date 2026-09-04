@@ -15,8 +15,7 @@ python robo_manip_baselines/misc/futureimagination/TrainImageVAE.py \
   --latent_dim 9 \
   --beta 2.0
 
-python robo_manip_baselines/misc/futureimag
-ination/AddImageVAEFeature.py \
+python robo_manip_baselines/misc/futureimagination/AddImageVAEFeature.py \
   "$train_dataset_dir" \
   --checkpoint "$vae_output_dir/final_model" \
   --camera_name front \
@@ -44,7 +43,7 @@ python robo_manip_baselines/bin/Train.py WrenchPredictor4 \
 python robo_manip_baselines/policy/wrench_predictor4/EvalWrenchPredictor4ImageFeatureSweepDir.py \
   "$wp4_checkpoint_dir/policy_best.ckpt" \
   "$validation_dataset_dir" \
-  --material_object_ids 0 1 2
+  --material_object_ids 0 1 2 3 4
 
 python robo_manip_baselines/misc/futureimagination/MakeReconstructionVideos.py \
   "$train_dataset_dir" \
