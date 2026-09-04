@@ -74,7 +74,7 @@ def load_reference_pbs(checkpoint_path: Path) -> np.ndarray:
     reference_pbs = state_dict["material_property.weight"]
     assert reference_pbs.ndim == 2 and reference_pbs.shape[1] == 1, reference_pbs.shape
     assert reference_pbs.shape[0] >= 3, reference_pbs.shape
-    return reference_pbs[:3, 0].numpy()
+    return reference_pbs[:, 0].numpy()
 
 
 def get_source_checkpoint(episodes: list[dict]) -> Path:
@@ -116,13 +116,21 @@ def save_plot(
         linewidth=2.6,
         label=f"mean trajectory (all {len(episodes)} episodes)",
     )
-    reference_colors = ("tab:red", "tab:orange", "tab:green")
-    for object_id, (reference_pb, color) in enumerate(
-        zip(reference_pbs, reference_colors, strict=True)
-    ):
+    reference_colors = (
+        "tab:red",
+        "tab:orange",
+        "tab:green",
+        "tab:purple",
+        "tab:brown",
+        "tab:pink",
+        "tab:gray",
+        "tab:olive",
+        "tab:cyan",
+    )
+    for object_id, reference_pb in enumerate(reference_pbs):
         axis.axhline(
             reference_pb,
-            color=color,
+            color=reference_colors[object_id % len(reference_colors)],
             linestyle="--",
             linewidth=2.0,
             label=f"trained Object{object_id} PB={reference_pb:.4f}",

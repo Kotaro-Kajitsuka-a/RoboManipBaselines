@@ -19,7 +19,7 @@ cp -aL "$source_training_dataset/." "$constant_training_dataset/"
 
 python robo_manip_baselines/policy/wrench_predictor4_online/AddOnlinePbToDataset.py \
   "$online_training_dataset" \
-  0 \
+  2 \
   --checkpoint "$wp4_checkpoint" \
   --lr 8e-3 \
   --wrench_loss_weight 1.0 \
@@ -32,7 +32,7 @@ python robo_manip_baselines/policy/wrench_predictor4_online/AddConstantPbToDatas
 
 python robo_manip_baselines/policy/wrench_predictor4_online/AddOnlinePbToDataset.py \
   "$online_validation_dataset" \
-  0 \
+  2 \
   --checkpoint "$wp4_checkpoint" \
   --lr 8e-3 \
   --wrench_loss_weight 1.0 \
