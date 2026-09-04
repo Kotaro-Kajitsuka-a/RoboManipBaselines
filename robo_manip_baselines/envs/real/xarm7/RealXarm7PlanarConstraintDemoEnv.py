@@ -45,6 +45,7 @@ class RealXarm7PlanarConstraintDemoEnv(RealXarm7FixedGripperDemoEnv):
     # default init_qpos = np.concatenate(
     #               [np.deg2rad([0.0, -30.0, 0.0, 45.0, 0.0, 75.0, 0.0]), fixed_gripper_joint_pos]
     #           )
+    # Without 6 Axis Force Torque Sensor, the init_qpos is set to the following values to avoid collision with the table.
     # fixed_gripper_init_qpos = np.concatenate(
     #     [
     #         np.deg2rad([1.1, 17.8, -1.4, 23.5, -2.4, 5.6, 1.3]),
@@ -54,7 +55,7 @@ class RealXarm7PlanarConstraintDemoEnv(RealXarm7FixedGripperDemoEnv):
 
     fixed_gripper_init_qpos = np.concatenate(
         [
-            np.deg2rad([0.0, -30.0, 0.0, 45.0, 0.0, 75.0, 0.0]),
+            np.deg2rad([-0.3, -13.7, 0.2, 23.4, -0.8, 37.1, 0.2]),
             fixed_gripper_joint_pos,
         ]
     )

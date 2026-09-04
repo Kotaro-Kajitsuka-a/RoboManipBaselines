@@ -14,7 +14,7 @@ def dice():
     y = np.random.uniform(0, 10)
     yaw = np.random.randint(-30, 31)
 
-    return f"{x:.1f}, {y:.1f}, {yaw}"
+    return f"{x:.0f}, {y:.0f}, {yaw}"
 
 
 print(dice())
