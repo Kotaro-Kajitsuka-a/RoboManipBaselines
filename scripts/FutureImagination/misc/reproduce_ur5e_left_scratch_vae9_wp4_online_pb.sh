@@ -77,15 +77,18 @@ python robo_manip_baselines/policy/wrench_predictor4_online/AddOnlinePbToDataset
 
 python robo_manip_baselines/misc/futureimagination/PlotOnlinePbDataset.py \
   "$online_dataset/WrenchPredObject0" \
-  --output "$online_dataset/WrenchPredObject0_online_pb_trajectories.png"
+  --output "$online_dataset/WrenchPredObject0_online_pb_trajectories.png" \
+  --reference_object_ids 0 1 2
 
 python robo_manip_baselines/misc/futureimagination/PlotOnlinePbDataset.py \
   "$online_dataset/WrenchPredObject1" \
-  --output "$online_dataset/WrenchPredObject1_online_pb_trajectories.png"
+  --output "$online_dataset/WrenchPredObject1_online_pb_trajectories.png" \
+  --reference_object_ids 0 1 2
 
 python robo_manip_baselines/misc/futureimagination/PlotOnlinePbDataset.py \
   "$online_dataset/WrenchPredObject2" \
-  --output "$online_dataset/WrenchPredObject2_online_pb_trajectories.png"
+  --output "$online_dataset/WrenchPredObject2_online_pb_trajectories.png" \
+  --reference_object_ids 0 1 2
 
 sha256sum "$vae_output_dir/final_model/model.pt" "$wp4_checkpoint"
 

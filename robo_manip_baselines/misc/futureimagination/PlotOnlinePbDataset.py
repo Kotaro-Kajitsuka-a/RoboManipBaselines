@@ -31,6 +31,13 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="output PNG path",
     )
+    parser.add_argument(
+        "--reference_object_ids",
+        type=int,
+        nargs="+",
+        default=[0, 1, 2],
+        help="trained object IDs whose PBs are shown as reference lines",
+    )
     return parser.parse_args()
 
 
@@ -68,13 +75,21 @@ def get_mean_trajectory(episodes: list[dict]) -> tuple[np.ndarray, np.ndarray]:
     return time_array.mean(axis=0), pb_array.mean(axis=0)
 
 
-def load_reference_pbs(checkpoint_path: Path) -> np.ndarray:
+def load_reference_pbs(
+    checkpoint_path: Path,
+    reference_object_ids: list[int],
+) -> np.ndarray:
     assert checkpoint_path.is_file(), checkpoint_path
+    assert len(reference_object_ids) == len(set(reference_object_ids))
+    assert {0, 1, 2}.issubset(reference_object_ids), reference_object_ids
     state_dict = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
     reference_pbs = state_dict["material_property.weight"]
     assert reference_pbs.ndim == 2 and reference_pbs.shape[1] == 1, reference_pbs.shape
     assert reference_pbs.shape[0] >= 3, reference_pbs.shape
-    return reference_pbs[:, 0].numpy()
+    assert all(
+        0 <= object_id < reference_pbs.shape[0] for object_id in reference_object_ids
+    ), reference_object_ids
+    return reference_pbs[reference_object_ids, 0].numpy()
 
 
 def get_source_checkpoint(episodes: list[dict]) -> Path:
@@ -91,6 +106,7 @@ def get_default_output_path(dataset_path: Path) -> Path:
 def save_plot(
     episodes: list[dict],
     reference_pbs: np.ndarray,
+    reference_object_ids: list[int],
     output_path: Path,
 ) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -127,7 +143,11 @@ def save_plot(
         "tab:olive",
         "tab:cyan",
     )
-    for object_id, reference_pb in enumerate(reference_pbs):
+    for object_id, reference_pb in zip(
+        reference_object_ids,
+        reference_pbs,
+        strict=True,
+    ):
         axis.axhline(
             reference_pb,
             color=reference_colors[object_id % len(reference_colors)],
@@ -153,7 +173,10 @@ def main() -> None:
 
     episodes = [load_episode(filename) for filename in filenames]
     source_checkpoint = get_source_checkpoint(episodes)
-    reference_pbs = load_reference_pbs(source_checkpoint)
+    reference_pbs = load_reference_pbs(
+        source_checkpoint,
+        args.reference_object_ids,
+    )
 
     output_path = args.output
     if output_path is None:
@@ -161,6 +184,7 @@ def main() -> None:
     save_plot(
         episodes,
         reference_pbs,
+        args.reference_object_ids,
         output_path,
     )
 

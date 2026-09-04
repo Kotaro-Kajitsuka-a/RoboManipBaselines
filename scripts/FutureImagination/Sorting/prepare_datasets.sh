@@ -39,19 +39,25 @@ python robo_manip_baselines/policy/wrench_predictor4_online/AddOnlinePbToDataset
   --overwrite
 
 python robo_manip_baselines/misc/futureimagination/PlotOnlinePbDataset.py \
-  "$online_training_dataset/WrenchPredObject0"
+  "$online_training_dataset/WrenchPredObject0" \
+  --reference_object_ids 0 1 2
 
 python robo_manip_baselines/misc/futureimagination/PlotOnlinePbDataset.py \
-  "$online_training_dataset/WrenchPredObject1"
+  "$online_training_dataset/WrenchPredObject1" \
+  --reference_object_ids 0 1 2
 
 python robo_manip_baselines/misc/futureimagination/PlotOnlinePbDataset.py \
-  "$online_training_dataset/WrenchPredObject2"
+  "$online_training_dataset/WrenchPredObject2" \
+  --reference_object_ids 0 1 2
 
 python robo_manip_baselines/misc/futureimagination/PlotOnlinePbDataset.py \
-  "$online_validation_dataset/WrenchPredObject0"
+  "$online_validation_dataset/WrenchPredObject0" \
+  --reference_object_ids 0 1 2
 
 python robo_manip_baselines/misc/futureimagination/PlotOnlinePbDataset.py \
-  "$online_validation_dataset/WrenchPredObject1"
+  "$online_validation_dataset/WrenchPredObject1" \
+  --reference_object_ids 0 1 2
 
 python robo_manip_baselines/misc/futureimagination/PlotOnlinePbDataset.py \
-  "$online_validation_dataset/WrenchPredObject2"
+  "$online_validation_dataset/WrenchPredObject2" \
+  --reference_object_ids 0 1 2
