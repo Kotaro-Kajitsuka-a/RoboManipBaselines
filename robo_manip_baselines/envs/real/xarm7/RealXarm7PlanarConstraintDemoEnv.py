@@ -36,11 +36,15 @@ class PlanarConstraintArmManager(ArmManager):
 
 class RealXarm7PlanarConstraintDemoEnv(RealXarm7FixedGripperDemoEnv):
     max_eef_z_drop = 0.005  # [m]
-    reset_approach_z_offset = 0.10  # [m]
+    reset_approach_z_offset = 0.05  # [m]
     reset_eef_pos_tolerance = 0.005  # [m]
     reset_joint_pos_tolerance = np.deg2rad(0.1)  # [rad]
 
     fixed_gripper_joint_pos = np.array([119.0], dtype=np.float64)
+
+    # default init_qpos = np.concatenate(
+    #               [np.deg2rad([0.0, -30.0, 0.0, 45.0, 0.0, 75.0, 0.0]), fixed_gripper_joint_pos]
+    #           )
     # fixed_gripper_init_qpos = np.concatenate(
     #     [
     #         np.deg2rad([1.1, 17.8, -1.4, 23.5, -2.4, 5.6, 1.3]),
@@ -50,7 +54,7 @@ class RealXarm7PlanarConstraintDemoEnv(RealXarm7FixedGripperDemoEnv):
 
     fixed_gripper_init_qpos = np.concatenate(
         [
-            np.deg2rad([-0.4, -0.9, 0.1, 21.5, -1.6, 22.4, 0.7]),
+            np.deg2rad([0.0, -30.0, 0.0, 45.0, 0.0, 75.0, 0.0]),
             fixed_gripper_joint_pos,
         ]
     )
