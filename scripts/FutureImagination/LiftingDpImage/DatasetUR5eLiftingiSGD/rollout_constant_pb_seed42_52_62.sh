@@ -4,7 +4,7 @@ set -e
 # Reuse the Constant-PB DP checkpoints trained by DatasetUR5eLiftingi.
 # Evaluation identifies PB online with MomentumSGD.
 eval_timestamp=$(date +%Y%m%d_%H%M%S)
-eval_dir="robo_manip_baselines/dataset/tests/FutureImagination/DatasetMujocoUR5eLiftingi/DP_eef_pose_constant_pb_sgd_lr8e3_eval_${eval_timestamp}"
+eval_dir="robo_manip_baselines/dataset/tests/FutureImagination/DatasetMujocoUR5eLiftingi/DpImage_eef_pose_constant_pb_sgd_lr8e3_eval_${eval_timestamp}"
 rmb_dir="$eval_dir/rmb"
 wp4_checkpoint=robo_manip_baselines/checkpoint/WrenchPredictor4/DatasetMujocoUR5eLiftingi_EefPose/policy_best.ckpt
 mkdir -p "$rmb_dir"
@@ -19,7 +19,7 @@ for train_seed in 42 52 62; do
 
   python robo_manip_baselines/bin/Rollout.py \
     DiffusionPolicyOnlinePb MujocoUR5eLiftingi_I0 \
-    --demo_name "MujocoUR5eLiftingi_I0_eef_pose_constant_pb_sgd_lr8e3_trainseed${train_seed}" \
+    --demo_name "DpImage_MujocoUR5eLiftingi_I0_eef_pose_constant_pb_sgd_lr8e3_trainseed${train_seed}" \
     --checkpoint "$checkpoint" \
     --wp4_checkpoint "$wp4_checkpoint" \
     --online_pb_optimizer sgd \
@@ -37,7 +37,7 @@ for train_seed in 42 52 62; do
 
   python robo_manip_baselines/bin/Rollout.py \
     DiffusionPolicyOnlinePb MujocoUR5eLiftingi_I1 \
-    --demo_name "MujocoUR5eLiftingi_I1_eef_pose_constant_pb_sgd_lr8e3_trainseed${train_seed}" \
+    --demo_name "DpImage_MujocoUR5eLiftingi_I1_eef_pose_constant_pb_sgd_lr8e3_trainseed${train_seed}" \
     --checkpoint "$checkpoint" \
     --wp4_checkpoint "$wp4_checkpoint" \
     --online_pb_optimizer sgd \
@@ -55,7 +55,7 @@ for train_seed in 42 52 62; do
 
   python robo_manip_baselines/bin/Rollout.py \
     DiffusionPolicyOnlinePb MujocoUR5eLiftingi_I2 \
-    --demo_name "MujocoUR5eLiftingi_I2_eef_pose_constant_pb_sgd_lr8e3_trainseed${train_seed}" \
+    --demo_name "DpImage_MujocoUR5eLiftingi_I2_eef_pose_constant_pb_sgd_lr8e3_trainseed${train_seed}" \
     --checkpoint "$checkpoint" \
     --wp4_checkpoint "$wp4_checkpoint" \
     --online_pb_optimizer sgd \
@@ -73,7 +73,7 @@ for train_seed in 42 52 62; do
 
   python robo_manip_baselines/bin/Rollout.py \
     DiffusionPolicyOnlinePb MujocoUR5eLiftingi_I4 \
-    --demo_name "MujocoUR5eLiftingi_I4_eef_pose_constant_pb_sgd_lr8e3_trainseed${train_seed}" \
+    --demo_name "DpImage_MujocoUR5eLiftingi_I4_eef_pose_constant_pb_sgd_lr8e3_trainseed${train_seed}" \
     --checkpoint "$checkpoint" \
     --wp4_checkpoint "$wp4_checkpoint" \
     --online_pb_optimizer sgd \
@@ -91,7 +91,7 @@ for train_seed in 42 52 62; do
 
   python robo_manip_baselines/bin/Rollout.py \
     DiffusionPolicyOnlinePb MujocoUR5eLiftingi_I5 \
-    --demo_name "MujocoUR5eLiftingi_I5_eef_pose_constant_pb_sgd_lr8e3_trainseed${train_seed}" \
+    --demo_name "DpImage_MujocoUR5eLiftingi_I5_eef_pose_constant_pb_sgd_lr8e3_trainseed${train_seed}" \
     --checkpoint "$checkpoint" \
     --wp4_checkpoint "$wp4_checkpoint" \
     --online_pb_optimizer sgd \
@@ -109,7 +109,7 @@ for train_seed in 42 52 62; do
 
   python robo_manip_baselines/bin/Rollout.py \
     DiffusionPolicyOnlinePb MujocoUR5eLiftingi_I6 \
-    --demo_name "MujocoUR5eLiftingi_I6_eef_pose_constant_pb_sgd_lr8e3_trainseed${train_seed}" \
+    --demo_name "DpImage_MujocoUR5eLiftingi_I6_eef_pose_constant_pb_sgd_lr8e3_trainseed${train_seed}" \
     --checkpoint "$checkpoint" \
     --wp4_checkpoint "$wp4_checkpoint" \
     --online_pb_optimizer sgd \
@@ -127,7 +127,7 @@ for train_seed in 42 52 62; do
 
   python robo_manip_baselines/bin/Rollout.py \
     DiffusionPolicyOnlinePb MujocoUR5eLiftingi_I7 \
-    --demo_name "MujocoUR5eLiftingi_I7_eef_pose_constant_pb_sgd_lr8e3_trainseed${train_seed}" \
+    --demo_name "DpImage_MujocoUR5eLiftingi_I7_eef_pose_constant_pb_sgd_lr8e3_trainseed${train_seed}" \
     --checkpoint "$checkpoint" \
     --wp4_checkpoint "$wp4_checkpoint" \
     --online_pb_optimizer sgd \
@@ -150,7 +150,7 @@ for train_seed in 42 52 62; do
       -mindepth 1 \
       -maxdepth 1 \
       -type d \
-      -name "RolloutDiffusionPolicyOnlinePb_MujocoUR5eLiftingi_I${object_id}_eef_pose_constant_pb_sgd_lr8e3_trainseed${train_seed}_20*" \
+      -name "RolloutDiffusionPolicyOnlinePb_DpImage_MujocoUR5eLiftingi_I${object_id}_eef_pose_constant_pb_sgd_lr8e3_trainseed${train_seed}_20*" \
       -newer "$rollout_start_marker" \
       -exec mv -- {} "$object_dir" \;
   done

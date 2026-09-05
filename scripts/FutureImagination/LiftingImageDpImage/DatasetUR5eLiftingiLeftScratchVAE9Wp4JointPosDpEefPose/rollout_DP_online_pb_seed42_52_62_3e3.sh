@@ -2,7 +2,7 @@
 set -e
 
 eval_timestamp=$(date +%Y%m%d_%H%M%S)
-eval_dir="robo_manip_baselines/dataset/tests/FutureImagination/DatasetMujocoUR5eLiftingi_LeftScratchVAE9_Wp4JointPos_DpEefPose/DP_adam_online_pb_lr3e3_eval_${eval_timestamp}"
+eval_dir="robo_manip_baselines/dataset/tests/FutureImagination/DatasetMujocoUR5eLiftingi_LeftScratchVAE9_Wp4JointPos_DpEefPose/DpImage_adam_online_pb_lr3e3_eval_${eval_timestamp}"
 rmb_dir="$eval_dir/rmb"
 wp4_checkpoint=robo_manip_baselines/checkpoint/WrenchPredictor4/DatasetMujocoUR5eLiftingi_left_image_vae_9_joint_pos/policy_best.ckpt
 image_vae_checkpoint=robo_manip_baselines/checkpoint/ImageVAE/DatasetMujocoUR5eLiftingi_left_9/final_model
@@ -17,7 +17,7 @@ for train_seed in 42 52 62; do
 
   python robo_manip_baselines/bin/Rollout.py \
     DiffusionPolicyOnlinePb MujocoUR5eLiftingi_I0 \
-    --demo_name "MujocoUR5eLiftingi_I0_left_scratch_vae9_wp4_joint_dp_eef_adam_online_pb_lr3e3_trainseed${train_seed}" \
+    --demo_name "DpImage_MujocoUR5eLiftingi_I0_left_scratch_vae9_wp4_joint_dp_eef_adam_online_pb_lr3e3_trainseed${train_seed}" \
     --checkpoint "$dp_checkpoint" \
     --wp4_checkpoint "$wp4_checkpoint" \
     --image_vae_checkpoint "$image_vae_checkpoint" \
@@ -35,7 +35,7 @@ for train_seed in 42 52 62; do
 
   python robo_manip_baselines/bin/Rollout.py \
     DiffusionPolicyOnlinePb MujocoUR5eLiftingi_I1 \
-    --demo_name "MujocoUR5eLiftingi_I1_left_scratch_vae9_wp4_joint_dp_eef_adam_online_pb_lr3e3_trainseed${train_seed}" \
+    --demo_name "DpImage_MujocoUR5eLiftingi_I1_left_scratch_vae9_wp4_joint_dp_eef_adam_online_pb_lr3e3_trainseed${train_seed}" \
     --checkpoint "$dp_checkpoint" \
     --wp4_checkpoint "$wp4_checkpoint" \
     --image_vae_checkpoint "$image_vae_checkpoint" \
@@ -53,7 +53,7 @@ for train_seed in 42 52 62; do
 
   python robo_manip_baselines/bin/Rollout.py \
     DiffusionPolicyOnlinePb MujocoUR5eLiftingi_I2 \
-    --demo_name "MujocoUR5eLiftingi_I2_left_scratch_vae9_wp4_joint_dp_eef_adam_online_pb_lr3e3_trainseed${train_seed}" \
+    --demo_name "DpImage_MujocoUR5eLiftingi_I2_left_scratch_vae9_wp4_joint_dp_eef_adam_online_pb_lr3e3_trainseed${train_seed}" \
     --checkpoint "$dp_checkpoint" \
     --wp4_checkpoint "$wp4_checkpoint" \
     --image_vae_checkpoint "$image_vae_checkpoint" \
@@ -71,7 +71,7 @@ for train_seed in 42 52 62; do
 
   python robo_manip_baselines/bin/Rollout.py \
     DiffusionPolicyOnlinePb MujocoUR5eLiftingi_I4 \
-    --demo_name "MujocoUR5eLiftingi_I4_left_scratch_vae9_wp4_joint_dp_eef_adam_online_pb_lr3e3_trainseed${train_seed}" \
+    --demo_name "DpImage_MujocoUR5eLiftingi_I4_left_scratch_vae9_wp4_joint_dp_eef_adam_online_pb_lr3e3_trainseed${train_seed}" \
     --checkpoint "$dp_checkpoint" \
     --wp4_checkpoint "$wp4_checkpoint" \
     --image_vae_checkpoint "$image_vae_checkpoint" \
@@ -89,7 +89,7 @@ for train_seed in 42 52 62; do
 
   python robo_manip_baselines/bin/Rollout.py \
     DiffusionPolicyOnlinePb MujocoUR5eLiftingi_I5 \
-    --demo_name "MujocoUR5eLiftingi_I5_left_scratch_vae9_wp4_joint_dp_eef_adam_online_pb_lr3e3_trainseed${train_seed}" \
+    --demo_name "DpImage_MujocoUR5eLiftingi_I5_left_scratch_vae9_wp4_joint_dp_eef_adam_online_pb_lr3e3_trainseed${train_seed}" \
     --checkpoint "$dp_checkpoint" \
     --wp4_checkpoint "$wp4_checkpoint" \
     --image_vae_checkpoint "$image_vae_checkpoint" \
@@ -107,7 +107,7 @@ for train_seed in 42 52 62; do
 
   python robo_manip_baselines/bin/Rollout.py \
     DiffusionPolicyOnlinePb MujocoUR5eLiftingi_I6 \
-    --demo_name "MujocoUR5eLiftingi_I6_left_scratch_vae9_wp4_joint_dp_eef_adam_online_pb_lr3e3_trainseed${train_seed}" \
+    --demo_name "DpImage_MujocoUR5eLiftingi_I6_left_scratch_vae9_wp4_joint_dp_eef_adam_online_pb_lr3e3_trainseed${train_seed}" \
     --checkpoint "$dp_checkpoint" \
     --wp4_checkpoint "$wp4_checkpoint" \
     --image_vae_checkpoint "$image_vae_checkpoint" \
@@ -125,7 +125,7 @@ for train_seed in 42 52 62; do
 
   python robo_manip_baselines/bin/Rollout.py \
     DiffusionPolicyOnlinePb MujocoUR5eLiftingi_I7 \
-    --demo_name "MujocoUR5eLiftingi_I7_left_scratch_vae9_wp4_joint_dp_eef_adam_online_pb_lr3e3_trainseed${train_seed}" \
+    --demo_name "DpImage_MujocoUR5eLiftingi_I7_left_scratch_vae9_wp4_joint_dp_eef_adam_online_pb_lr3e3_trainseed${train_seed}" \
     --checkpoint "$dp_checkpoint" \
     --wp4_checkpoint "$wp4_checkpoint" \
     --image_vae_checkpoint "$image_vae_checkpoint" \
@@ -148,7 +148,7 @@ for train_seed in 42 52 62; do
       -mindepth 1 \
       -maxdepth 1 \
       -type d \
-      -name "RolloutDiffusionPolicyOnlinePb_MujocoUR5eLiftingi_I${object_id}_left_scratch_vae9_wp4_joint_dp_eef_adam_online_pb_lr3e3_trainseed${train_seed}_20*" \
+      -name "RolloutDiffusionPolicyOnlinePb_DpImage_MujocoUR5eLiftingi_I${object_id}_left_scratch_vae9_wp4_joint_dp_eef_adam_online_pb_lr3e3_trainseed${train_seed}_20*" \
       -newer "$rollout_start_marker" \
       -exec mv -- {} "$object_dir" \;
   done

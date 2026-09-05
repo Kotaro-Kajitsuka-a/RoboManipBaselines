@@ -4,7 +4,7 @@ set -e
 # Run from the repository root after train_baseline_seed42_52_62.sh.
 # Evaluate ordinary Diffusion Policy without online PB adaptation.
 eval_timestamp=$(date +%Y%m%d_%H%M%S)
-eval_dir="robo_manip_baselines/dataset/tests/FutureImagination/LiftingAB_B_only/DP_baseline_eval_${eval_timestamp}"
+eval_dir="robo_manip_baselines/dataset/tests/FutureImagination/LiftingAB_B_only/DpImage_baseline_eval_${eval_timestamp}"
 rmb_dir="$eval_dir/rmb"
 mkdir -p "$rmb_dir"
 rollout_start_marker="$eval_dir/.rollout_start"
@@ -15,7 +15,7 @@ for train_seed in 42 52 62; do
 
   python robo_manip_baselines/bin/Rollout.py \
     DiffusionPolicy MujocoUR5eLiftingi_I0 \
-    --demo_name "MujocoUR5eLiftingi_I0_baseline_trainseed${train_seed}" \
+    --demo_name "DpImage_MujocoUR5eLiftingi_I0_baseline_trainseed${train_seed}" \
     --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/DpImageLeft/LiftingAB_B_only_Baseline_seed${train_seed}/policy_last.ckpt" \
     --seed 42 \
     --world_idx_list {70..79} \
@@ -28,7 +28,7 @@ for train_seed in 42 52 62; do
 
   python robo_manip_baselines/bin/Rollout.py \
     DiffusionPolicy MujocoUR5eLiftingi_I1 \
-    --demo_name "MujocoUR5eLiftingi_I1_baseline_trainseed${train_seed}" \
+    --demo_name "DpImage_MujocoUR5eLiftingi_I1_baseline_trainseed${train_seed}" \
     --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/DpImageLeft/LiftingAB_B_only_Baseline_seed${train_seed}/policy_last.ckpt" \
     --seed 42 \
     --world_idx_list {170..179} \
@@ -41,7 +41,7 @@ for train_seed in 42 52 62; do
 
   python robo_manip_baselines/bin/Rollout.py \
     DiffusionPolicy MujocoUR5eLiftingi_I2 \
-    --demo_name "MujocoUR5eLiftingi_I2_baseline_trainseed${train_seed}" \
+    --demo_name "DpImage_MujocoUR5eLiftingi_I2_baseline_trainseed${train_seed}" \
     --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/DpImageLeft/LiftingAB_B_only_Baseline_seed${train_seed}/policy_last.ckpt" \
     --seed 42 \
     --world_idx_list {270..279} \
@@ -54,7 +54,7 @@ for train_seed in 42 52 62; do
 
   python robo_manip_baselines/bin/Rollout.py \
     DiffusionPolicy MujocoUR5eLiftingi_I4 \
-    --demo_name "MujocoUR5eLiftingi_I4_baseline_trainseed${train_seed}" \
+    --demo_name "DpImage_MujocoUR5eLiftingi_I4_baseline_trainseed${train_seed}" \
     --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/DpImageLeft/LiftingAB_B_only_Baseline_seed${train_seed}/policy_last.ckpt" \
     --seed 42 \
     --world_idx_list {470..479} \
@@ -67,7 +67,7 @@ for train_seed in 42 52 62; do
 
   python robo_manip_baselines/bin/Rollout.py \
     DiffusionPolicy MujocoUR5eLiftingi_I5 \
-    --demo_name "MujocoUR5eLiftingi_I5_baseline_trainseed${train_seed}" \
+    --demo_name "DpImage_MujocoUR5eLiftingi_I5_baseline_trainseed${train_seed}" \
     --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/DpImageLeft/LiftingAB_B_only_Baseline_seed${train_seed}/policy_last.ckpt" \
     --seed 42 \
     --world_idx_list {570..579} \
@@ -80,7 +80,7 @@ for train_seed in 42 52 62; do
 
   python robo_manip_baselines/bin/Rollout.py \
     DiffusionPolicy MujocoUR5eLiftingi_I6 \
-    --demo_name "MujocoUR5eLiftingi_I6_baseline_trainseed${train_seed}" \
+    --demo_name "DpImage_MujocoUR5eLiftingi_I6_baseline_trainseed${train_seed}" \
     --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/DpImageLeft/LiftingAB_B_only_Baseline_seed${train_seed}/policy_last.ckpt" \
     --seed 42 \
     --world_idx_list {670..679} \
@@ -93,7 +93,7 @@ for train_seed in 42 52 62; do
 
   python robo_manip_baselines/bin/Rollout.py \
     DiffusionPolicy MujocoUR5eLiftingi_I7 \
-    --demo_name "MujocoUR5eLiftingi_I7_baseline_trainseed${train_seed}" \
+    --demo_name "DpImage_MujocoUR5eLiftingi_I7_baseline_trainseed${train_seed}" \
     --checkpoint "robo_manip_baselines/checkpoint/DiffusionPolicy/DpImageLeft/LiftingAB_B_only_Baseline_seed${train_seed}/policy_last.ckpt" \
     --seed 42 \
     --world_idx_list {770..779} \
@@ -111,7 +111,7 @@ for train_seed in 42 52 62; do
       -mindepth 1 \
       -maxdepth 1 \
       -type d \
-      -name "RolloutDiffusionPolicy_MujocoUR5eLiftingi_I${object_id}_baseline_trainseed${train_seed}_20*" \
+      -name "RolloutDiffusionPolicy_DpImage_MujocoUR5eLiftingi_I${object_id}_baseline_trainseed${train_seed}_20*" \
       -newer "$rollout_start_marker" \
       -exec mv -- {} "$object_dir" \;
   done
