@@ -11,6 +11,31 @@ from robo_manip_baselines.common import (
 )
 
 
+def _load_wrench(rmb_data, model_meta_info):
+    wrench_info = model_meta_info["wrench"]
+    wrench_key = wrench_info["key"]
+    if wrench_key in rmb_data.keys():
+        return np.asarray(rmb_data[wrench_key][:])
+
+    if "percentile_clip" not in wrench_info:
+        raise KeyError(
+            f"'{wrench_key}' is not found and the checkpoint does not contain "
+            "percentile clipping metadata"
+        )
+
+    clip_info = wrench_info["percentile_clip"]
+    source_key = clip_info["source_key"]
+    if source_key not in rmb_data.keys():
+        raise KeyError(f"Neither '{wrench_key}' nor its source '{source_key}' is found")
+
+    source_wrench = np.asarray(rmb_data[source_key][:])
+    return np.clip(
+        source_wrench,
+        clip_info["min"],
+        clip_info["max"],
+    ).astype(source_wrench.dtype, copy=False)
+
+
 class WrenchPredictor4OnlineDataset(DatasetBase):
     """One episode split into chronological, fully observed prediction windows."""
 
@@ -77,7 +102,7 @@ class WrenchPredictor4OnlineDataset(DatasetBase):
 
             wrench_key = self.model_meta_info["wrench"]["key"]
             wrench = get_skipped_data_seq(
-                rmb_data[wrench_key][:],
+                _load_wrench(rmb_data, self.model_meta_info),
                 wrench_key,
                 skip,
             )[time_idxes]
