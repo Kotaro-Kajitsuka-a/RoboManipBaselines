@@ -13,9 +13,10 @@ mkdir -p \
   "$online_training_dataset" \
   "$online_validation_dataset" \
   "$constant_training_dataset"
-cp -aL "$source_training_dataset/." "$online_training_dataset/"
-cp -aL "$source_validation_dataset/." "$online_validation_dataset/"
-cp -aL "$source_training_dataset/." "$constant_training_dataset/"
+# Mirror the source, removing stale files and overwriting even when size/mtime match.
+rsync -aL --ignore-times --delete "$source_training_dataset/" "$online_training_dataset/"
+rsync -aL --ignore-times --delete "$source_validation_dataset/" "$online_validation_dataset/"
+rsync -aL --ignore-times --delete "$source_training_dataset/" "$constant_training_dataset/"
 
 python robo_manip_baselines/policy/wrench_predictor4_online/AddOnlinePbToDataset.py \
   "$online_training_dataset" \
