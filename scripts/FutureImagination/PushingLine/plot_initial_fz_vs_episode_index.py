@@ -33,15 +33,15 @@ def correlation(x: np.ndarray, y: np.ndarray) -> float:
 
 def main() -> None:
     training_paths = []
-    for object_id in (2, 3, 4):
+    for object_id in (0, 1, 2, 3, 4):
         training_paths.extend(
-            (DATASET_DIR / "training" / f"WrenchPredObject{object_id}" / "fast").glob(
+            (DATASET_DIR / "training" / f"WrenchPredObject{object_id}" / "fast").rglob(
                 "*.rmb"
             )
         )
 
     validation_paths = []
-    for object_dir in sorted((DATASET_DIR / "validation").glob("WrenchPredObject*")):
+    for object_dir in sorted((DATASET_DIR / "validation").rglob("WrenchPredObject*")):
         for rmb_path in object_dir.glob("*.rmb"):
             if object_dir.name == "WrenchPredObject4" and episode_index(rmb_path) == 0:
                 continue

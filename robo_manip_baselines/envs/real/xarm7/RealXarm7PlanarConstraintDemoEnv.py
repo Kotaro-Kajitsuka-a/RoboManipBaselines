@@ -37,7 +37,7 @@ class PlanarConstraintArmManager(ArmManager):
 
 
 class RealXarm7PlanarConstraintDemoEnv(RealXarm7FixedGripperDemoEnv):
-    max_eef_z_drop = 0.005  # [m]
+    max_eef_z_drop = 0.0075  # [m]
     reset_approach_z_offset = 0.05  # [m]
     reset_eef_pos_tolerance = 0.005  # [m]
     reset_joint_pos_tolerance = np.deg2rad(0.1)  # [rad]
