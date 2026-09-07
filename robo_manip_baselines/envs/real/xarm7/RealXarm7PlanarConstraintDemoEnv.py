@@ -1,3 +1,5 @@
+import time
+
 import numpy as np
 import pinocchio as pin
 
@@ -90,6 +92,8 @@ class RealXarm7PlanarConstraintDemoEnv(RealXarm7FixedGripperDemoEnv):
             )
             obs = self._get_obs()
 
+        self.xarm_api.ft_sensor_set_zero()
+        time.sleep(0.2)
         print(
             f"[{self.__class__.__name__}] Finish moving the robot to the reset position."
         )
