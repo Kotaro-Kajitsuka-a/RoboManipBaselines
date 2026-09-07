@@ -1,3 +1,5 @@
+import time
+
 import numpy as np
 import pinocchio as pin
 
@@ -80,6 +82,7 @@ class RealXarm7PlanarConstraintDemoEnv(RealXarm7FixedGripperDemoEnv):
 
         arm_config = self.body_config_list[0]
         obs = self._get_obs()
+        self._sync_reset_arm_manager(obs)
         arm_joint_pos = obs["joint_pos"][arm_config.arm_joint_idxes]
         arm_joint_pos_error = arm_config.init_arm_joint_pos - arm_joint_pos
         if np.max(np.abs(arm_joint_pos_error)) > self.reset_joint_pos_tolerance:
@@ -101,6 +104,8 @@ class RealXarm7PlanarConstraintDemoEnv(RealXarm7FixedGripperDemoEnv):
             )
             obs = self._get_obs()
 
+        self.xarm_api.ft_sensor_set_zero()
+        time.sleep(0.2)
         print(
             f"[{self.__class__.__name__}] Finish moving the robot to the reset position."
         )
@@ -132,22 +137,30 @@ class RealXarm7PlanarConstraintDemoEnv(RealXarm7FixedGripperDemoEnv):
                 wait=True,
             )
             obs = self._get_obs()
+            self._sync_reset_arm_manager(obs)
 
         print(
             f"[{self.__class__.__name__}] Finish moving the EEF to the reset approach pose."
         )
         return obs
 
-    def _get_obs(self):
-        obs = super()._get_obs()
-
+    def _sync_reset_arm_manager(self, obs):
         arm_config = self.body_config_list[0]
         joint_pos = obs["joint_pos"]
         self.reset_arm_manager.set_command_joint_pos(
             joint_pos[arm_config.arm_joint_idxes],
             joint_pos[arm_config.gripper_joint_idxes],
         )
-        measured_eef_z = self.reset_arm_manager.current_se3.translation[2]
+
+    def _get_obs(self):
+        obs = super()._get_obs()
+
+        arm_config = self.body_config_list[0]
+        joint_pos = obs["joint_pos"]
+        measured_eef_pose = self.reset_arm_manager.get_eef_pose_from_joint_pos(
+            joint_pos[arm_config.arm_joint_idxes]
+        )
+        measured_eef_z = measured_eef_pose[2]
         init_eef_z = self.init_eef_se3.translation[2]
         if measured_eef_z < init_eef_z - self.max_eef_z_drop:
             raise RuntimeError(
