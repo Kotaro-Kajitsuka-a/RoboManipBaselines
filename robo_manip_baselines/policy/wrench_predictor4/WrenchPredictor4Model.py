@@ -40,6 +40,9 @@ class WrenchPredictor4Model(nn.Module):
         assert self.output_head in ("mlp", "mlp_only"), self.output_head
 
         self.material_property = nn.Embedding(num_objects, pb_dim)
+        with torch.no_grad():
+            for object_id in range(num_objects):
+                self.material_property.weight[object_id].fill_(object_id * 0.2)
         self.image_feature_proj = nn.Linear(image_feature_dim, hidden_dim)
         self.state_proj = nn.Linear(state_dim, hidden_dim)
         self.action_proj = nn.Linear(action_dim, hidden_dim)
