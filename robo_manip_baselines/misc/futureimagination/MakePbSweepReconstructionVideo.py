@@ -10,8 +10,12 @@ from diffusers.models import AutoencoderKL
 from pythae.models import AutoModel
 from torch.utils.data import DataLoader
 
-from robo_manip_baselines.common import DataKey, RmbData, denormalize_data
-from robo_manip_baselines.common import find_rmb_files
+from robo_manip_baselines.common import (
+    DataKey,
+    RmbData,
+    denormalize_data,
+    find_rmb_files,
+)
 from robo_manip_baselines.policy.wrench_predictor4.EvalWrenchPredictor4SweepCommon import (
     EvalWrenchPredictor4Dataset,
 )
@@ -21,7 +25,6 @@ from robo_manip_baselines.policy.wrench_predictor4.WrenchPredictor4Model import 
 from robo_manip_baselines.policy.wrench_predictor5.WrenchPredictor5Model import (
     WrenchPredictor5Model,
 )
-
 
 BATCH_SIZE = 64
 WP5_BATCH_SIZE = 8
@@ -142,15 +145,15 @@ def load_policy(checkpoint_dir, checkpoint_name, model_meta_info, device):
     checkpoint = checkpoint_dir / checkpoint_name
     assert checkpoint.is_file(), checkpoint
     policy_name = model_meta_info["policy"]["name"]
+    state_dict = torch.load(checkpoint, map_location=device, weights_only=True)
     if policy_name == "WrenchPredictor4":
-        policy_class = WrenchPredictor4Model
+        policy = WrenchPredictor4Model.from_checkpoint(
+            model_meta_info["policy"]["args"], state_dict
+        )
     else:
         assert policy_name == "WrenchPredictor5", policy_name
-        policy_class = WrenchPredictor5Model
-    policy = policy_class(**model_meta_info["policy"]["args"])
-    policy.load_state_dict(
-        torch.load(checkpoint, map_location=device, weights_only=True)
-    )
+        policy = WrenchPredictor5Model(**model_meta_info["policy"]["args"])
+        policy.load_state_dict(state_dict)
     policy.to(device).eval().requires_grad_(False)
     return policy
 
@@ -199,9 +202,7 @@ def predict_image_features(
                 key: value.to(device) if isinstance(value, torch.Tensor) else value
                 for key, value in batch.items()
             }
-            batch["object_id"] = torch.full_like(
-                batch["object_id"], material_object_id
-            )
+            batch["object_id"] = torch.full_like(batch["object_id"], material_object_id)
             with torch.inference_mode():
                 prediction = policy.predict(batch)["image_feature"][:, -1]
             predicted_batches.append(prediction.cpu().numpy())
@@ -223,9 +224,7 @@ def decode_image_vae_features(vae, features, device):
         )
         with torch.inference_mode():
             reconstruction = vae.decoder(latent).reconstruction
-        reconstructed_batches.append(
-            reconstruction.permute(0, 2, 3, 1).cpu().numpy()
-        )
+        reconstructed_batches.append(reconstruction.permute(0, 2, 3, 1).cpu().numpy())
     reconstructed = np.concatenate(reconstructed_batches)
     return np.round(255.0 * reconstructed).clip(0, 255).astype(np.uint8)
 
@@ -242,9 +241,7 @@ def decode_sd3_features(vae, features, latent_shape, device):
         with torch.inference_mode():
             reconstruction = vae.decode(decode_latent, return_dict=False)[0]
         reconstruction = ((reconstruction.float() + 1.0) / 2.0).clamp(0.0, 1.0)
-        reconstructed_batches.append(
-            reconstruction.permute(0, 2, 3, 1).cpu().numpy()
-        )
+        reconstructed_batches.append(reconstruction.permute(0, 2, 3, 1).cpu().numpy())
     reconstructed = np.concatenate(reconstructed_batches)
     return np.round(255.0 * reconstructed).astype(np.uint8)
 
@@ -252,9 +249,9 @@ def decode_sd3_features(vae, features, latent_shape, device):
 def decode_sd3_latent_ae_features(sd3_vae, latent_ae, features, device):
     reconstructed_batches = []
     for start in range(0, len(features), WP5_BATCH_SIZE):
-        compact_latent = torch.from_numpy(
-            features[start : start + WP5_BATCH_SIZE]
-        ).to(device=device, dtype=torch.float32)
+        compact_latent = torch.from_numpy(features[start : start + WP5_BATCH_SIZE]).to(
+            device=device, dtype=torch.float32
+        )
         with torch.inference_mode():
             flat_sd3_latent = latent_ae.decoder(compact_latent).reconstruction
         assert flat_sd3_latent.shape[1] == SD3_LATENT_DIM, flat_sd3_latent.shape
