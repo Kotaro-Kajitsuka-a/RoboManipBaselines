@@ -359,9 +359,9 @@ class EvalWrenchPredictor4SweepBase:
         return matched_object_keys[0]
 
     def setup_policy(self, checkpoint):
-        self.policy = WrenchPredictor4Model.from_checkpoint(
-            self.model_meta_info["policy"]["args"],
-            torch.load(checkpoint, map_location=self.device, weights_only=True),
+        self.policy = WrenchPredictor4Model(**self.model_meta_info["policy"]["args"])
+        self.policy.load_state_dict(
+            torch.load(checkpoint, map_location=self.device, weights_only=True)
         )
         self.policy.to(self.device)
         self.policy.eval()

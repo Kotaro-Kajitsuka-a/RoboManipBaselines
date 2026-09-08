@@ -41,10 +41,14 @@ def load_policy(
     model_meta_info: dict,
     device: torch.device,
 ) -> WrenchPredictor4Model:
-    policy = WrenchPredictor4Model.from_checkpoint(
-        model_meta_info["policy"]["args"],
-        torch.load(checkpoint_path, map_location=device, weights_only=True),
-    ).to(device)
+    policy = WrenchPredictor4Model(**model_meta_info["policy"]["args"]).to(device)
+    policy.load_state_dict(
+        torch.load(
+            checkpoint_path,
+            map_location=device,
+            weights_only=True,
+        )
+    )
     policy.requires_grad_(False)
     policy.eval()
     return policy

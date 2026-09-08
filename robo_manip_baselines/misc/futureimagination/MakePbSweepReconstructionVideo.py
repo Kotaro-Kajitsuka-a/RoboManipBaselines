@@ -145,15 +145,15 @@ def load_policy(checkpoint_dir, checkpoint_name, model_meta_info, device):
     checkpoint = checkpoint_dir / checkpoint_name
     assert checkpoint.is_file(), checkpoint
     policy_name = model_meta_info["policy"]["name"]
-    state_dict = torch.load(checkpoint, map_location=device, weights_only=True)
     if policy_name == "WrenchPredictor4":
-        policy = WrenchPredictor4Model.from_checkpoint(
-            model_meta_info["policy"]["args"], state_dict
-        )
+        policy_class = WrenchPredictor4Model
     else:
         assert policy_name == "WrenchPredictor5", policy_name
-        policy = WrenchPredictor5Model(**model_meta_info["policy"]["args"])
-        policy.load_state_dict(state_dict)
+        policy_class = WrenchPredictor5Model
+    policy = policy_class(**model_meta_info["policy"]["args"])
+    policy.load_state_dict(
+        torch.load(checkpoint, map_location=device, weights_only=True)
+    )
     policy.to(device).eval().requires_grad_(False)
     return policy
 

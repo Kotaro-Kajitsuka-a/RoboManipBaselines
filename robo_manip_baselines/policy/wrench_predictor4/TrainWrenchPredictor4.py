@@ -131,7 +131,7 @@ class TrainWrenchPredictor4(TrainBase):
             "--hidden_dim",
             type=int,
             default=256,
-            help="Transformer hidden dimension",
+            help="input projection and Transformer hidden dimension",
         )
         parser.add_argument(
             "--nhead",
@@ -152,12 +152,6 @@ class TrainWrenchPredictor4(TrainBase):
             help="output MLP hidden width and Transformer feedforward dimension",
         )
         parser.add_argument(
-            "--mlp_num_hidden_layers",
-            type=int,
-            default=3,
-            help="number of hidden layers in the output MLP",
-        )
-        parser.add_argument(
             "--dropout",
             type=float,
             default=0.1,
@@ -168,7 +162,7 @@ class TrainWrenchPredictor4(TrainBase):
             type=str,
             default="mlp_only",
             choices=["mlp", "mlp_only"],
-            help="mlp: Transformer + MLP; mlp_only: direct-input MLP",
+            help="mlp: input projections + Transformer + MLP; mlp_only: input projections + MLP",
         )
         parser.add_argument(
             "--val_dataset_dir",
@@ -361,7 +355,6 @@ class TrainWrenchPredictor4(TrainBase):
             "nhead": self.args.nhead,
             "num_encoder_layers": self.args.num_encoder_layers,
             "dim_feedforward": self.args.dim_feedforward,
-            "mlp_num_hidden_layers": self.args.mlp_num_hidden_layers,
             "dropout": self.args.dropout,
             "output_head": self.args.output_head,
             "wrench_loss_weight": self.args.wrench_loss_weight,
