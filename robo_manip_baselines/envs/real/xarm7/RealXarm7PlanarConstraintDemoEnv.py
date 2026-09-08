@@ -107,6 +107,15 @@ class RealXarm7PlanarConstraintDemoEnv(RealXarm7FixedGripperDemoEnv):
         self.xarm_api.ft_sensor_set_zero()
         time.sleep(0.2)
         self.xarm_api.set_state(0)
+        xarm_code, ft_sensor_config = self.xarm_api.get_ft_sensor_config()
+        if xarm_code != 0:
+            raise RuntimeError(
+                f"[{self.__class__.__name__}] get_ft_sensor_config failed: xArm API code {xarm_code}"
+            )
+        if ft_sensor_config[1] != 1:
+            raise RuntimeError(
+                f"[{self.__class__.__name__}] Force sensor is not started: ft_is_started={ft_sensor_config[1]}"
+            )
         print(
             f"[{self.__class__.__name__}] Finish moving the robot to the reset position."
         )
