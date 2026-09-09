@@ -128,6 +128,12 @@ class TrainWrenchPredictor4(TrainBase):
             help="dimension of object-wise material property vector",
         )
         parser.add_argument(
+            "--fixed_pb_checkpoint",
+            type=str,
+            default=None,
+            help="WP4 policy_best.ckpt whose PB table is loaded and frozen; other weights are not loaded by this option",
+        )
+        parser.add_argument(
             "--hidden_dim",
             type=int,
             default=256,
@@ -381,6 +387,38 @@ class TrainWrenchPredictor4(TrainBase):
         print(
             f"  - trajectory dim: {self.policy.trajectory_dim}, image feature dim: {self.policy.image_feature_dim}, wrench dim: {self.policy.wrench_dim}"
         )
+
+    def load_ckpt(self):
+        super().load_ckpt()
+        if self.args.fixed_pb_checkpoint is None:
+            return
+
+        checkpoint_path = os.path.realpath(self.args.fixed_pb_checkpoint)
+        meta_info_path = os.path.join(
+            os.path.dirname(checkpoint_path), "model_meta_info.pkl"
+        )
+        with open(meta_info_path, "rb") as file:
+            source_meta_info = pickle.load(file)
+        material_property_info = self.model_meta_info["material_property"]
+        if (
+            source_meta_info["material_property"]["object_key_to_id"]
+            != material_property_info["object_key_to_id"]
+        ):
+            raise ValueError("Fixed PB checkpoint has a different object ID mapping.")
+
+        state_dict = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
+        fixed_pb = state_dict["material_property.weight"]
+        pb_weight = self.policy.material_property.weight
+        if fixed_pb.shape != pb_weight.shape:
+            raise ValueError(
+                f"Fixed PB shape {tuple(fixed_pb.shape)} does not match "
+                f"model PB shape {tuple(pb_weight.shape)}."
+            )
+        with torch.no_grad():
+            pb_weight.copy_(fixed_pb)
+        pb_weight.requires_grad_(False)
+        material_property_info["fixed_pb_checkpoint"] = checkpoint_path
+        print(f"[{self.__class__.__name__}] Load and freeze PBs: {checkpoint_path}")
 
     def train_loop(self):
         for epoch in tqdm(range(self.args.num_epochs)):
