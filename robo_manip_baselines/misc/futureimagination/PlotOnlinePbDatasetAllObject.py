@@ -38,10 +38,12 @@ def parse_args() -> argparse.Namespace:
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
         description=(
             "Overlay online parameter trajectories from WrenchPredObject<N> "
-            "directories. Negative and fractional object IDs are excluded."
+            "anywhere in episode paths. Negative and fractional object IDs are excluded."
         ),
     )
-    parser.add_argument("dataset_path", type=Path, help="parent of object directories")
+    parser.add_argument(
+        "dataset_path", type=Path, help="dataset directory searched recursively"
+    )
     parser.add_argument("--output", type=Path, default=None, help="output PNG path")
     parser.add_argument(
         "--reference_object_ids",
@@ -50,7 +52,7 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help=(
             "seen object IDs to plot and show as references; by default, use all "
-            "nonnegative integer object directories plus references 0, 1, 2"
+            "nonnegative integer object IDs found in paths plus references 0, 1, 2"
         ),
     )
     return parser.parse_args()
@@ -59,31 +61,36 @@ def parse_args() -> argparse.Namespace:
 def load_object_episodes(
     dataset_path: Path, reference_object_ids: list[int] | None
 ) -> tuple[dict[int, list[dict]], list[int]]:
-    object_dirs = {}
-    for path in sorted(dataset_path.iterdir()):
-        if not path.is_dir():
+    object_filenames = {}
+    for filename in sorted(find_rmb_files(str(dataset_path.absolute()))):
+        # Capture fractional IDs as a whole so Object0_5 is not treated as Object0.
+        object_tokens = set(
+            re.findall(r"WrenchPredObject(-?\d+(?:[_.]\d+)?)", filename)
+        )
+        if not object_tokens:
             continue
-        match = re.fullmatch(r"WrenchPredObject(0|[1-9][0-9]*)", path.name)
-        if match:
-            object_dirs[int(match[1])] = path
-        elif path.name.startswith("WrenchPredObject"):
-            print(f"Skip unseen object directory: {path.name}")
+        if any(not token.isdecimal() for token in object_tokens):
+            print(f"Skip unseen object episode: {filename}")
+            continue
+        object_ids = {int(token) for token in object_tokens}
+        if len(object_ids) != 1:
+            raise ValueError(f"Ambiguous object IDs {sorted(object_ids)} in {filename}")
+        object_id = object_ids.pop()
+        object_filenames.setdefault(object_id, []).append(filename)
 
     if reference_object_ids is None:
-        reference_object_ids = sorted({0, 1, 2} | object_dirs.keys())
+        reference_object_ids = sorted({0, 1, 2} | object_filenames.keys())
     assert {0, 1, 2}.issubset(reference_object_ids), reference_object_ids
     assert len(reference_object_ids) == len(set(reference_object_ids))
     assert all(object_id >= 0 for object_id in reference_object_ids)
     reference_object_ids = sorted(reference_object_ids)
 
     object_episodes = {}
-    for object_id, path in sorted(object_dirs.items()):
+    for object_id, filenames in sorted(object_filenames.items()):
         if object_id not in reference_object_ids:
-            print(f"Skip unselected object directory: {path.name}")
+            print(f"Skip unselected object ID: {object_id}")
             continue
-        filenames = sorted(find_rmb_files(str(path)))
-        if filenames:
-            object_episodes[object_id] = [load_episode(f) for f in filenames]
+        object_episodes[object_id] = [load_episode(f) for f in filenames]
     assert object_episodes, f"No seen-object RMB episodes found under {dataset_path}"
     return object_episodes, reference_object_ids
 
