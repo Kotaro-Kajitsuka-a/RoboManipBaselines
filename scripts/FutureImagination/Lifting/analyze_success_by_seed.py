@@ -31,6 +31,7 @@ EVAL_PATTERNS = {
 }
 TRAINING_SEEDS = (42, 52, 62)
 OBJECT_IDS = (0, 1, 2, 4, 5, 6, 7)
+SEEN_OBJECT_IDS = (0, 1, 2)
 TRAINING_SEED_PATTERN = re.compile(r"trainseed(\d+)(?=[_/\.]|$)")
 
 
@@ -86,17 +87,23 @@ def summarize_run(rows: list[dict]) -> list[dict]:
             f"Unexpected seed/object/world entries: {sorted(actual - expected)}"
         )
 
+    groups = {
+        "all": tuple(f"I{i}" for i in OBJECT_IDS),
+        "seen": tuple(f"I{i}" for i in SEEN_OBJECT_IDS),
+        "unseen": tuple(f"I{i}" for i in OBJECT_IDS if i not in SEEN_OBJECT_IDS),
+        **{f"I{i}": (f"I{i}",) for i in OBJECT_IDS},
+    }
     summaries = []
     for seed in (*TRAINING_SEEDS, "all"):
-        for group in ("all", *(f"I{i}" for i in OBJECT_IDS)):
+        for group, object_names in groups.items():
             selected = [
                 r
                 for r in rows
                 if (seed == "all" or r["training_seed"] == seed)
-                and (group == "all" or r["group"] == group)
+                and r["group"] in object_names
             ]
-            expected_count = (3 if seed == "all" else 1) * (
-                70 if group == "all" else 10
+            expected_count = (
+                (len(TRAINING_SEEDS) if seed == "all" else 1) * len(object_names) * 10
             )
             total = len(selected)
             success = sum(r["success"] for r in selected)
@@ -146,13 +153,13 @@ def main() -> None:
         episodes.extend({**metadata, **row} for row in rows)
         for summary in summarize_run(rows):
             summaries.append({**metadata, **summary})
-            if summary["group"] == "all":
+            if summary["group"] in ("all", "seen", "unseen"):
                 total = summary["total"]
                 rate = summary["success_rate"]
                 rate_text = f"{100 * rate:.2f}%" if rate is not None else "N/A"
                 status = "" if summary["complete"] else " INCOMPLETE"
                 print(
-                    f"  seed {summary['training_seed']}: "
+                    f"  seed {summary['training_seed']} {summary['group']}: "
                     f"final {summary['success']}/{total} ({rate_text}), "
                     f"once {summary['success_once']}/{total}; "
                     f"expected {summary['expected_total']}{status}",
