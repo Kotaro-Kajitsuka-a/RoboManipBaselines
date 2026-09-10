@@ -21,6 +21,9 @@ from robo_manip_baselines.common import (
     find_rmb_files,
     get_skipped_data_seq,
 )
+from robo_manip_baselines.misc.futureimagination.Wp4PlotStyle import (
+    PLOT_STYLE,
+)
 from robo_manip_baselines.policy.wrench_predictor4.WrenchPredictor4Dataset import (
     WrenchPredictor4Dataset,
 )
@@ -559,28 +562,34 @@ class EvalWrenchPredictor4SweepBase:
             self.save_checkpoint_heatmap(output_png, checkpoint_stem, checkpoint_rows)
             print(f"[{self.__class__.__name__}] Save heatmap: {output_png}")
 
+    @plt.rc_context(PLOT_STYLE)
     def save_checkpoint_heatmap(self, output_png, checkpoint_stem, rows):
         metrics = self.get_heatmap_metrics()
-        fig, axes = plt.subplots(len(metrics), 2, figsize=(12, 3.5 * len(metrics)))
+        fig, axes = plt.subplots(
+            len(metrics),
+            2,
+            figsize=(13, 4.6 * len(metrics)),
+            squeeze=False,
+            layout="constrained",
+        )
         for row_idx, (metric_name, row_metric_key) in enumerate(metrics):
             error_matrix = self.build_error_matrix(rows, row_metric_key)
             delta_matrix = self.compute_delta_from_correct(error_matrix)
             self.draw_heatmap(
                 axes[row_idx, 0],
                 error_matrix,
-                f"{metric_name} absolute",
+                f"{metric_name}\nAbsolute error",
                 "viridis",
             )
             self.draw_heatmap(
                 axes[row_idx, 1],
                 delta_matrix,
-                f"{metric_name} delta from correct",
+                f"{metric_name}\nDifference from correct parameter",
                 "coolwarm",
                 center_zero=True,
             )
 
         fig.suptitle(f"{checkpoint_stem} sweep", fontsize=13)
-        fig.tight_layout()
         fig.savefig(output_png)
         plt.close(fig)
 
@@ -633,11 +642,11 @@ class EvalWrenchPredictor4SweepBase:
         ax.set_xticks(range(len(self.material_object_keys)))
         ax.set_xticklabels(
             [
-                object_key.replace("WrenchPredObject", "PB")
+                rf"$d_{{{self.object_key_to_id[object_key]}}}$"
                 for object_key in self.material_object_keys
             ],
-            rotation=45,
-            ha="right",
+            rotation=0,
+            fontsize=18,
         )
         ax.set_yticks(range(len(self.target_object_keys)))
         ax.set_yticklabels(
@@ -646,8 +655,11 @@ class EvalWrenchPredictor4SweepBase:
                 for object_key in self.target_object_keys
             ]
         )
-        ax.set_xlabel("used material PB")
-        ax.set_ylabel("actual object")
+        ax.set_xlabel(r"Conditioning parameter $d$")
+        ax.set_ylabel("Actual object")
+        ax.tick_params(length=0, pad=7)
+        for spine in ax.spines.values():
+            spine.set_visible(False)
         for row_idx in range(matrix.shape[0]):
             for col_idx in range(matrix.shape[1]):
                 ax.text(
@@ -656,7 +668,7 @@ class EvalWrenchPredictor4SweepBase:
                     f"{matrix[row_idx, col_idx]:.3g}",
                     ha="center",
                     va="center",
-                    color="white",
-                    fontsize=8,
+                    color="black",
+                    fontsize=14,
                 )
         plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)

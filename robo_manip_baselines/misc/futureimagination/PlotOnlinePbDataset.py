@@ -10,6 +10,9 @@ import numpy as np
 import torch
 
 from robo_manip_baselines.common import DataKey, RmbData, find_rmb_files
+from robo_manip_baselines.misc.futureimagination.Wp4PlotStyle import (
+    PLOT_STYLE,
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -103,6 +106,7 @@ def get_default_output_path(dataset_path: Path) -> Path:
     return dataset_path.resolve() / "online_pb_trajectories.png"
 
 
+@plt.rc_context(PLOT_STYLE)
 def save_plot(
     episodes: list[dict],
     reference_pbs: np.ndarray,
@@ -110,7 +114,7 @@ def save_plot(
     output_path: Path,
 ) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    figure, axis = plt.subplots(figsize=(11, 6.5))
+    figure, axis = plt.subplots(figsize=(8, 4.8), layout="constrained")
 
     for episode_idx, episode in enumerate(episodes):
         axis.plot(
@@ -119,9 +123,7 @@ def save_plot(
             color="tab:blue",
             linewidth=1.0,
             alpha=0.25,
-            label=f"individual episodes (n={len(episodes)})"
-            if episode_idx == 0
-            else None,
+            label=f"Episodes (n={len(episodes)})" if episode_idx == 0 else None,
         )
 
     mean_time, mean_pb = get_mean_trajectory(episodes)
@@ -130,10 +132,10 @@ def save_plot(
         mean_pb,
         color="black",
         linewidth=2.6,
-        label=f"mean trajectory (all {len(episodes)} episodes)",
+        label="Mean",
     )
     reference_colors = (
-        "tab:red",
+        "tab:blue",
         "tab:orange",
         "tab:green",
         "tab:purple",
@@ -153,16 +155,16 @@ def save_plot(
             color=reference_colors[object_id % len(reference_colors)],
             linestyle="--",
             linewidth=2.0,
-            label=f"trained Object{object_id} PB={reference_pb:.4f}",
+            label=rf"$d_{{{object_id}}} = {reference_pb:.4f}$",
         )
 
-    axis.set_xlabel("episode elapsed time [s]")
-    axis.set_ylabel("PB")
-    axis.set_title("Online PB trajectories")
-    axis.grid(alpha=0.3)
-    axis.legend(loc="best")
-    figure.tight_layout()
-    figure.savefig(output_path, dpi=180)
+    axis.set_xlabel("Elapsed time [s]")
+    axis.set_ylabel(r"$d$", fontsize=20)
+    axis.set_title("Online parameter trajectories")
+    axis.grid(True)
+    axis.margins(x=0.01, y=0.08)
+    axis.legend(loc="upper center", bbox_to_anchor=(0.5, -0.18), ncol=3, fontsize=14)
+    figure.savefig(output_path)
     plt.close(figure)
 
 

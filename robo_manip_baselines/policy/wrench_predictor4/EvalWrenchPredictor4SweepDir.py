@@ -6,6 +6,9 @@ import torch
 from tqdm import tqdm
 
 from robo_manip_baselines.common import denormalize_data, get_pose7_from_pose9
+from robo_manip_baselines.misc.futureimagination.Wp4PlotStyle import (
+    PLOT_STYLE,
+)
 from robo_manip_baselines.policy.wrench_predictor4.EvalWrenchPredictor4SweepCommon import (
     WRENCH_LABELS,
     EvalWrenchPredictor4SweepBase,
@@ -296,6 +299,7 @@ class EvalWrenchPredictor4SweepDir(EvalWrenchPredictor4SweepBase):
         )
         return gt_wrench, pred_wrench, position_error, rotation_error
 
+    @plt.rc_context(PLOT_STYLE)
     def save_episode_plot(
         self,
         output_png,
@@ -304,7 +308,9 @@ class EvalWrenchPredictor4SweepDir(EvalWrenchPredictor4SweepBase):
         rmb_stem,
         plot_data,
     ):
-        fig, axes = plt.subplots(8, 1, figsize=(12, 18), sharex=True)
+        fig, axes = plt.subplots(
+            8, 1, figsize=(12, 22), sharex=True, layout="constrained"
+        )
         time_idx = plot_data["time_idx"]
         gt_wrench = plot_data["gt_wrench"]
         material_key_to_pred_wrench = plot_data["material_key_to_pred_wrench"]
@@ -317,18 +323,28 @@ class EvalWrenchPredictor4SweepDir(EvalWrenchPredictor4SweepBase):
                 gt_wrench[:, wrench_idx],
                 color="black",
                 linewidth=2.0,
-                label=f"GT {WRENCH_LABELS[wrench_idx]}",
+                label="Ground truth",
             )
             for material_object_key, pred_wrench in material_key_to_pred_wrench.items():
                 ax.plot(
                     time_idx,
                     pred_wrench[:, wrench_idx],
-                    linewidth=1.2,
-                    label=f"{material_object_key} PB",
+                    linewidth=1.8,
+                    linestyle="-" if material_object_key == actual_object_key else "--",
+                    label=rf"$d_{{{self.object_key_to_id[material_object_key]}}}$",
                 )
-            ax.set_ylabel(WRENCH_LABELS[wrench_idx])
+            ax.set_ylabel(
+                f"{WRENCH_LABELS[wrench_idx]} [{'N' if wrench_idx < 3 else 'N m'}]"
+            )
             ax.grid(True)
-            ax.legend(loc="best", fontsize=8)
+            ax.legend(
+                loc="upper right",
+                fontsize=14,
+                frameon=True,
+                facecolor="white",
+                edgecolor="none",
+                framealpha=0.85,
+            )
 
         ax = axes[6]
         for (
@@ -338,12 +354,20 @@ class EvalWrenchPredictor4SweepDir(EvalWrenchPredictor4SweepBase):
             ax.plot(
                 time_idx,
                 100.0 * position_error,
-                linewidth=1.2,
-                label=f"{material_object_key} PB",
+                linewidth=1.8,
+                linestyle="-" if material_object_key == actual_object_key else "--",
+                label=rf"$d_{{{self.object_key_to_id[material_object_key]}}}$",
             )
-        ax.set_ylabel("block position [cm]")
+        ax.set_ylabel("Position error\n[cm]")
         ax.grid(True)
-        ax.legend(loc="best", fontsize=8)
+        ax.legend(
+            loc="upper right",
+            fontsize=14,
+            frameon=True,
+            facecolor="white",
+            edgecolor="none",
+            framealpha=0.85,
+        )
 
         ax = axes[7]
         for (
@@ -353,19 +377,29 @@ class EvalWrenchPredictor4SweepDir(EvalWrenchPredictor4SweepBase):
             ax.plot(
                 time_idx,
                 rotation_error,
-                linewidth=1.2,
-                label=f"{material_object_key} PB",
+                linewidth=1.8,
+                linestyle="-" if material_object_key == actual_object_key else "--",
+                label=rf"$d_{{{self.object_key_to_id[material_object_key]}}}$",
             )
-        ax.set_xlabel("skipped time index of t + H - 1")
-        ax.set_ylabel("block rotation [deg]")
+        ax.set_xlabel("Subsampled time index ($t + H - 1$)")
+        ax.set_ylabel("Rotation error\n[deg]")
         ax.grid(True)
-        ax.legend(loc="best", fontsize=8)
+        ax.legend(
+            loc="upper right",
+            fontsize=14,
+            frameon=True,
+            facecolor="white",
+            edgecolor="none",
+            framealpha=0.85,
+        )
 
         fig.suptitle(
             f"{checkpoint_stem} / actual={actual_object_key} / {rmb_stem}",
             fontsize=11,
         )
-        fig.tight_layout()
+        for ax in axes:
+            ax.margins(x=0.01)
+            ax.tick_params(axis="x", labelbottom=True)
         fig.savefig(output_png)
         plt.close(fig)
 

@@ -1,0 +1,28 @@
+"""Shared appearance for WP4 sweep and online PB figures."""
+
+PLOT_STYLE = {
+    "font.family": "DejaVu Sans",
+    "font.size": 14,
+    "mathtext.fontset": "dejavusans",
+    "axes.labelsize": 16,
+    "axes.titlesize": 16,
+    "axes.titlepad": 12,
+    "axes.linewidth": 0.8,
+    "axes.spines.top": False,
+    "axes.spines.right": False,
+    "axes.axisbelow": True,
+    "xtick.labelsize": 13,
+    "ytick.labelsize": 13,
+    "xtick.direction": "out",
+    "ytick.direction": "out",
+    "grid.color": "0.88",
+    "grid.linewidth": 0.6,
+    "legend.fontsize": 12,
+    "legend.frameon": False,
+    "savefig.dpi": 300,
+    "savefig.facecolor": "white",
+    "savefig.bbox": "tight",
+    "savefig.pad_inches": 0.1,
+    "pdf.fonttype": 42,
+    "ps.fonttype": 42,
+}

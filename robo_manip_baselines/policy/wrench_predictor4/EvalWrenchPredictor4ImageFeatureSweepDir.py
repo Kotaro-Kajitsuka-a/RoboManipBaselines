@@ -6,6 +6,9 @@ import torch
 from tqdm import tqdm
 
 from robo_manip_baselines.common import denormalize_data
+from robo_manip_baselines.misc.futureimagination.Wp4PlotStyle import (
+    PLOT_STYLE,
+)
 from robo_manip_baselines.policy.wrench_predictor4.EvalWrenchPredictor4SweepCommon import (
     WRENCH_LABELS,
     EvalWrenchPredictor4SweepBase,
@@ -208,9 +211,9 @@ class EvalWrenchPredictor4ImageFeatureSweepDir(EvalWrenchPredictor4SweepBase):
                         material_object_key
                     ]
                     for wrench_idx, wrench_label in enumerate(WRENCH_LABELS):
-                        row[f"{material_object_key}_pred_{wrench_label}"] = (
-                            pred_wrench[time_offset, wrench_idx]
-                        )
+                        row[f"{material_object_key}_pred_{wrench_label}"] = pred_wrench[
+                            time_offset, wrench_idx
+                        ]
                     row[f"{material_object_key}_normalized_feature_mse"] = plot_data[
                         "material_key_to_normalized_feature_mse"
                     ][material_object_key][time_offset]
@@ -280,12 +283,13 @@ class EvalWrenchPredictor4ImageFeatureSweepDir(EvalWrenchPredictor4SweepBase):
             pred["image_feature"][:, -1].detach().cpu().numpy()
             - batch["image_feature"][:, -1].detach().cpu().numpy()
         )
-        normalized_feature_mse = np.square(
-            normalized_image_feature_abs_error
-        ).mean(axis=-1)
+        normalized_feature_mse = np.square(normalized_image_feature_abs_error).mean(
+            axis=-1
+        )
         normalized_feature_mae = normalized_image_feature_abs_error.mean(axis=-1)
         return gt_wrench, pred_wrench, normalized_feature_mse, normalized_feature_mae
 
+    @plt.rc_context(PLOT_STYLE)
     def save_episode_plot(
         self,
         output_png,
@@ -294,7 +298,9 @@ class EvalWrenchPredictor4ImageFeatureSweepDir(EvalWrenchPredictor4SweepBase):
         rmb_stem,
         plot_data,
     ):
-        fig, axes = plt.subplots(8, 1, figsize=(12, 18), sharex=True)
+        fig, axes = plt.subplots(
+            8, 1, figsize=(12, 22), sharex=True, layout="constrained"
+        )
         time_idx = plot_data["time_idx"]
         for wrench_idx, ax in enumerate(axes[:6]):
             ax.plot(
@@ -302,7 +308,7 @@ class EvalWrenchPredictor4ImageFeatureSweepDir(EvalWrenchPredictor4SweepBase):
                 plot_data["gt_wrench"][:, wrench_idx],
                 color="black",
                 linewidth=2.0,
-                label=f"GT {WRENCH_LABELS[wrench_idx]}",
+                label="Ground truth",
             )
             for material_object_key, pred_wrench in plot_data[
                 "material_key_to_pred_wrench"
@@ -310,42 +316,62 @@ class EvalWrenchPredictor4ImageFeatureSweepDir(EvalWrenchPredictor4SweepBase):
                 ax.plot(
                     time_idx,
                     pred_wrench[:, wrench_idx],
-                    linewidth=1.2,
-                    label=f"{material_object_key} PB",
+                    linewidth=1.8,
+                    linestyle="-" if material_object_key == actual_object_key else "--",
+                    label=rf"$d_{{{self.object_key_to_id[material_object_key]}}}$",
                 )
-            ax.set_ylabel(WRENCH_LABELS[wrench_idx])
+            ax.set_ylabel(
+                f"{WRENCH_LABELS[wrench_idx]} [{'N' if wrench_idx < 3 else 'N m'}]"
+            )
             ax.grid(True)
-            ax.legend(loc="best", fontsize=8)
+            ax.legend(
+                loc="upper right",
+                fontsize=14,
+                frameon=True,
+                facecolor="white",
+                edgecolor="none",
+                framealpha=0.85,
+            )
 
         for ax, data_key, ylabel in (
             (
                 axes[6],
                 "material_key_to_normalized_feature_mse",
-                "normalized feature MSE",
+                "Normalized feature\nMSE",
             ),
             (
                 axes[7],
                 "material_key_to_normalized_feature_mae",
-                "normalized feature MAE",
+                "Normalized feature\nMAE",
             ),
         ):
             for material_object_key, error in plot_data[data_key].items():
                 ax.plot(
                     time_idx,
                     error,
-                    linewidth=1.2,
-                    label=f"{material_object_key} PB",
+                    linewidth=1.8,
+                    linestyle="-" if material_object_key == actual_object_key else "--",
+                    label=rf"$d_{{{self.object_key_to_id[material_object_key]}}}$",
                 )
             ax.set_ylabel(ylabel)
             ax.grid(True)
-            ax.legend(loc="best", fontsize=8)
+            ax.legend(
+                loc="upper right",
+                fontsize=14,
+                frameon=True,
+                facecolor="white",
+                edgecolor="none",
+                framealpha=0.85,
+            )
 
-        axes[-1].set_xlabel("skipped time index of t + H - 1")
+        axes[-1].set_xlabel("Subsampled time index ($t + H - 1$)")
         fig.suptitle(
             f"{checkpoint_stem} / actual={actual_object_key} / {rmb_stem}",
             fontsize=11,
         )
-        fig.tight_layout()
+        for ax in axes:
+            ax.margins(x=0.01)
+            ax.tick_params(axis="x", labelbottom=True)
         fig.savefig(output_png)
         plt.close(fig)
 
