@@ -324,7 +324,7 @@ class EvalWrenchPredictor4SweepDir(EvalWrenchPredictor4SweepBase):
                 gt_wrench[:, wrench_idx],
                 color="black",
                 linewidth=2.0,
-                label="Ground truth",
+                label="GT",
             )
             for material_object_key, pred_wrench in material_key_to_pred_wrench.items():
                 ax.plot(
