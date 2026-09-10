@@ -309,8 +309,9 @@ class EvalWrenchPredictor4SweepDir(EvalWrenchPredictor4SweepBase):
         plot_data,
     ):
         fig, axes = plt.subplots(
-            8, 1, figsize=(12, 22), sharex=True, layout="constrained"
+            8, 1, figsize=(7, 25), sharex=True, layout="constrained"
         )
+        fig.get_layout_engine().set(h_pad=0.18, hspace=0.08)
         time_idx = plot_data["time_idx"]
         gt_wrench = plot_data["gt_wrench"]
         material_key_to_pred_wrench = plot_data["material_key_to_pred_wrench"]
@@ -393,7 +394,7 @@ class EvalWrenchPredictor4SweepDir(EvalWrenchPredictor4SweepBase):
         )
 
         fig.suptitle(
-            f"Checkpoint: {checkpoint_stem} / Actual: {actual_object_key} / {rmb_stem}",
+            f"Checkpoint: {checkpoint_stem} / Actual: {actual_object_key}\n{rmb_stem}",
             fontsize=11,
         )
         for ax in axes:

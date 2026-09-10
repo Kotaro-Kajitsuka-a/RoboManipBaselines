@@ -103,7 +103,7 @@ def save_plot(
     output_path: Path,
 ) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    figure, axis = plt.subplots(figsize=(8, 4.8), layout="constrained")
+    figure, axis = plt.subplots(figsize=(7, 4.8), layout="constrained")
     for object_id, episodes in sorted(object_episodes.items()):
         for episode in episodes:
             axis.plot(
