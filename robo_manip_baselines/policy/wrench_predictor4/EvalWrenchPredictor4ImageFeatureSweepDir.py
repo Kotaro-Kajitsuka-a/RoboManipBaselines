@@ -364,12 +364,12 @@ class EvalWrenchPredictor4ImageFeatureSweepDir(EvalWrenchPredictor4SweepBase):
                 framealpha=0.85,
             )
 
-        axes[-1].set_xlabel("Subsampled time index ($t + H - 1$)")
         fig.suptitle(
-            f"{checkpoint_stem} / actual={actual_object_key} / {rmb_stem}",
+            f"Checkpoint: {checkpoint_stem} / Actual: {actual_object_key} / {rmb_stem}",
             fontsize=11,
         )
         for ax in axes:
+            ax.set_xlabel("Time index")
             ax.margins(x=0.01)
             ax.tick_params(axis="x", labelbottom=True)
         fig.savefig(output_png)

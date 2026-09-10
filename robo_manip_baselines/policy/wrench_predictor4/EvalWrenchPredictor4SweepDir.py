@@ -381,7 +381,6 @@ class EvalWrenchPredictor4SweepDir(EvalWrenchPredictor4SweepBase):
                 linestyle="-" if material_object_key == actual_object_key else "--",
                 label=rf"$d_{{{self.object_key_to_id[material_object_key]}}}$",
             )
-        ax.set_xlabel("Subsampled time index ($t + H - 1$)")
         ax.set_ylabel("Rotation error\n[deg]")
         ax.grid(True)
         ax.legend(
@@ -394,10 +393,11 @@ class EvalWrenchPredictor4SweepDir(EvalWrenchPredictor4SweepBase):
         )
 
         fig.suptitle(
-            f"{checkpoint_stem} / actual={actual_object_key} / {rmb_stem}",
+            f"Checkpoint: {checkpoint_stem} / Actual: {actual_object_key} / {rmb_stem}",
             fontsize=11,
         )
         for ax in axes:
+            ax.set_xlabel("Time index")
             ax.margins(x=0.01)
             ax.tick_params(axis="x", labelbottom=True)
         fig.savefig(output_png)

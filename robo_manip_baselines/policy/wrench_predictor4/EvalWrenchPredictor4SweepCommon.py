@@ -589,7 +589,7 @@ class EvalWrenchPredictor4SweepBase:
                 center_zero=True,
             )
 
-        fig.suptitle(f"{checkpoint_stem} sweep", fontsize=13)
+        fig.suptitle(f"Sweep: {checkpoint_stem}", fontsize=13)
         fig.savefig(output_png)
         plt.close(fig)
 
@@ -644,7 +644,7 @@ class EvalWrenchPredictor4SweepBase:
             vmin = -abs_max
             vmax = abs_max
         im = ax.imshow(display_matrix, cmap=cmap, vmin=vmin, vmax=vmax)
-        ax.set_title(title)
+        ax.set_title(title[0].upper() + title[1:])
         ax.set_xticks(range(len(self.material_object_keys)))
         ax.set_xticklabels(
             [
@@ -661,7 +661,6 @@ class EvalWrenchPredictor4SweepBase:
                 for object_key in self.target_object_keys
             ]
         )
-        ax.set_xlabel(r"Conditioning parameter $d$")
         ax.set_ylabel("Actual object")
         ax.tick_params(length=0, pad=7)
         for spine in ax.spines.values():
