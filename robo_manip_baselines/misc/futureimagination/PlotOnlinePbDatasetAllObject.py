@@ -126,7 +126,7 @@ def save_plot(
         )
     axis.set_xlabel("Elapsed time [s]")
     axis.set_ylabel(r"$d$", fontsize=20)
-    axis.set_title("Online parameter trajectories")
+    axis.set_title("Online parameter estimation")
     axis.grid(True)
     axis.margins(x=0.01, y=0.08)
     axis.legend(loc="upper center", bbox_to_anchor=(0.5, -0.18), ncol=3, fontsize=14)

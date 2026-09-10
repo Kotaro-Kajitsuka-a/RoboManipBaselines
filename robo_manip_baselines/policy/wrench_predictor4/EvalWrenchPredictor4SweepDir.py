@@ -359,7 +359,7 @@ class EvalWrenchPredictor4SweepDir(EvalWrenchPredictor4SweepBase):
                 linestyle="-" if material_object_key == actual_object_key else "--",
                 label=rf"$d_{{{self.object_key_to_id[material_object_key]}}}$",
             )
-        ax.set_ylabel("Position error\n[cm]")
+        ax.set_ylabel("Position prediction\nerror [cm]")
         ax.grid(True)
         ax.legend(
             loc="upper right",
@@ -382,7 +382,7 @@ class EvalWrenchPredictor4SweepDir(EvalWrenchPredictor4SweepBase):
                 linestyle="-" if material_object_key == actual_object_key else "--",
                 label=rf"$d_{{{self.object_key_to_id[material_object_key]}}}$",
             )
-        ax.set_ylabel("Rotation error\n[deg]")
+        ax.set_ylabel("Rotation prediction\nerror [deg]")
         ax.grid(True)
         ax.legend(
             loc="upper right",

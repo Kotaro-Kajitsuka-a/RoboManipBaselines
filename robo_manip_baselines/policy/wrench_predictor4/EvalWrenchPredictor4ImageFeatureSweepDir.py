@@ -338,12 +338,12 @@ class EvalWrenchPredictor4ImageFeatureSweepDir(EvalWrenchPredictor4SweepBase):
             (
                 axes[6],
                 "material_key_to_normalized_feature_mse",
-                "Normalized feature\nMSE",
+                "Normalized feature\nprediction MSE",
             ),
             (
                 axes[7],
                 "material_key_to_normalized_feature_mae",
-                "Normalized feature\nMAE",
+                "Normalized feature\nprediction MAE",
             ),
         ):
             for material_object_key, error in plot_data[data_key].items():
