@@ -629,15 +629,21 @@ class EvalWrenchPredictor4SweepBase:
         cmap,
         center_zero=False,
     ):
+        # Use one engineering-scale factor for cells and colorbar alike.
+        abs_max = np.nanmax(np.abs(matrix))
+        exponent = int(3 * np.floor(np.log10(abs_max) / 3)) if abs_max > 0 else 0
+        display_matrix = matrix / 10.0**exponent
+        if exponent != 0:
+            title += "\n" + rf"$\times 10^{{{exponent}}}$"
         vmin = None
         vmax = None
         if center_zero:
-            abs_max = np.nanmax(np.abs(matrix))
+            abs_max = np.nanmax(np.abs(display_matrix))
             if abs_max == 0:
                 abs_max = 1.0
             vmin = -abs_max
             vmax = abs_max
-        im = ax.imshow(matrix, cmap=cmap, vmin=vmin, vmax=vmax)
+        im = ax.imshow(display_matrix, cmap=cmap, vmin=vmin, vmax=vmax)
         ax.set_title(title)
         ax.set_xticks(range(len(self.material_object_keys)))
         ax.set_xticklabels(
@@ -665,7 +671,9 @@ class EvalWrenchPredictor4SweepBase:
                 ax.text(
                     col_idx,
                     row_idx,
-                    f"{matrix[row_idx, col_idx]:.3g}",
+                    f"{display_matrix[row_idx, col_idx]:.2f}".rstrip("0").rstrip(".")
+                    if abs(display_matrix[row_idx, col_idx]) >= 0.005
+                    else "0",
                     ha="center",
                     va="center",
                     color="black",
