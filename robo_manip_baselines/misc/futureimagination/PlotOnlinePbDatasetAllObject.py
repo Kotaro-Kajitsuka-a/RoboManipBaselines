@@ -19,13 +19,13 @@ from robo_manip_baselines.misc.futureimagination.PlotOnlinePbDataset import (
 )
 from robo_manip_baselines.misc.futureimagination.Wp4PlotStyle import PLOT_STYLE
 
-# Match the reference-line colors in PlotOnlinePbDataset.
+# Use the same object colors for trajectories and reference lines.
 REFERENCE_COLORS = (
     "tab:blue",
     "tab:orange",
     "tab:green",
+    "tab:red",
     "tab:purple",
-    "tab:brown",
     "tab:pink",
     "tab:gray",
     "tab:olive",
