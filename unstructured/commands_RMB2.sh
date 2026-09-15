@@ -363,7 +363,7 @@ python ./robo_manip_baselines/bin/Rollout.py DiffusionPolicyOnlinePb \
 python ./robo_manip_baselines/bin/Rollout.py DiffusionPolicy \
     RealXarm7PlanarConstraintDemo   \
     --config ./robo_manip_baselines/envs/configs/RealXarm7DemoEnvKajitsukafront.yaml  \
-     --checkpoint robo_manip_baselines/checkpoint/DiffusionPolicy/PushingLine/DatasetPushingLine_EefPose_Baseline_seed42/policy_last.ckpt   \
+     --checkpoint robo_manip_baselines/checkpoint/DiffusionPolicy/DatasetPushingLine/DatasetPushingLine_EefPose_Baseline_seed42/policy_last.ckpt   \
        --wait_before_start --skip_draw 50000 --save_rollout \
        --world_idx_repeat_count 30    --auto_exit --max_duration 15.0
 
@@ -371,12 +371,12 @@ python ./robo_manip_baselines/bin/Rollout.py DiffusionPolicy \
 python ./robo_manip_baselines/bin/Rollout.py DiffusionPolicyOnlinePb \
   RealXarm7PlanarConstraintDemo  \
      --config ./robo_manip_baselines/envs/configs/RealXarm7DemoEnvKajitsukafront.yaml  \
-      --checkpoint robo_manip_baselines/checkpoint/DiffusionPolicy/PushingLine/   \
+      --checkpoint robo_manip_baselines/checkpoint/DiffusionPolicy/DatasetPushingLine/DatasetPushingLine_FrontVAE9_Wp4JointPos_EefPoseWrench_ConstantPB_seed    \
       --wait_before_start --skip_draw 50000 --save_rollout --world_idx_repeat_count 30   \
       --auto_exit --max_duration 15.0     \
       --wp4_checkpoint robo_manip_baselines/checkpoint/WrenchPredictor4/DatasetPushingLine_front_image_vae_9_joint_pos/policy_best.ckpt     \
       --image_vae_checkpoint robo_manip_baselines/checkpoint/ImageVAE/DatasetPushingLine_front_9/final_model/       \
-      --image_vae_camera_name front  --initial_object_id 2  --online_pb_lr 2e-2 --wrench_loss_weight 1.0   \
+      --image_vae_camera_name front  --initial_object_id 2  --online_pb_lr 8e-3 --wrench_loss_weight 1.0   \
       --demo_name PushingLine_constant_normal
 
 ##############################################
