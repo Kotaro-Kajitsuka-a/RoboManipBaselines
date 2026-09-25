@@ -26,7 +26,6 @@ commit.sh
 
 
 asobiba.ipynb
-check_hdf5.ipynb
 
 
 robo_manip_baselines/rollout_debug_log_expanded.csv
