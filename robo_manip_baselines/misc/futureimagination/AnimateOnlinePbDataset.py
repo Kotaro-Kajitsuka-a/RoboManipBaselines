@@ -73,21 +73,18 @@ def save_animation(
     figure, axis = plt.subplots(figsize=(7, 4.8), layout="constrained")
     # Initialize with the whole trajectory to fix the limits before animation.
     (line,) = axis.plot(time, pb, color="black", linewidth=2.0)
-    (point,) = axis.plot([], [], "o", color="black", markersize=5)
     for object_id, reference_pb in enumerate(reference_pbs):
         axis.axhline(
             reference_pb,
             color=REFERENCE_COLORS[object_id],
             linestyle="--",
             linewidth=2.0,
-            label=rf"PB{object_id}: $d_{{{object_id}}} = {reference_pb:.4f}$",
         )
     axis.set_xlabel("Elapsed time [s]")
     axis.set_ylabel(r"$d$", fontsize=20)
     axis.set_title("Online parameter estimation")
     axis.grid(True)
     axis.margins(x=0.01, y=0.08)
-    axis.legend(loc="upper center", bbox_to_anchor=(0.5, -0.18), ncol=3, fontsize=11)
     figure.canvas.draw()
     axis.set_autoscale_on(False)
     figure.set_layout_engine("none")
@@ -111,9 +108,6 @@ def save_animation(
         with writer.saving(figure, str(output_path), dpi=150):
             for frame_idx in range(len(time)):
                 line.set_data(time[: frame_idx + 1], pb[: frame_idx + 1])
-                point.set_data(
-                    time[frame_idx : frame_idx + 1], pb[frame_idx : frame_idx + 1]
-                )
                 writer.grab_frame()
     finally:
         plt.close(figure)
