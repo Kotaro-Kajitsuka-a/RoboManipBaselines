@@ -1,6 +1,7 @@
 """Overlay seen-object online parameter trajectories, colored by true object."""
 
 import argparse
+import json
 import re
 from pathlib import Path
 
@@ -45,6 +46,12 @@ def parse_args() -> argparse.Namespace:
         "dataset_path", type=Path, help="dataset directory searched recursively"
     )
     parser.add_argument("--output", type=Path, default=None, help="output PNG path")
+    for object_id in range(3):
+        parser.add_argument(
+            f"--d_{object_id}",
+            type=float,
+            help=f"override reference line d_{object_id} (default: checkpoint value)",
+        )
     parser.add_argument(
         "--reference_object_ids",
         type=int,
@@ -101,6 +108,7 @@ def save_plot(
     reference_pbs: np.ndarray,
     reference_object_ids: list[int],
     output_path: Path,
+    metadata: dict[str, str],
 ) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     figure, axis = plt.subplots(figsize=(7, 4.8), layout="constrained")
@@ -130,7 +138,7 @@ def save_plot(
     axis.grid(True)
     axis.margins(x=0.01, y=0.08)
     axis.legend(loc="upper center", bbox_to_anchor=(0.5, -0.18), ncol=3, fontsize=14)
-    figure.savefig(output_path)
+    figure.savefig(output_path, metadata=metadata)
     plt.close(figure)
 
 
@@ -142,15 +150,36 @@ def main() -> None:
     episodes = [episode for group in object_episodes.values() for episode in group]
     checkpoint = get_source_checkpoint(episodes)
     assert checkpoint.name == "policy_best.ckpt", checkpoint
-    reference_pbs = load_reference_pbs(checkpoint, reference_object_ids)
+    reference_pbs = load_reference_pbs(checkpoint, reference_object_ids).astype(float)
+    reference_overrides = {}
+    for object_id in range(3):
+        value = getattr(args, f"d_{object_id}")
+        if value is not None:
+            if not np.isfinite(value):
+                raise ValueError(f"--d_{object_id} must be finite")
+            reference_overrides[f"d_{object_id}"] = value
+            reference_pbs[reference_object_ids.index(object_id)] = value
     output_path = args.output
     if output_path is None:
         output_path = (
             args.dataset_path.resolve() / "online_pb_trajectories_all_object.png"
         )
-    save_plot(object_episodes, reference_pbs, reference_object_ids, output_path)
+    save_plot(
+        object_episodes,
+        reference_pbs,
+        reference_object_ids,
+        output_path,
+        metadata={
+            "wp4_checkpoint": str(checkpoint),
+            "reference_object_ids": json.dumps(reference_object_ids),
+            "reference_pbs": json.dumps(reference_pbs.tolist()),
+            "reference_overrides": json.dumps(reference_overrides),
+        },
+    )
 
     print(f"reference checkpoint: {checkpoint}")
+    print(f"reference PBs: {dict(zip(reference_object_ids, reference_pbs.tolist()))}")
+    print(f"reference overrides: {reference_overrides}")
     for object_id, group in object_episodes.items():
         final_pb = np.asarray([episode["plot_pb"][-1] for episode in group])
         print(

@@ -31,6 +31,12 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("rmb_file", type=Path, help="single .rmb episode directory")
     parser.add_argument("--output", type=Path, help="output MP4 path")
+    for object_id in range(3):
+        parser.add_argument(
+            f"--d_{object_id}",
+            type=float,
+            help=f"override reference line d_{object_id} (default: checkpoint value)",
+        )
     return parser.parse_args()
 
 
@@ -67,6 +73,7 @@ def save_animation(
     reference_pbs: np.ndarray,
     fps: Fraction,
     output_path: Path,
+    reference_overrides: dict[str, float],
 ) -> None:
     time = episode["plot_time"]
     pb = episode["plot_pb"]
@@ -93,7 +100,15 @@ def save_animation(
     writer = FFMpegWriter(
         fps=fps,
         codec="libx264",
-        metadata={"comment": f"WP4 checkpoint: {episode['source_checkpoint']}"},
+        metadata={
+            "comment": json.dumps(
+                {
+                    "wp4_checkpoint": str(episode["source_checkpoint"]),
+                    "reference_pbs": reference_pbs.tolist(),
+                    "reference_overrides": reference_overrides,
+                }
+            )
+        },
         extra_args=[
             "-pix_fmt",
             "yuv420p",
@@ -140,7 +155,15 @@ def main() -> None:
     checkpoint = episode["source_checkpoint"]
     if checkpoint.name != "policy_best.ckpt":
         raise ValueError(f"Expected the experiment's policy_best.ckpt: {checkpoint}")
-    reference_pbs = load_reference_pbs(checkpoint, [0, 1, 2])
+    reference_pbs = load_reference_pbs(checkpoint, [0, 1, 2]).astype(float)
+    reference_overrides = {}
+    for object_id in range(3):
+        value = getattr(args, f"d_{object_id}")
+        if value is not None:
+            if not np.isfinite(value):
+                raise ValueError(f"--d_{object_id} must be finite")
+            reference_overrides[f"d_{object_id}"] = value
+            reference_pbs[object_id] = value
     output = (args.output or rmb_file / "online_pb_animation.mp4").resolve()
     if output.suffix != ".mp4" or output.name.endswith(".rmb.mp4"):
         raise ValueError(
@@ -151,10 +174,12 @@ def main() -> None:
 
     print(f"reference videos: {[str(video) for video in videos]}")
     print(f"reference checkpoint: {checkpoint}")
+    print(f"reference PBs: {reference_pbs.tolist()}")
+    print(f"reference overrides: {reference_overrides}")
     print(
         f"frames: {frames}, fps: {fps}, duration: {float(duration):.6f} s", flush=True
     )
-    save_animation(episode, reference_pbs, fps, output)
+    save_animation(episode, reference_pbs, fps, output, reference_overrides)
     if read_video_timing(output) != timing:
         raise RuntimeError(f"Output video timing does not match the source: {output}")
     print(output)
