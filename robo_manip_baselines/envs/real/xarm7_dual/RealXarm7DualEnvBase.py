@@ -207,6 +207,26 @@ class RealXarm7DualEnvBase(RealEnvBase):
         self.xarm_api_left.set_state(0)
         self.xarm_api_right.set_state(0)
 
+        xarm_code, ft_sensor_config = self.xarm_api_left.get_ft_sensor_config()
+        if xarm_code != 0:
+            raise RuntimeError(
+                f"[{self.__class__.__name__}] left get_ft_sensor_config failed: xArm API code {xarm_code}"
+            )
+        if ft_sensor_config[1] != 1:
+            raise RuntimeError(
+                f"[{self.__class__.__name__}] left force sensor is not started: ft_is_started={ft_sensor_config[1]}"
+            )
+
+        xarm_code, ft_sensor_config = self.xarm_api_right.get_ft_sensor_config()
+        if xarm_code != 0:
+            raise RuntimeError(
+                f"[{self.__class__.__name__}] right get_ft_sensor_config failed: xArm API code {xarm_code}"
+            )
+        if ft_sensor_config[1] != 1:
+            raise RuntimeError(
+                f"[{self.__class__.__name__}] right force sensor is not started: ft_is_started={ft_sensor_config[1]}"
+            )
+
         print(
             f"[{self.__class__.__name__}] Finish moving the robot to the reset position."
         )
@@ -323,12 +343,19 @@ class RealXarm7DualEnvBase(RealEnvBase):
         right_gripper_joint_vel = np.zeros(1)
 
         # Get wrench from force sensor
-        left_wrench = np.array(
-            self.xarm_api_left.get_ft_sensor_data()[1], dtype=np.float64
-        )
-        right_wrench = np.array(
-            self.xarm_api_right.get_ft_sensor_data()[1], dtype=np.float64
-        )
+        xarm_code, left_wrench = self.xarm_api_left.get_ft_sensor_data()
+        if xarm_code != 0:
+            raise RuntimeError(
+                f"[{self.__class__.__name__}] left get_ft_sensor_data failed: xArm API code {xarm_code}"
+            )
+        left_wrench = np.array(left_wrench, dtype=np.float64)
+
+        xarm_code, right_wrench = self.xarm_api_right.get_ft_sensor_data()
+        if xarm_code != 0:
+            raise RuntimeError(
+                f"[{self.__class__.__name__}] right get_ft_sensor_data failed: xArm API code {xarm_code}"
+            )
+        right_wrench = np.array(right_wrench, dtype=np.float64)
 
         return {
             "joint_pos": np.concatenate(
