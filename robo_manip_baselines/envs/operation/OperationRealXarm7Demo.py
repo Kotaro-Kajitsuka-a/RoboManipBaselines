@@ -11,10 +11,11 @@ class GraspPhase(GraspPhaseBase):
 
 
 class OperationRealXarm7Demo:
-    def __init__(self, robot_ip, camera_ids, gelsight_ids=None):
+    def __init__(self, robot_ip, camera_ids, gelsight_ids=None, has_gripper=True):
         self.robot_ip = robot_ip
         self.camera_ids = camera_ids
         self.gelsight_ids = gelsight_ids
+        self.has_gripper = has_gripper
         super().__init__()
 
     def setup_env(self, render_mode="human"):
@@ -23,6 +24,7 @@ class OperationRealXarm7Demo:
             robot_ip=self.robot_ip,
             camera_ids=self.camera_ids,
             gelsight_ids=self.gelsight_ids,
+            has_gripper=self.has_gripper,
         )
 
     def get_pre_motion_phases(self):

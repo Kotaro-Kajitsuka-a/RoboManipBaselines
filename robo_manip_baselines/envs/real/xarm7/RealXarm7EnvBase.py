@@ -59,12 +59,14 @@ class RealXarm7EnvBase(RealEnvBase):
         camera_ids,
         gelsight_ids,
         init_qpos,
+        has_gripper=True,
         **kwargs,
     ):
         super().__init__(**kwargs)
 
         # Setup robot
         self.init_qpos = init_qpos
+        self.has_gripper = has_gripper
         self.joint_vel_limit = np.deg2rad(180)  # [rad/s]
         self.body_config_list = [
             ArmConfig(
@@ -97,10 +99,11 @@ class RealXarm7EnvBase(RealEnvBase):
         self.xarm_api.set_mode(6)
         self.xarm_api.set_state(0)
         self.xarm_api.set_collision_sensitivity(1)
-        self.xarm_api.clean_gripper_error()
-        self.xarm_api.set_gripper_mode(0)
-        self.xarm_api.set_gripper_enable(True)
-        time.sleep(0.2)
+        if self.has_gripper:
+            self.xarm_api.clean_gripper_error()
+            self.xarm_api.set_gripper_mode(0)
+            self.xarm_api.set_gripper_enable(True)
+            time.sleep(0.2)
         xarm_code, joint_states = self.xarm_api.get_joint_states(is_radian=True)
         if xarm_code != 0:
             raise RuntimeError(
@@ -177,12 +180,13 @@ class RealXarm7EnvBase(RealEnvBase):
             )
 
         # Send command to xArm gripper
-        gripper_pos = action[self.body_config_list[0].gripper_joint_idxes][0]
-        xarm_code = self.xarm_api.set_gripper_position(gripper_pos, wait=False)
-        if xarm_code != 0:
-            raise RuntimeError(
-                f"[{self.__class__.__name__}] Invalid xArm API code: {xarm_code}"
-            )
+        if self.has_gripper:
+            gripper_pos = action[self.body_config_list[0].gripper_joint_idxes][0]
+            xarm_code = self.xarm_api.set_gripper_position(gripper_pos, wait=False)
+            if xarm_code != 0:
+                raise RuntimeError(
+                    f"[{self.__class__.__name__}] Invalid xArm API code: {xarm_code}"
+                )
 
         # Wait
         elapsed_duration = time.time() - start_time
@@ -200,12 +204,14 @@ class RealXarm7EnvBase(RealEnvBase):
         arm_joint_vel = joint_states[1]
         self.arm_joint_pos_actual = arm_joint_pos.copy()
 
-        # Get state from Robotiq gripper
-        xarm_code, gripper_pos = self.xarm_api.get_gripper_position()
-        if xarm_code != 0:
-            raise RuntimeError(
-                f"[{self.__class__.__name__}] Invalid xArm API code: {xarm_code}"
-            )
+        # Keep the gripper observation slot even when no gripper is connected.
+        gripper_pos = 0.0
+        if self.has_gripper:
+            xarm_code, gripper_pos = self.xarm_api.get_gripper_position()
+            if xarm_code != 0:
+                raise RuntimeError(
+                    f"[{self.__class__.__name__}] Invalid xArm API code: {xarm_code}"
+                )
         gripper_joint_pos = np.array([gripper_pos], dtype=np.float64)
         gripper_joint_vel = np.zeros(1)
 
