@@ -1,10 +1,39 @@
 import time
 
+import numpy as np
+import pinocchio as pin
+
+from robo_manip_baselines.common import ArmManager, get_se3_from_pose
+
 from .RealXarm7DemoEnv import RealXarm7DemoEnv
 
 
+class SafeXarm7ArmManager(ArmManager):
+    def set_command_eef_pose(self, eef_pose):
+        if isinstance(eef_pose, pin.SE3):
+            target_se3 = eef_pose.copy()
+        else:
+            target_se3 = get_se3_from_pose(eef_pose)
+
+        # Use measured joints, not current_se3 (which follows commanded joints).
+        measured_eef_pos = self.get_eef_pose_from_joint_pos(
+            np.asarray(self.env.unwrapped.arm_joint_pos_actual, dtype=np.float64)
+        )[:3]
+        position_offset = target_se3.translation - measured_eef_pos
+        position_offset_norm = np.linalg.norm(position_offset)
+        max_position_offset = 1e-3 * self.env.unwrapped.max_eef_position_offset
+        if position_offset_norm > max_position_offset:
+            target_se3.translation = measured_eef_pos + (
+                max_position_offset * position_offset / position_offset_norm
+            )
+
+        super().set_command_eef_pose(target_se3)
+
+
 class RealXarm7SafeDemoEnv(RealXarm7DemoEnv):
-    min_eef_z = 40.0  # [mm]
+    min_eef_z = -125.0  # [mm]
+    # Maximum distance from measured EEF position to commanded EEF position [mm].
+    max_eef_position_offset = 10.0
     reset_eef_speed = 30  # 10 mm/sec when robot reset
     reset_eef_position = [
         325.564056,
@@ -14,6 +43,10 @@ class RealXarm7SafeDemoEnv(RealXarm7DemoEnv):
         -0.0106,
         0.809589,
     ]  # default value  x=400, y=-50, z=150, roll=-180, pitch=0, yaw=0,
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.body_config_list[0].BodyManagerClass = SafeXarm7ArmManager
 
     def _reset_robot(self):
         time.sleep(0.2)
