@@ -19,7 +19,7 @@ class RealXarm7DemoEnv(RealXarm7DemoEnv):
     def _reset_robot(self):
         time.sleep(0.2)
         self.xarm_api.set_mode(7)
-        self.set_state(0)
+        self.xarm_api.set_state(0)
         time.sleep(0.2)
         self.xarm_api.set_position(
             *self.reset_eef_position,
@@ -28,9 +28,9 @@ class RealXarm7DemoEnv(RealXarm7DemoEnv):
             wait=True,
         )
 
-        super()._reset_robot()
-
         time.sleep(0.2)
         self.xarm_api.set_mode(6)
-        self.set_state(0)
-        time.sleep(0.2)
+        self.xarm_api.set_state(0)
+        time.sleep(4.0)
+
+        super()._reset_robot()
