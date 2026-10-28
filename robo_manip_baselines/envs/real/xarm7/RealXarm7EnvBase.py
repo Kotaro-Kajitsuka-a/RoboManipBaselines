@@ -125,7 +125,9 @@ class RealXarm7EnvBase(RealEnvBase):
             ),
         )
         time.sleep(0.5)
-        self.xarm_api.set_collision_sensitivity(5)
+        self._check_xarm_code(
+            "set_collision_sensitivity", self.xarm_api.set_collision_sensitivity(5)
+        )
         time.sleep(0.2)
         xarm_code, joint_states = self.xarm_api.get_joint_states(is_radian=True)
         if xarm_code != 0:

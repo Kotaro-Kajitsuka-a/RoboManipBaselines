@@ -10,4 +10,5 @@ class OperationRealXarm7SafeDemo(OperationRealXarm7Demo):
             robot_ip=self.robot_ip,
             camera_ids=self.camera_ids,
             gelsight_ids=self.gelsight_ids,
+            has_gripper=self.has_gripper,
         )
