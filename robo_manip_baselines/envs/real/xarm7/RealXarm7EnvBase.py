@@ -106,11 +106,23 @@ class RealXarm7EnvBase(RealEnvBase):
             time.sleep(0.2)
 
         # collision detection with ft sensor
-        self.xarm_api.set_ft_collision_detection(True)
-        self.xarm_api.set_ft_collision_rebound(True)
-        self.xarm_api.set_ft_collision_threshold([50.1, 5.1, 50.1, 0.11, 0.11, 0.11])
-        self.xarm_api.set_ft_collision_reb_distance(
-            [20.0, 20.0, 20.0, 3.0, 3.0, 3.0], is_radian=False
+        self._check_xarm_code(
+            "set_ft_collision_detection", self.xarm_api.set_ft_collision_detection(True)
+        )
+        self._check_xarm_code(
+            "set_ft_collision_rebound", self.xarm_api.set_ft_collision_rebound(True)
+        )
+        self._check_xarm_code(
+            "set_ft_collision_threshold",
+            self.xarm_api.set_ft_collision_threshold(
+                [50.1, 5.1, 50.1, 0.11, 0.11, 0.11]
+            ),
+        )
+        self._check_xarm_code(
+            "set_ft_collision_reb_distance",
+            self.xarm_api.set_ft_collision_reb_distance(
+                [20.0, 20.0, 20.0, 3.0, 3.0, 3.0], is_radian=False
+            ),
         )
         time.sleep(0.5)
         self.xarm_api.set_collision_sensitivity(5)
@@ -129,6 +141,11 @@ class RealXarm7EnvBase(RealEnvBase):
 
     def close(self):
         self.xarm_api.disconnect()
+
+    @staticmethod
+    def _check_xarm_code(name, code):
+        if code != 0:
+            raise RuntimeError(f"{name} failed: code={code}")
 
     def setup_input_device(self, input_device_name, motion_manager, overwrite_kwargs):
         if input_device_name == "spacemouse":
