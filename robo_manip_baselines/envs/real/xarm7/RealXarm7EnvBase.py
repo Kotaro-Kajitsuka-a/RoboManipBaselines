@@ -96,7 +96,15 @@ class RealXarm7EnvBase(RealEnvBase):
         self.xarm_api.clean_error()
         self.xarm_api.set_mode(6)
         self.xarm_api.set_state(0)
-        self.xarm_api.set_collision_sensitivity(1)
+        # collision detection with ft sensor
+        self.xarm_api.set_ft_collision_detection(True)
+        self.xarm_api.set_ft_collision_rebound(True)
+        self.xarm_api.set_ft_collision_threshold([50.1, 5.1, 50.1, 0.11, 0.11, 0.11])
+        self.xarm_api.set_ft_collision_reb_distance(
+            [20.0, 20.0, 20.0, 3.0, 3.0, 3.0], is_radian=False
+        )
+        time.sleep(0.5)
+        self.xarm_api.set_collision_sensitivity(5)
         self.xarm_api.clean_gripper_error()
         self.xarm_api.set_gripper_mode(0)
         self.xarm_api.set_gripper_enable(True)
