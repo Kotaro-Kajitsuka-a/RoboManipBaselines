@@ -1,1 +1,2 @@
 from .RealXarm7DemoEnv import RealXarm7DemoEnv
+from .RealXarm7SafeDemoEnv import RealXarm7DemoEnv as RealXarm7SafeDemoEnv
