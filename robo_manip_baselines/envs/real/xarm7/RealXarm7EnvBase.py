@@ -144,9 +144,17 @@ class RealXarm7EnvBase(RealEnvBase):
     def close(self):
         self.xarm_api.disconnect()
 
-    @staticmethod
-    def _check_xarm_code(name, code):
+    def _check_xarm_code(self, name, code):
         if code != 0:
+            query_code, err_warn = self.xarm_api.get_err_warn_code(show=True)
+            if query_code == 0 and err_warn[0] == 54:
+                print(
+                    f"[{self.__class__.__name__}] get_c54_error_info"
+                    f"(code, [direction, threshold, actual_ft])"
+                    f"{self.xarm_api.get_c54_error_info()}"
+                )
+            elif query_code != 0:
+                print(self.xarm_api.get_err_warn_code(show=True))
             raise RuntimeError(f"{name} failed: code={code}")
 
     def setup_input_device(self, input_device_name, motion_manager, overwrite_kwargs):
@@ -209,17 +217,16 @@ class RealXarm7EnvBase(RealEnvBase):
         scaled_joint_vel_limit = (
             np.clip(joint_vel_limit_scale, 0.01, 10.0) * self.joint_vel_limit
         )
-        xarm_code = self.xarm_api.set_servo_angle(
-            angle=arm_joint_pos_command,
-            speed=scaled_joint_vel_limit,
-            mvtime=duration,
-            is_radian=True,
-            wait=False,
+        self._check_xarm_code(
+            "set_servo_angle",
+            self.xarm_api.set_servo_angle(
+                angle=arm_joint_pos_command,
+                speed=scaled_joint_vel_limit,
+                mvtime=duration,
+                is_radian=True,
+                wait=False,
+            ),
         )
-        if xarm_code != 0:
-            raise RuntimeError(
-                f"[{self.__class__.__name__}] Invalid xArm API code: {xarm_code}"
-            )
 
         # Send command to xArm gripper
         if self.has_gripper:
