@@ -17,8 +17,10 @@ class RealXarm7DemoEnv(RealXarm7EnvBase):
         )
 
     def get_input_device_kwargs(self, input_device_name):
-        if input_device_name in ("spacemouse", "spacemouse_vel"):
+        if input_device_name == "spacemouse":
             return {"gripper_scale": 20.0}
+        elif input_device_name == "spacemouse_vel":
+            return {"pos_scale": 2e-2, "gripper_scale": 20.0}
         else:
             return super().get_input_device_kwargs(input_device_name)
 

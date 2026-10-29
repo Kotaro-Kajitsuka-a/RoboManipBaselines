@@ -1,12 +1,13 @@
 import numpy as np
+import pinocchio as pin
 
 from .SpacemouseInputDevice import SpacemouseInputDevice
 
 
 class SpacemouseVelocityInputDevice(SpacemouseInputDevice):
-    """Translation-only position targets relative to the measured EEF position."""
+    """Measured-position targets with incremental SpaceMouse rotation."""
 
-    max_position_offset = 0.01  # [m]
+    max_position_offset = 0.02  # [m]
 
     def set_command_data(self):
         measured_eef_pos = self.arm_manager.get_eef_pose_from_joint_pos(
@@ -21,9 +22,14 @@ class SpacemouseVelocityInputDevice(SpacemouseInputDevice):
         if offset_norm > self.max_position_offset:
             position_offset *= self.max_position_offset / offset_norm
 
-        # Re-anchor every command to the measurement; keep the commanded rotation.
+        delta_rpy = self.rpy_scale * np.array(
+            [-self.state.roll, -self.state.pitch, -2.0 * self.state.yaw]
+        )
+
+        # Re-anchor translation to the measurement and accumulate rotation input.
         target_se3 = self.arm_manager.target_se3.copy()
         target_se3.translation = measured_eef_pos + position_offset
+        target_se3.rotation = pin.rpy.rpyToMatrix(*delta_rpy) @ target_se3.rotation
         self.arm_manager.set_command_eef_pose(target_se3)
 
         gripper_joint_pos = self.arm_manager.get_command_gripper_joint_pos().copy()
