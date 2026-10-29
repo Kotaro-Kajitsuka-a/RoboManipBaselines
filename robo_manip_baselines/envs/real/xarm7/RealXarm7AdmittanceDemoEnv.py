@@ -9,6 +9,15 @@ class RealXarm7AdmittanceDemoEnv(RealXarm7SafeDemoEnv):
         time.sleep(0.2)
         self.setup_admittance_control()
 
+    # override
+    def get_input_device_kwargs(self, input_device_name):
+        if input_device_name == "spacemouse":
+            return {"pos_scale": 2e-3, "rpy_scale": 5e-3, "gripper_scale": 20.0}
+        else:
+            raise ValueError(
+                f"For admittance control, only 'spasemouse' is supported. Requested config{input_device_name}"
+            )
+
     def setup_admittance_control(self):
         # Disable admittance while configuring its parameters.
         self._check_xarm_code("set_ft_sensor_mode", self.xarm_api.set_ft_sensor_mode(0))

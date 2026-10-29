@@ -33,7 +33,7 @@ class SafeXarm7ArmManager(ArmManager):
 class RealXarm7SafeDemoEnv(RealXarm7DemoEnv):
     min_eef_z = -125.0  # [mm]
     # Maximum distance from measured EEF position to commanded EEF position [mm].
-    max_eef_position_offset = 10.0
+    max_eef_position_offset = 100.0
     reset_eef_speed = 30  # 10 mm/sec when robot reset
     reset_eef_position = [
         325.564056,
@@ -47,6 +47,7 @@ class RealXarm7SafeDemoEnv(RealXarm7DemoEnv):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.body_config_list[0].BodyManagerClass = SafeXarm7ArmManager
+        self.xarm_api.set_tcp_offset([0.0, 0.0, 300.0, 0.0, 0.0, 0.0])
 
     def _reset_robot(self):
         time.sleep(0.2)
@@ -54,11 +55,12 @@ class RealXarm7SafeDemoEnv(RealXarm7DemoEnv):
         self.xarm_api.set_state(0)
         time.sleep(0.2)
 
+        start_time = time.time()
         while True:
             xarm_code, measured_eef_pose = self.xarm_api.get_position(is_radian=False)
             self._check_xarm_code("get_position", xarm_code)
             position_reached = all(
-                abs(measured_eef_pose[i] - self.reset_eef_position[i]) < 1.0
+                abs(measured_eef_pose[i] - self.reset_eef_position[i]) < 10.0  # 10.0 mm
                 for i in range(3)
             )
             # Wrap angular differences to [-180, 180) degrees.
@@ -67,9 +69,24 @@ class RealXarm7SafeDemoEnv(RealXarm7DemoEnv):
                 - 180.0
                 for i in range(3, 6)
             ]
-            orientation_reached = all(abs(error) < 1.0 for error in orientation_errors)
+            orientation_reached = all(
+                abs(error) < 1.0 for error in orientation_errors
+            )  # 1.0deg
             if position_reached and orientation_reached:
                 break
+
+            if time.time() - start_time >= 10.0:
+                position_errors = [
+                    measured_eef_pose[i] - self.reset_eef_position[i] for i in range(3)
+                ]
+                raise TimeoutError(
+                    f"Reset EEF pose timeout after 10 seconds. "
+                    f"Position errors (mm): {position_errors}, "
+                    f"Orientation errors (degrees): {orientation_errors}, "
+                    f"Measured pose: {measured_eef_pose}, "
+                    f"Target pose: {self.reset_eef_position}"
+                )
+
             self._get_obs(measured_eef_pose)  # for safety check
             xarm_code = self.xarm_api.set_position(
                 *self.reset_eef_position,

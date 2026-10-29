@@ -98,7 +98,6 @@ class RealXarm7EnvBase(RealEnvBase):
         self.xarm_api.clean_error()
         self.xarm_api.set_mode(6)
         self.xarm_api.set_state(0)
-        self.xarm_api.set_collision_sensitivity(1)
         if self.has_gripper:
             self.xarm_api.clean_gripper_error()
             self.xarm_api.set_gripper_mode(0)
@@ -115,7 +114,7 @@ class RealXarm7EnvBase(RealEnvBase):
         self._check_xarm_code(
             "set_ft_collision_threshold",
             self.xarm_api.set_ft_collision_threshold(
-                [50.1, 5.1, 50.1, 0.11, 0.11, 0.11]
+                [10.1, 10.1, 5.1, 3.11, 3.11, 0.51]
             ),
         )
         self._check_xarm_code(
