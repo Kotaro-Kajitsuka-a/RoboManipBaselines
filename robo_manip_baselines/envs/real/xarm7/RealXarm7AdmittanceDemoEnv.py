@@ -12,7 +12,7 @@ class RealXarm7AdmittanceDemoEnv(RealXarm7SafeDemoEnv):
     # override
     def get_input_device_kwargs(self, input_device_name):
         if input_device_name == "spacemouse":
-            return {"pos_scale": 2e-3, "rpy_scale": 5e-3, "gripper_scale": 20.0}
+            return super().get_input_device_kwargs(input_device_name)
         else:
             raise ValueError(
                 f"For admittance control, only 'spasemouse' is supported. Requested config{input_device_name}"

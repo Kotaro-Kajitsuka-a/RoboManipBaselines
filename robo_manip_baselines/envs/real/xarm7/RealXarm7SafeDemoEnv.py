@@ -47,7 +47,16 @@ class RealXarm7SafeDemoEnv(RealXarm7DemoEnv):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.body_config_list[0].BodyManagerClass = SafeXarm7ArmManager
-        self.xarm_api.set_tcp_offset([0.0, 0.0, 300.0, 0.0, 0.0, 0.0])
+        self._check_xarm_code(
+            "set_tcp_offset",
+            self.xarm_api.set_tcp_offset([0.0, 0.0, 300.0, 0.0, 0.0, 0.0]),
+        )
+
+    def get_input_device_kwargs(self, input_device_name):
+        if input_device_name == "spacemouse":
+            return {"pos_scale": 2e-3, "rpy_scale": 5e-3, "gripper_scale": 20.0}
+        else:
+            return super().get_input_device_kwargs(input_device_name)
 
     def _reset_robot(self):
         time.sleep(0.2)
@@ -76,6 +85,7 @@ class RealXarm7SafeDemoEnv(RealXarm7DemoEnv):
                 break
 
             if time.time() - start_time >= 10.0:
+                stop_code = self.xarm_api.set_state(4)
                 position_errors = [
                     measured_eef_pose[i] - self.reset_eef_position[i] for i in range(3)
                 ]
@@ -84,7 +94,8 @@ class RealXarm7SafeDemoEnv(RealXarm7DemoEnv):
                     f"Position errors (mm): {position_errors}, "
                     f"Orientation errors (degrees): {orientation_errors}, "
                     f"Measured pose: {measured_eef_pose}, "
-                    f"Target pose: {self.reset_eef_position}"
+                    f"Target pose: {self.reset_eef_position}; "
+                    f"set_state(4) code={stop_code}"
                 )
 
             self._get_obs(measured_eef_pose)  # for safety check
