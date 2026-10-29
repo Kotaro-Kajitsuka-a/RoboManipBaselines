@@ -114,13 +114,13 @@ class RealXarm7EnvBase(RealEnvBase):
         self._check_xarm_code(
             "set_ft_collision_threshold",
             self.xarm_api.set_ft_collision_threshold(
-                [10.1, 10.1, 5.1, 3.11, 3.11, 0.51]
+                [15.1, 15.1, 15.1, 2.11, 2.11, 0.51]
             ),
         )
         self._check_xarm_code(
             "set_ft_collision_reb_distance",
             self.xarm_api.set_ft_collision_reb_distance(
-                [20.0, 20.0, 20.0, 3.0, 3.0, 3.0], is_radian=False
+                [10.0, 10.0, 20.0, 3.0, 3.0, 3.0], is_radian=False
             ),
         )
         time.sleep(0.5)

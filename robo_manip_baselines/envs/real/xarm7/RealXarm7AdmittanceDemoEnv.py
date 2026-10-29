@@ -26,7 +26,7 @@ class RealXarm7AdmittanceDemoEnv(RealXarm7SafeDemoEnv):
         K_ori = 4  #  Rx/Ry/Rz rotational stiffness coefficient, range: 0 ~ 20 (Nm/rad)
 
         # Attention: for M and J, smaller value means less effort to drive the arm, but may also be less stable, please be careful.
-        M = float(0.06)  #  x/y/z equivalent mass; range: 0.02 ~ 1 kg
+        M = float(0.03)  #  x/y/z equivalent mass; range: 0.02 ~ 1 kg
         J = (
             M * 0.01
         )  #  Rx/Ry/Rz equivalent moment of inertia, range: 1e-4 ~ 0.01 (Kg*m^2)
