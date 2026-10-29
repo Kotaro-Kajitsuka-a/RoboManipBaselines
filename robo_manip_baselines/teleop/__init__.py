@@ -1,5 +1,6 @@
 from .InputDeviceBase import InputDeviceBase
 from .SpacemouseInputDevice import SpacemouseInputDevice
+from .SpacemouseVelocityInputDevice import SpacemouseVelocityInputDevice
 from .KeyboardInputDevice import KeyboardInputDevice
 from .SpacemouseMobileInputDevice import SpacemouseMobileInputDevice
 from .GelloInputDevice import GelloInputDevice
