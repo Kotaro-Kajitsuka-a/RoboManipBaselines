@@ -115,7 +115,7 @@ class RealXarm7EnvBase(RealEnvBase):
         self._check_xarm_code(
             "set_ft_collision_threshold",
             self.xarm_api.set_ft_collision_threshold(
-                [15.1, 15.1, 20.1, 2.11, 2.11, 0.51]
+                [15.1, 15.1, 20.1, 3.11, 3.11, 0.51]
             ),
         )
         self._check_xarm_code(
@@ -147,15 +147,15 @@ class RealXarm7EnvBase(RealEnvBase):
     def _check_xarm_code(self, name, code):
         if code != 0:
             query_code, err_warn = self.xarm_api.get_err_warn_code(show=True)
-            if query_code == 0 and err_warn[0] == 54:
-                print(
-                    f"[{self.__class__.__name__}] get_c54_error_info"
-                    f"(code, [direction, threshold, actual_ft])"
-                    f"{self.xarm_api.get_c54_error_info()}"
-                )
-            elif query_code != 0:
-                print(self.xarm_api.get_err_warn_code(show=True))
-            raise RuntimeError(f"{name} failed: code={code}")
+            servo_query_code, servo_errors = self.xarm_api.get_servo_error_code()
+            servo_errors = ", ".join(
+                f"J{i + 1}=0x{int(error):02X}" for i, error in enumerate(servo_errors)
+            )
+            raise RuntimeError(
+                f"{name} failed: code={code}; "
+                f"err_warn=({query_code}, {err_warn}); "
+                f"servo_errors=({servo_query_code}, [{servo_errors}])"
+            )
 
     def setup_input_device(self, input_device_name, motion_manager, overwrite_kwargs):
         if input_device_name == "spacemouse":
