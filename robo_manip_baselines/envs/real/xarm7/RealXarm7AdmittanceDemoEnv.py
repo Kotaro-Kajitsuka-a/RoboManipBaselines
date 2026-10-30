@@ -31,7 +31,7 @@ class RealXarm7AdmittanceDemoEnv(RealXarm7SafeDemoEnv):
             M * 0.01
         )  #  Rx/Ry/Rz equivalent moment of inertia, range: 1e-4 ~ 0.01 (Kg*m^2)
 
-        c_axis = [1, 1, 1, 1, 1, 1]  # set z axis as compliant axis
+        c_axis = [1, 1, 1, 0, 0, 1]  # set z axis as compliant axis
         ref_frame = 0  # 0 : base , 1 : tool
 
         self._check_xarm_code(

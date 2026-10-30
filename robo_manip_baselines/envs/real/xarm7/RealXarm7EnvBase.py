@@ -115,7 +115,7 @@ class RealXarm7EnvBase(RealEnvBase):
         self._check_xarm_code(
             "set_ft_collision_threshold",
             self.xarm_api.set_ft_collision_threshold(
-                [15.1, 15.1, 15.1, 2.11, 2.11, 0.51]
+                [15.1, 15.1, 20.1, 2.11, 2.11, 0.51]
             ),
         )
         self._check_xarm_code(
