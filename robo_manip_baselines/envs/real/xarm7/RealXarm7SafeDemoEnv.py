@@ -31,7 +31,7 @@ class SafeXarm7ArmManager(ArmManager):
 
 
 class RealXarm7SafeDemoEnv(RealXarm7DemoEnv):
-    min_eef_z = -125.0  # [mm]
+    min_eef_z = -325.0  # [mm]
     # Maximum distance from measured EEF position to commanded EEF position [mm].
     max_eef_position_offset = 50.0
     reset_eef_speed = 30  # 10 mm/sec when robot reset
@@ -84,13 +84,13 @@ class RealXarm7SafeDemoEnv(RealXarm7DemoEnv):
             if position_reached and orientation_reached:
                 break
 
-            if time.time() - start_time >= 10.0:
+            if time.time() - start_time >= 20.0:
                 stop_code = self.xarm_api.set_state(4)
                 position_errors = [
                     measured_eef_pose[i] - self.reset_eef_position[i] for i in range(3)
                 ]
                 raise TimeoutError(
-                    f"Reset EEF pose timeout after 10 seconds. "
+                    f"Reset EEF pose timeout after 20 seconds. "
                     f"Position errors (mm): {position_errors}, "
                     f"Orientation errors (degrees): {orientation_errors}, "
                     f"Measured pose: {measured_eef_pose}, "
