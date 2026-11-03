@@ -7,7 +7,7 @@ from .SpacemouseInputDevice import SpacemouseInputDevice
 class SpacemouseVelocityInputDevice(SpacemouseInputDevice):
     """Measured-position targets with incremental SpaceMouse rotation."""
 
-    max_position_offset = 0.02  # [m]
+    max_position_offset = 0.04  # [m]
 
     def set_command_data(self):
         measured_eef_pos = self.arm_manager.get_eef_pose_from_joint_pos(

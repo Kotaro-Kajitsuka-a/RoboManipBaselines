@@ -126,7 +126,7 @@ class RealXarm7EnvBase(RealEnvBase):
         )
         time.sleep(0.5)
         self._check_xarm_code(
-            "set_collision_sensitivity", self.xarm_api.set_collision_sensitivity(5)
+            "set_collision_sensitivity", self.xarm_api.set_collision_sensitivity(4)
         )
         time.sleep(0.2)
         xarm_code, joint_states = self.xarm_api.get_joint_states(is_radian=True)
@@ -147,9 +147,11 @@ class RealXarm7EnvBase(RealEnvBase):
     def _check_xarm_code(self, name, code):
         if code != 0:
             query_code, err_warn = self.xarm_api.get_err_warn_code(show=True)
-            servo_query_code, servo_errors = self.xarm_api.get_servo_error_code()
+            servo_query_code, servo_info = self.xarm_api.get_servo_debug_msg()
             servo_errors = ", ".join(
-                f"J{i + 1}=0x{int(error):02X}" for i, error in enumerate(servo_errors)
+                f"J{info['servo_id']}={info['code']} ({info['title']})"
+                for info in servo_info
+                if info["servo_id"] <= 7
             )
             raise RuntimeError(
                 f"{name} failed: code={code}; "
