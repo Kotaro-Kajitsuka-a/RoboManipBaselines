@@ -7,8 +7,14 @@ import torch
 from robo_manip_baselines.policy.wrench_predictor4.WrenchPredictor4Dataset import (
     WrenchPredictor4Dataset,
 )
+from robo_manip_baselines.policy.wrench_predictor4.WrenchPredictor4MLPModel import (
+    WrenchPredictor4MLPModel,
+)
 from robo_manip_baselines.policy.wrench_predictor4.WrenchPredictor4Model import (
     WrenchPredictor4Model,
+)
+from robo_manip_baselines.policy.wrench_predictor4.WrenchPredictor4TransformerModel import (
+    WrenchPredictor4TransformerModel,
 )
 
 
@@ -40,7 +46,7 @@ def load_policy(
     checkpoint_path: Path,
     model_meta_info: dict,
     device: torch.device,
-) -> WrenchPredictor4Model:
+) -> WrenchPredictor4MLPModel | WrenchPredictor4TransformerModel:
     policy = WrenchPredictor4Model(**model_meta_info["policy"]["args"]).to(device)
     policy.load_state_dict(
         torch.load(

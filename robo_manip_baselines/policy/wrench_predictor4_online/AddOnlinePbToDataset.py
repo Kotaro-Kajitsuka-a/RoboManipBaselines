@@ -12,8 +12,11 @@ from robo_manip_baselines.common import (
     find_rmb_files,
     set_random_seed,
 )
-from robo_manip_baselines.policy.wrench_predictor4.WrenchPredictor4Model import (
-    WrenchPredictor4Model,
+from robo_manip_baselines.policy.wrench_predictor4.WrenchPredictor4MLPModel import (
+    WrenchPredictor4MLPModel,
+)
+from robo_manip_baselines.policy.wrench_predictor4.WrenchPredictor4TransformerModel import (
+    WrenchPredictor4TransformerModel,
 )
 from robo_manip_baselines.policy.wrench_predictor4_online.WrenchPredictor4OnlineDataset import (
     WrenchPredictor4OnlineDataset,
@@ -92,7 +95,7 @@ def parse_args() -> argparse.Namespace:
 def adapt_pb_trajectory(
     filename: str,
     initial_pb: np.ndarray,
-    policy: WrenchPredictor4Model,
+    policy: WrenchPredictor4MLPModel | WrenchPredictor4TransformerModel,
     model_meta_info: dict,
     device: torch.device,
     learning_rate: float,

@@ -137,7 +137,7 @@ class TrainWrenchPredictor4(TrainBase):
             "--hidden_dim",
             type=int,
             default=256,
-            help="input projection and Transformer hidden dimension",
+            help="input projection and Transformer hidden dimension (mlp head only)",
         )
         parser.add_argument(
             "--nhead",
@@ -168,7 +168,7 @@ class TrainWrenchPredictor4(TrainBase):
             type=str,
             default="mlp_only",
             choices=["mlp", "mlp_only"],
-            help="mlp: input projections + Transformer + MLP; mlp_only: input projections + MLP",
+            help="mlp: input projections + Transformer + one-hidden-layer MLP; mlp_only: concatenated raw inputs + three-hidden-layer MLP",
         )
         parser.add_argument(
             "--val_dataset_dir",
