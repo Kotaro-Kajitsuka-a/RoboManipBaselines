@@ -5,6 +5,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 import torch
+from PIL import Image, ImageDraw, ImageFont
 from pythae.models import AutoModel
 
 from robo_manip_baselines.common import (
@@ -22,11 +23,11 @@ from robo_manip_baselines.policy.wrench_predictor4_online.WrenchPredictor4Online
     load_policy,
 )
 
-
 BATCH_SIZE = 64
 REFERENCE_OBJECT_IDS = (0, 1, 2)
 DEFAULT_OUTPUT_SIZE = (640, 480)
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
+CAPTION_FONT = ImageFont.truetype("DejaVuSans.ttf", 15)
 
 
 def parse_args() -> argparse.Namespace:
@@ -99,9 +100,7 @@ def resolve_recorded_path(value) -> Path:
 
     for part_idx in range(len(parts) - 1):
         if parts[part_idx : part_idx + len(marker)] == marker:
-            relocated_path = REPOSITORY_ROOT.joinpath(
-                *parts[part_idx:]
-            ).resolve()
+            relocated_path = REPOSITORY_ROOT.joinpath(*parts[part_idx:]).resolve()
             if relocated_path.exists():
                 return relocated_path
 
@@ -156,11 +155,7 @@ def load_image_source_info(
 ) -> tuple[Path, str, bool]:
     with RmbData(str(rmb_path)) as rmb_data:
         has_stored_features = image_feature_key in rmb_data
-        feature_attrs = (
-            rmb_data[image_feature_key].attrs
-            if has_stored_features
-            else {}
-        )
+        feature_attrs = rmb_data[image_feature_key].attrs if has_stored_features else {}
 
         if vae_checkpoint_override is not None:
             vae_checkpoint = vae_checkpoint_override.resolve()
@@ -176,17 +171,13 @@ def load_image_source_info(
                 "use --vae_checkpoint",
                 rmb_path,
             )
-            vae_checkpoint = resolve_recorded_path(
-                feature_attrs["model"]
-            )
+            vae_checkpoint = resolve_recorded_path(feature_attrs["model"])
 
         if camera_name_override is not None:
             camera_name = camera_name_override
 
         elif "online_pb_image_vae_camera_name" in rmb_data.attrs:
-            camera_name = str(
-                rmb_data.attrs["online_pb_image_vae_camera_name"]
-            )
+            camera_name = str(rmb_data.attrs["online_pb_image_vae_camera_name"])
 
         elif "source_camera" in feature_attrs:
             camera_name = str(feature_attrs["source_camera"])
@@ -369,11 +360,7 @@ def read_video(
         len(target_raw_idxes),
     )
 
-    encoded_features = (
-        np.concatenate(encoded_batches)
-        if encode_features
-        else None
-    )
+    encoded_features = np.concatenate(encoded_batches) if encode_features else None
 
     return selected_frames, encoded_features, fps
 
@@ -505,17 +492,14 @@ def predict_farthest_features(
         len(start_idxes),
         BATCH_SIZE,
     ):
-        batch_start_idxes = start_idxes[
-            batch_start : batch_start + BATCH_SIZE
-        ]
+        batch_start_idxes = start_idxes[batch_start : batch_start + BATCH_SIZE]
 
         batch_observation_idxes = latest_observation_idxes[
             batch_start : batch_start + BATCH_SIZE
         ]
 
         time_idxes = np.clip(
-            batch_start_idxes[:, np.newaxis]
-            + np.arange(horizon),
+            batch_start_idxes[:, np.newaxis] + np.arange(horizon),
             0,
             episode_len - 1,
         )
@@ -576,9 +560,7 @@ def predict_farthest_features(
             -1,
         )
 
-        predicted_batches.append(
-            farthest_prediction.cpu().numpy()
-        )
+        predicted_batches.append(farthest_prediction.cpu().numpy())
 
         online_pb_batches.append(batch_online_pb)
 
@@ -619,9 +601,7 @@ def decode_image_features(
         )
 
         with torch.inference_mode():
-            reconstruction = vae.decoder(
-                latent
-            ).reconstruction
+            reconstruction = vae.decoder(latent).reconstruction
 
         reconstructed_batches.append(
             reconstruction.permute(
@@ -629,18 +609,14 @@ def decode_image_features(
                 2,
                 3,
                 1,
-            ).cpu().numpy()
+            )
+            .cpu()
+            .numpy()
         )
 
-    reconstructed = np.concatenate(
-        reconstructed_batches
-    )
+    reconstructed = np.concatenate(reconstructed_batches)
 
-    reconstructed = (
-        np.round(255.0 * reconstructed)
-        .clip(0, 255)
-        .astype(np.uint8)
-    )
+    reconstructed = np.round(255.0 * reconstructed).clip(0, 255).astype(np.uint8)
 
     return reconstructed.reshape(
         *features.shape[:-1],
@@ -686,21 +662,17 @@ def fit_image(
     width: int,
     height: int,
 ) -> np.ndarray:
-    resized_width, resized_height, x, y = (
-        get_fitted_image_geometry(
-            image,
-            width,
-            height,
-        )
+    resized_width, resized_height, x, y = get_fitted_image_geometry(
+        image,
+        width,
+        height,
     )
 
     resized = cv2.resize(
         image,
         (resized_width, resized_height),
         interpolation=(
-            cv2.INTER_AREA
-            if resized_width < image.shape[1]
-            else cv2.INTER_LINEAR
+            cv2.INTER_AREA if resized_width < image.shape[1] else cv2.INTER_LINEAR
         ),
     )
 
@@ -709,10 +681,7 @@ def fit_image(
         dtype=np.uint8,
     )
 
-    panel[
-        y : y + resized_height,
-        x : x + resized_width
-    ] = resized
+    panel[y : y + resized_height, x : x + resized_width] = resized
 
     return panel
 
@@ -727,17 +696,16 @@ def add_label(
     y: int,
     panel_width: int | None = None,
 ) -> None:
-    font = cv2.FONT_HERSHEY_SIMPLEX
-    font_scale = 0.46
-    thickness = 1
-
-    # Captionの大きさを取得
-    (text_width, text_height), baseline = cv2.getTextSize(
+    rgb_image = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+    draw = ImageDraw.Draw(rgb_image)
+    bounds = draw.textbbox(
+        (0, 0),
         text,
-        font,
-        font_scale,
-        thickness,
+        font=CAPTION_FONT,
+        anchor="ls",
+        stroke_width=2,
     )
+    text_width = bounds[2] - bounds[0]
 
     # panel_widthが指定されていれば、
     # Captionをパネルの中央寄りに配置する
@@ -749,38 +717,20 @@ def add_label(
     else:
         text_x = x + 7
 
-    # y は「Captionを表示する場所の下端」
-    text_y = y
-
-    # 黒い縁取り
-    cv2.putText(
-        image,
+    draw.text(
+        (text_x, y),
         text,
-        (text_x, text_y),
-        font,
-        font_scale,
-        (0, 0, 0),
-        3,
-        cv2.LINE_AA,
+        font=CAPTION_FONT,
+        fill=(255, 255, 255),
+        anchor="ls",
+        stroke_width=2,
+        stroke_fill=(0, 0, 0),
     )
-
-    # 白い文字
-    cv2.putText(
-        image,
-        text,
-        (text_x, text_y),
-        font,
-        font_scale,
-        (255, 255, 255),
-        1,
-        cv2.LINE_AA,
-    )
+    image[:] = cv2.cvtColor(np.asarray(rgb_image), cv2.COLOR_RGB2BGR)
 
 
 def format_pb(pb: np.ndarray) -> str:
-    return "[" + ", ".join(
-        f"{value:.4f}" for value in pb
-    ) + "]"
+    return "[" + ", ".join(f"{value:.4f}" for value in pb) + "]"
 
 
 def make_canvas(
@@ -788,9 +738,6 @@ def make_canvas(
     reconstructed_rgb: np.ndarray,
     online_pb: np.ndarray,
     reference_pbs: np.ndarray,
-    camera_name: str,
-    horizon: int,
-    target_time: float,
     output_size: tuple[int, int],
 ) -> np.ndarray:
     output_width, output_height = output_size
@@ -824,37 +771,31 @@ def make_canvas(
         top_height,
     )
 
-    canvas[
-        :top_height,
-        :top_width
-    ] = original_panel
+    canvas[:top_height, :top_width] = original_panel
 
-    canvas[
-        :top_height,
-        top_width:
-    ] = online_panel
+    canvas[:top_height, top_width:] = online_panel
 
     # --------------------------------------------------------
-    # OriginalのCaption
+    # Ground-truth future frame caption
     # 「上」ではなく「左上パネルの下端」に表示
     # --------------------------------------------------------
     add_label(
         canvas,
-        f"Original {camera_name}  t={target_time:.2f}s",
+        "GT at 1.5s Future",
         0,
         top_height - 8,
         panel_width=top_width,
     )
 
     # --------------------------------------------------------
-    # Online PBのCaption
+    # Predicted feature caption
     # 「上」ではなく「右上パネルの下端」に表示
     # --------------------------------------------------------
     online_panel_width = output_width - top_width
 
     add_label(
         canvas,
-        f"Online PB={format_pb(online_pb)}  horizon={horizon}",
+        f"Online d̂ = {format_pb(online_pb)}",
         top_width,
         top_height - 8,
         panel_width=online_panel_width,
@@ -872,9 +813,7 @@ def make_canvas(
         )
     ).astype(int)
 
-    for panel_idx, object_id in enumerate(
-        REFERENCE_OBJECT_IDS
-    ):
+    for panel_idx, object_id in enumerate(REFERENCE_OBJECT_IDS):
         x0 = bottom_edges[panel_idx]
         x1 = bottom_edges[panel_idx + 1]
 
@@ -892,17 +831,14 @@ def make_canvas(
             panel_height,
         )
 
-        canvas[
-            top_height:,
-            x0:x1
-        ] = panel
+        canvas[top_height:, x0:x1] = panel
 
         # ----------------------------------------------------
         # Captionを画像の「下側」に表示
         # ----------------------------------------------------
         add_label(
             canvas,
-            f"PB{object_id}={format_pb(reference_pbs[panel_idx])}",
+            f"d*{('₀', '₁', '₂')[object_id]}={format_pb(reference_pbs[panel_idx])}",
             x0,
             output_height - 8,
             panel_width=panel_width,
@@ -917,9 +853,6 @@ def encode_video(
     reconstructed: np.ndarray,
     online_pbs: np.ndarray,
     reference_pbs: np.ndarray,
-    camera_name: str,
-    horizon: int,
-    target_times: np.ndarray,
     fps: float,
     output_size: tuple[int, int],
 ) -> None:
@@ -943,17 +876,12 @@ def encode_video(
     assert writer.isOpened(), work_path
 
     try:
-        for frame_idx, original_frame in enumerate(
-            original_frames
-        ):
+        for frame_idx, original_frame in enumerate(original_frames):
             canvas = make_canvas(
                 original_frame,
                 reconstructed[frame_idx],
                 online_pbs[frame_idx],
                 reference_pbs,
-                camera_name,
-                horizon,
-                target_times[frame_idx],
                 output_size,
             )
 
@@ -1003,10 +931,7 @@ def get_output_path(
                 f"{input_path.name}_OnlinePbReconstructionVideos"
             )
 
-    return (
-        output_dir
-        / f"{rmb_path.stem}_{camera_name}_online_pb_reconstruction.mp4"
-    )
+    return output_dir / f"{rmb_path.stem}_{camera_name}_online_pb_reconstruction.mp4"
 
 
 def main() -> None:
@@ -1014,74 +939,39 @@ def main() -> None:
 
     assert args.rmb_path.is_dir(), args.rmb_path
 
-    assert (
-        args.output_width > 0
-        and args.output_width % 2 == 0
-    ), args.output_width
+    assert args.output_width > 0 and args.output_width % 2 == 0, args.output_width
 
-    assert (
-        args.output_height > 0
-        and args.output_height % 2 == 0
-    ), args.output_height
+    assert args.output_height > 0 and args.output_height % 2 == 0, args.output_height
 
-    rmb_paths = sorted(
-        Path(path)
-        for path in find_rmb_files(
-            str(args.rmb_path)
-        )
-    )
+    rmb_paths = sorted(Path(path) for path in find_rmb_files(str(args.rmb_path)))
 
     assert rmb_paths, args.rmb_path
 
-    assert all(
-        path.suffix == ".rmb"
-        for path in rmb_paths
-    ), rmb_paths
+    assert all(path.suffix == ".rmb" for path in rmb_paths), rmb_paths
 
     if len(rmb_paths) > 1:
-        assert (
-            args.output is None
-        ), "Use --output_dir for multiple RMB episodes."
+        assert args.output is None, "Use --output_dir for multiple RMB episodes."
     else:
-        assert (
-            args.output_dir is None
-            or args.output is None
-        )
+        assert args.output_dir is None or args.output is None
 
-    checkpoint_paths = [
-        load_wp4_checkpoint_path(path)
-        for path in rmb_paths
-    ]
+    checkpoint_paths = [load_wp4_checkpoint_path(path) for path in rmb_paths]
 
     checkpoint_path = checkpoint_paths[0]
 
-    assert all(
-        path == checkpoint_path
-        for path in checkpoint_paths
-    ), checkpoint_paths
+    assert all(path == checkpoint_path for path in checkpoint_paths), checkpoint_paths
 
-    model_meta_info = load_model_meta_info(
-        checkpoint_path
-    )
+    model_meta_info = load_model_meta_info(checkpoint_path)
 
-    assert (
-        model_meta_info["data"]["horizon"] == 16
-    ), model_meta_info["data"]
+    assert model_meta_info["data"]["horizon"] == 16, model_meta_info["data"]
 
-    image_feature_key = model_meta_info["data"][
-        "image_feature_key"
-    ]
+    image_feature_key = model_meta_info["data"]["image_feature_key"]
 
-    assert image_feature_key.startswith(
-        "image_vae"
-    ), (
+    assert image_feature_key.startswith("image_vae"), (
         "This video requires an ImageVAE-based WP4",
         image_feature_key,
     )
 
-    latent_dim = model_meta_info["policy"]["args"][
-        "image_feature_dim"
-    ]
+    latent_dim = model_meta_info["policy"]["args"]["image_feature_dim"]
 
     image_source_info = [
         load_image_source_info(
@@ -1094,18 +984,13 @@ def main() -> None:
         for path in rmb_paths
     ]
 
-    vae_checkpoint, camera_name, _ = (
-        image_source_info[0]
-    )
+    vae_checkpoint, camera_name, _ = image_source_info[0]
 
     assert all(
-        info[:2] == (vae_checkpoint, camera_name)
-        for info in image_source_info
+        info[:2] == (vae_checkpoint, camera_name) for info in image_source_info
     ), image_source_info
 
-    assert torch.cuda.is_available(), (
-        "WP4 reconstruction requires a CUDA GPU."
-    )
+    assert torch.cuda.is_available(), "WP4 reconstruction requires a CUDA GPU."
 
     device = torch.device("cuda")
 
@@ -1120,30 +1005,18 @@ def main() -> None:
         model_meta_info,
     )
 
-    reference_pbs = reference_pb_table[
-        list(REFERENCE_OBJECT_IDS)
-    ]
+    reference_pbs = reference_pb_table[list(REFERENCE_OBJECT_IDS)]
 
-    vae = (
-        AutoModel.load_from_folder(
-            str(vae_checkpoint)
-        )
-        .eval()
-        .to(device)
-    )
+    vae = AutoModel.load_from_folder(str(vae_checkpoint)).eval().to(device)
 
     vae.requires_grad_(False)
 
-    assert (
-        vae.model_config.latent_dim == latent_dim
-    ), (
+    assert vae.model_config.latent_dim == latent_dim, (
         vae.model_config.latent_dim,
         latent_dim,
     )
 
-    _, image_height, image_width = (
-        vae.model_config.input_dim
-    )
+    _, image_height, image_width = vae.model_config.input_dim
 
     image_size = (
         image_width,
@@ -1155,30 +1028,13 @@ def main() -> None:
         args.output_height,
     )
 
-    print(
-        f"WP4 checkpoint: {checkpoint_path}"
-    )
-    print(
-        f"ImageVAE checkpoint: {vae_checkpoint}"
-    )
-    print(
-        f"Image feature: "
-        f"{image_feature_key} ({latent_dim}D)"
-    )
-    print(
-        f"Camera: {camera_name}"
-    )
-    print(
-        f"Reference PBs: "
-        f"{reference_pbs.tolist()}"
-    )
-    print(
-        f"Output size: "
-        f"{output_size[0]}x{output_size[1]}"
-    )
-    print(
-        f"Episodes: {len(rmb_paths)}"
-    )
+    print(f"WP4 checkpoint: {checkpoint_path}")
+    print(f"ImageVAE checkpoint: {vae_checkpoint}")
+    print(f"Image feature: " f"{image_feature_key} ({latent_dim}D)")
+    print(f"Camera: {camera_name}")
+    print(f"Reference PBs: " f"{reference_pbs.tolist()}")
+    print(f"Output size: " f"{output_size[0]}x{output_size[1]}")
+    print(f"Episodes: {len(rmb_paths)}")
 
     for episode_idx, (
         rmb_path,
@@ -1194,9 +1050,7 @@ def main() -> None:
         _, _, has_stored_features = source_info
 
         with RmbData(str(rmb_path)) as rmb_data:
-            num_raw_steps = rmb_data[
-                DataKey.TIME
-            ].shape[0]
+            num_raw_steps = rmb_data[DataKey.TIME].shape[0]
 
         (
             start_idxes,
@@ -1207,10 +1061,7 @@ def main() -> None:
             model_meta_info,
         )
 
-        video_path = (
-            rmb_path
-            / f"{camera_name}_rgb_image.rmb.mp4"
-        )
+        video_path = rmb_path / f"{camera_name}_rgb_image.rmb.mp4"
 
         (
             original_frames,
@@ -1256,11 +1107,6 @@ def main() -> None:
             device,
         )
 
-        target_times = (
-            raw_time[target_raw_idxes]
-            - raw_time[0]
-        )
-
         output_path = get_output_path(
             rmb_path,
             args.rmb_path,
@@ -1275,9 +1121,6 @@ def main() -> None:
             reconstructed,
             prediction_online_pbs,
             reference_pbs,
-            camera_name,
-            model_meta_info["data"]["horizon"],
-            target_times,
             source_fps / model_meta_info["data"]["skip"],
             output_size,
         )
