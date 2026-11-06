@@ -59,6 +59,7 @@ class RealXarm7EnvBase(RealEnvBase):
         camera_ids,
         gelsight_ids,
         init_qpos,
+        pressure_sensor_ids=None,
         has_gripper=True,
         **kwargs,
     ):
@@ -91,11 +92,13 @@ class RealXarm7EnvBase(RealEnvBase):
         self.xarm_api = XArmAPI(self.robot_ip)
         self.xarm_api.connect()
         self.xarm_api.motion_enable(enable=True)
+
+        self.xarm_api.clean_error()
         self.xarm_api.ft_sensor_enable(1)
         time.sleep(0.2)
         self.xarm_api.ft_sensor_set_zero()
         time.sleep(0.2)
-        self.xarm_api.clean_error()
+
         self.xarm_api.set_mode(6)
         self.xarm_api.set_state(0)
         if self.has_gripper:
@@ -139,6 +142,7 @@ class RealXarm7EnvBase(RealEnvBase):
         # Connect to RealSense
         self.setup_realsense(camera_ids)
         self.setup_gelsight(gelsight_ids)
+        self.setup_pressure_sensor(pressure_sensor_ids)
 
     def close(self):
         self.xarm_api.disconnect()

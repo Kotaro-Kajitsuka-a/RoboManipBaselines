@@ -332,6 +332,12 @@ class TeleopBase(OperationDataMixin, ABC):
         )
 
         parser.add_argument(
+            "--plot_tactile_sheet",
+            action="store_true",
+            help="whether to plot tactile sensor sheet measurements",
+        )
+
+        parser.add_argument(
             "--world_idx_list",
             type=int,
             nargs="*",

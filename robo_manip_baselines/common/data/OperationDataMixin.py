@@ -76,6 +76,12 @@ class OperationDataMixin:
                     self.info["intensity_tactile"][intensity_tactile_name].copy(),
                 )
 
+        if "sheet_tactile" in self.info:
+            for sheet_tactile_name in self.info["sheet_tactile"]:
+                self.data_manager.append_single_data(
+                    sheet_tactile_name,
+                    self.info["sheet_tactile"][sheet_tactile_name].copy(),
+                )
         # Add pointcloud
         if "pointclouds" in self.info:
             for pointcloud_camera_name in self.info["pointclouds"]:
