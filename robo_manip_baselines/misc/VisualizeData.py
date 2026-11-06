@@ -315,8 +315,11 @@ class VisualizeData:
         )
 
     def plot(self):
+        time_seq = self.data_manager.get_data_seq(DataKey.TIME)
+        self.fig.canvas.mpl_connect("key_press_event", self.key_event)
         for time_idx in tqdm(
-            range(0, len(self.data_manager.get_data_seq(DataKey.TIME)), self.skip),
+            self.get_frame_indices(),
+            total=len(range(0, len(time_seq), self.skip)),
             desc=self.ax[0, 0].plot.__name__,
         ):
             if self.quit_flag:
@@ -408,7 +411,7 @@ class VisualizeData:
                 )
 
             plt.draw()
-            plt.pause(0.001)
+            self.wait_after_frame()
 
             if self.video_writer is not None:
                 buf = io.BytesIO()
@@ -418,8 +421,6 @@ class VisualizeData:
                 img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
                 self.video_writer.write(img)
                 buf.close()
-
-            self.fig.canvas.mpl_connect("key_press_event", self.key_event)
 
         if self.video_writer is not None:
             self.video_writer.release()
@@ -431,6 +432,12 @@ class VisualizeData:
         print(f"[{self.__class__.__name__}] Press 'Q' or 'Esc' to quit.")
 
         plt.show()
+
+    def get_frame_indices(self):
+        return range(0, len(self.data_manager.get_data_seq(DataKey.TIME)), self.skip)
+
+    def wait_after_frame(self):
+        plt.pause(0.001)
 
     def clear_axis(self, ax):
         for child in ax.get_children():
