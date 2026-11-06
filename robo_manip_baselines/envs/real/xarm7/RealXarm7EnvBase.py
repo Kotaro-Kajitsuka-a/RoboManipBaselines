@@ -145,6 +145,8 @@ class RealXarm7EnvBase(RealEnvBase):
         self.setup_pressure_sensor(pressure_sensor_ids)
 
     def close(self):
+        if self.sheet_tactiles:
+            self.close_pressure_sensors()
         self.xarm_api.disconnect()
 
     def _check_xarm_code(self, name, code):

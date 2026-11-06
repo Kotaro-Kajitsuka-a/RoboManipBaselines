@@ -33,6 +33,7 @@ class RealEnvBase(EnvDataMixin, gym.Env, ABC):
         self.rgb_tactiles = {}
         self.intensity_tactiles = {}
         self.sheet_tactiles = {}
+        self.sheet_tactile_bufs = {}
 
     def setup_realsense(self, camera_ids):
         if camera_ids is None:
@@ -212,10 +213,15 @@ class RealEnvBase(EnvDataMixin, gym.Env, ABC):
         from flexible_pressure_sensor_sample.serial_reader import SerialReader
 
         for sheet_tactile_name, port in pressure_sensor_ids.items():
-            serial_reader = SerialReader(port)
+            serial_reader = SerialReader(port, timeout=0.1)
             serial_reader.send_command("START")
 
             self.sheet_tactiles[sheet_tactile_name] = serial_reader
+
+    def close_pressure_sensors(self):
+        for serial_reader in self.sheet_tactiles.values():
+            serial_reader.send_command("STOP")
+            serial_reader.ser.close()
 
     def get_input_device_kwargs(self, input_device_name):
         return {}
@@ -372,16 +378,16 @@ class RealEnvBase(EnvDataMixin, gym.Env, ABC):
                 ] = intensity_tactile_name
 
             for sheet_tactile_name, serial_reader in self.sheet_tactiles.items():
-                futures[
-                    executor.submit(
-                        self.get_sheet_tactile_data,
-                        sheet_tactile_name,
-                        serial_reader,
-                    )
-                ] = sheet_tactile_name
+                future = executor.submit(
+                    self.get_sheet_tactile_data,
+                    sheet_tactile_name,
+                    serial_reader,
+                )
+                futures[future] = sheet_tactile_name
 
             for future in concurrent.futures.as_completed(futures):
                 name, result = future.result()
+
                 for key, value in result.items():
                     if value is None:
                         continue
@@ -510,11 +516,23 @@ class RealEnvBase(EnvDataMixin, gym.Env, ABC):
     def get_sheet_tactile_data(self, sheet_tactile_name, serial_reader):
         frame = serial_reader.read_frame()
         if frame is None:
-            return sheet_tactile_name, {}
-
-        frame_no, matrix = serial_reader.parse_frame(frame)
-
-        return sheet_tactile_name, {"sheet_tactile": matrix}
+            if sheet_tactile_name not in self.sheet_tactile_bufs:
+                raise TimeoutError(
+                    f"[{self.__class__.__name__}] No pressure sensor frame has "
+                    f"been received yet for '{sheet_tactile_name}'. "
+                    "This may happen because 0.1 seconds is a short time for the sensor. "
+                    "Please check that the serial reader timeout is set to 0.1 seconds."
+                )
+            print(
+                "\033[31mTactile sensor communication did not complete within "
+                "0.1 seconds. Using the most recent data instead.\033[0m"
+            )
+            matrix = self.sheet_tactile_bufs[sheet_tactile_name]
+            return sheet_tactile_name, {"sheet_tactile": matrix}
+        else:
+            _, matrix = serial_reader.parse_frame(frame)
+            self.sheet_tactile_bufs[sheet_tactile_name] = matrix
+            return sheet_tactile_name, {"sheet_tactile": matrix}
 
     def get_joint_pos_from_obs(self, obs):
         """Get joint position from observation."""

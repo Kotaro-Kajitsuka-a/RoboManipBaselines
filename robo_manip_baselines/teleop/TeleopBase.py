@@ -254,6 +254,9 @@ class TeleopBase(OperationDataMixin, ABC):
                     "but no tactile sensor with intensity output was found."
                 )
 
+        if self.env.unwrapped.sheet_tactile_names:
+            self.tactile_sheet_plots = {}
+
         # Setup input device
         if self.args.input_device_config is None:
             if self.args.input_device in ("gello", "vive"):
@@ -329,12 +332,6 @@ class TeleopBase(OperationDataMixin, ABC):
             "--plot_tactile",
             action="store_true",
             help="whether to plot tactile sensor measurements",
-        )
-
-        parser.add_argument(
-            "--plot_tactile_sheet",
-            action="store_true",
-            help="whether to plot tactile sensor sheet measurements",
         )
 
         parser.add_argument(
@@ -489,6 +486,9 @@ class TeleopBase(OperationDataMixin, ABC):
             if self.args.plot_tactile:
                 self.draw_tactile()
 
+            if self.env.unwrapped.sheet_tactile_names:
+                self.draw_tactile_sheet()
+
             self.phase_manager.post_update()
 
             self.key = cv2.waitKey(1)
@@ -520,6 +520,10 @@ class TeleopBase(OperationDataMixin, ABC):
         if self.args.replay_log is None:
             for input_device in self.input_device_list:
                 input_device.close()
+
+        if self.env.unwrapped.sheet_tactile_names:
+            for fig, _ in self.tactile_sheet_plots.values():
+                plt.close(fig)
 
         # self.env.close()
 
@@ -693,6 +697,34 @@ class TeleopBase(OperationDataMixin, ABC):
             )
             ax.set_title(tactile_name)
         plt.draw()
+        plt.pause(0.001)
+
+    def draw_tactile_sheet(self):
+        for tactile_name, matrix in self.info.get("sheet_tactile", {}).items():
+            if matrix is None:
+                continue
+
+            display_matrix = matrix[::-1, :]
+            if tactile_name not in self.tactile_sheet_plots:
+                fig, ax = plt.subplots(num=f"Tactile sheet: {tactile_name}")
+                image = ax.imshow(
+                    display_matrix,
+                    cmap="turbo",
+                    vmin=0,
+                    vmax=255,
+                    interpolation="nearest",
+                )
+                fig.colorbar(image, ax=ax)
+                ax.set_title(tactile_name)
+                ax.set_xlabel("Column")
+                ax.set_ylabel("Row")
+                self.tactile_sheet_plots[tactile_name] = (fig, image)
+            else:
+                fig, image = self.tactile_sheet_plots[tactile_name]
+                image.set_data(display_matrix)
+
+            fig.canvas.draw_idle()
+
         plt.pause(0.001)
 
     def print_statistics(self):
