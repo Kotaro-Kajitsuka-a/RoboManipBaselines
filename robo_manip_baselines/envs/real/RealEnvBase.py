@@ -395,7 +395,18 @@ class RealEnvBase(EnvDataMixin, gym.Env, ABC):
                         info[key] = {}
                     info[key][name] = value
 
+        # Run robot-specific hooks on the main thread, after sensor reads finish.
+        for name, is_over_threshold in info.pop(
+            "_is_pressure_sensor_over_threshold", {}
+        ).items():
+            if is_over_threshold:
+                self.retreat_and_stop_for_pressure_sensor(
+                    name, np.max(info["pressure_sensor_data"][name])
+                )
         return info
+
+    def retreat_and_stop_for_pressure_sensor(self, pressure_sensor_name, max_value):
+        pass
 
     def get_camera_data(self, camera_name, camera):
         rgb_image, depth_image = camera.read((640, 480))
@@ -514,6 +525,7 @@ class RealEnvBase(EnvDataMixin, gym.Env, ABC):
         return intensity_tactile_name, {"intensity_tactile": intensity_tactile_value}
 
     def get_pressure_sensor_data(self, pressure_sensor_name, serial_reader):
+        threshold = 235  # Raw sensor value (0..255).
         frame = serial_reader.read_frame()
         if frame is None:
             if pressure_sensor_name not in self.pressure_sensor_bufs:
@@ -528,11 +540,23 @@ class RealEnvBase(EnvDataMixin, gym.Env, ABC):
                 "0.1 seconds. Using the most recent data instead.\033[0m"
             )
             matrix = self.pressure_sensor_bufs[pressure_sensor_name]
-            return pressure_sensor_name, {"pressure_sensor_data": matrix}
         else:
             _, matrix = serial_reader.parse_frame(frame)
+            previous_matrix = self.pressure_sensor_bufs.get(pressure_sensor_name)
+            max_value = np.max(matrix)
+            threshold_reached = max_value >= threshold and (
+                previous_matrix is None or np.max(previous_matrix) < threshold
+            )
+            if threshold_reached:
+                print(
+                    f"[{self.__class__.__name__}] Pressure sensor '{pressure_sensor_name}' "
+                    f"reached the threshold: max={max_value}, threshold={threshold}"
+                )
             self.pressure_sensor_bufs[pressure_sensor_name] = matrix
-            return pressure_sensor_name, {"pressure_sensor_data": matrix}
+        return pressure_sensor_name, {
+            "pressure_sensor_data": matrix,
+            "_is_pressure_sensor_over_threshold": bool(np.max(matrix) >= threshold),
+        }
 
     def get_joint_pos_from_obs(self, obs):
         """Get joint position from observation."""

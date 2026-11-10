@@ -66,6 +66,24 @@ class RealXarm7SafeDemoEnv(RealXarm7DemoEnv):
         else:
             return super().get_input_device_kwargs(input_device_name)
 
+    def retreat_and_stop_for_pressure_sensor(self, pressure_sensor_name, max_value):
+        try:
+            self._check_xarm_code("set_mode(0)", self.xarm_api.set_mode(0))
+            self._check_xarm_code("set_state(0)", self.xarm_api.set_state(0))
+            time.sleep(0.2)
+            self._check_xarm_code(
+                "set_position (pressure retreat)",
+                self.xarm_api.set_position(
+                    z=10.0, relative=True, speed=30, wait=True, timeout=5.0
+                ),
+            )
+        finally:
+            self._check_xarm_code("set_state(4)", self.xarm_api.set_state(4))
+        raise RuntimeError(
+            f"Pressure sensor '{pressure_sensor_name}' reached {max_value}. "
+            "Retreated and stopped."
+        )
+
     def _reset_robot(self):
         time.sleep(0.2)
         self.xarm_api.set_mode(7)
