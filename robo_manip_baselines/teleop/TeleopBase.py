@@ -525,7 +525,7 @@ class TeleopBase(OperationDataMixin, ABC):
             for fig, _ in self.pressure_sensor_plots.values():
                 plt.close(fig)
 
-        # self.env.close()
+        self.env.close()
 
     def reset(self):
         # Reset motion manager

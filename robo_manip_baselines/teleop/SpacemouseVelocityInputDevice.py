@@ -7,8 +7,6 @@ from .SpacemouseInputDevice import SpacemouseInputDevice
 class SpacemouseVelocityInputDevice(SpacemouseInputDevice):
     """Measured-position targets with incremental SpaceMouse rotation."""
 
-    max_position_offset = 0.04  # [m]
-
     def set_command_data(self):
         measured_eef_pos = self.arm_manager.get_eef_pose_from_joint_pos(
             np.asarray(
@@ -18,9 +16,6 @@ class SpacemouseVelocityInputDevice(SpacemouseInputDevice):
         position_offset = self.pos_scale * np.array(
             [-self.state.y, self.state.x, self.state.z]
         )
-        offset_norm = np.linalg.norm(position_offset)
-        if offset_norm > self.max_position_offset:
-            position_offset *= self.max_position_offset / offset_norm
 
         delta_rpy = self.rpy_scale * np.array(
             [-self.state.roll, -self.state.pitch, -2.0 * self.state.yaw]

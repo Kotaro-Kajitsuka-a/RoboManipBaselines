@@ -525,7 +525,7 @@ class RealEnvBase(EnvDataMixin, gym.Env, ABC):
         return intensity_tactile_name, {"intensity_tactile": intensity_tactile_value}
 
     def get_pressure_sensor_data(self, pressure_sensor_name, serial_reader):
-        threshold = 235  # Raw sensor value (0..255).
+        threshold = 256  # Raw sensor value (0..255).
         frame = serial_reader.read_frame()
         if frame is None:
             if pressure_sensor_name not in self.pressure_sensor_bufs:
