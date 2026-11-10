@@ -11,4 +11,5 @@ class OperationRealXarm7SafeDemo(OperationRealXarm7Demo):
             camera_ids=self.camera_ids,
             gelsight_ids=self.gelsight_ids,
             has_gripper=self.has_gripper,
+            pressure_sensor_ids=self.pressure_sensor_ids,
         )

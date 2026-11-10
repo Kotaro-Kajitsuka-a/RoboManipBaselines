@@ -150,6 +150,14 @@ class RealXarm7EnvBase(RealEnvBase):
         self.xarm_api.disconnect()
 
     def _check_xarm_code(self, name, code):
+        if isinstance(code, int):
+            pass
+        elif isinstance(code, list):  # set_fense_mode returns list
+            code = code[0]
+            if not isinstance(code, int):
+                raise RuntimeError("Unexpected xarm code type")
+        else:
+            raise RuntimeError("Unexpected xarm code type")
         if code != 0:
             query_code, err_warn = self.xarm_api.get_err_warn_code(show=True)
             servo_query_code, servo_info = self.xarm_api.get_servo_debug_msg()
