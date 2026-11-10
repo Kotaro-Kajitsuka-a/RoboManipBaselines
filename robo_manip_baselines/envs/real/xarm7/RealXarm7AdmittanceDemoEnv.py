@@ -11,11 +11,11 @@ class RealXarm7AdmittanceDemoEnv(RealXarm7SafeDemoEnv):
 
     # override
     def get_input_device_kwargs(self, input_device_name):
-        if input_device_name == "spacemouse":
+        if input_device_name == "spacemouse_vel":
             return super().get_input_device_kwargs(input_device_name)
         else:
             raise ValueError(
-                f"For admittance control, only 'spasemouse' is supported. Requested config{input_device_name}"
+                f"For admittance control, only 'spacemouse_vel' is supported. Requested config: {input_device_name}"
             )
 
     def setup_admittance_control(self):
@@ -26,7 +26,7 @@ class RealXarm7AdmittanceDemoEnv(RealXarm7SafeDemoEnv):
         K_ori = 4  #  Rx/Ry/Rz rotational stiffness coefficient, range: 0 ~ 20 (Nm/rad)
 
         # Attention: for M and J, smaller value means less effort to drive the arm, but may also be less stable, please be careful.
-        M = float(0.03)  #  x/y/z equivalent mass; range: 0.02 ~ 1 kg
+        M = float(0.04)  #  x/y/z equivalent mass; range: 0.02 ~ 1 kg
         J = (
             M * 0.01
         )  #  Rx/Ry/Rz equivalent moment of inertia, range: 1e-4 ~ 0.01 (Kg*m^2)
