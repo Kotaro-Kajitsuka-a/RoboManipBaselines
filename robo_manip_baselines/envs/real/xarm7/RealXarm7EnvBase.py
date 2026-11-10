@@ -152,14 +152,11 @@ class RealXarm7EnvBase(RealEnvBase):
     def _check_xarm_code(self, name, code):
         if code != 0:
             query_code, err_warn = self.xarm_api.get_err_warn_code(show=True)
-            servo_query_code, servo_errors = self.xarm_api.get_servo_error_code()
-            servo_errors = ", ".join(
-                f"J{i + 1}=0x{int(error):02X}" for i, error in enumerate(servo_errors)
-            )
+            servo_query_code, servo_info = self.xarm_api.get_servo_debug_msg()
             raise RuntimeError(
                 f"{name} failed: code={code}; "
                 f"err_warn=({query_code}, {err_warn}); "
-                f"servo_errors=({servo_query_code}, [{servo_errors}])"
+                f"servo_debug=({servo_query_code}, {servo_info})"
             )
 
     def setup_input_device(self, input_device_name, motion_manager, overwrite_kwargs):

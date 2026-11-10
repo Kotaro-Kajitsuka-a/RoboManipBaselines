@@ -31,7 +31,9 @@ class SafeXarm7ArmManager(ArmManager):
 
 
 class RealXarm7SafeDemoEnv(RealXarm7DemoEnv):
-    min_eef_z = -325.0  # [mm]
+    # [x_max, x_min, y_max, y_min, z_max, z_min] in mm.
+    # Keep the other boundaries well outside the robot's reachable workspace.
+    fence_tcp_boundary = [10000, -10000, 10000, -10000, 10000, 0]
     # Maximum distance from measured EEF position to commanded EEF position [mm].
     max_eef_position_offset = 50.0
     reset_eef_speed = 30  # 10 mm/sec when robot reset
@@ -47,10 +49,16 @@ class RealXarm7SafeDemoEnv(RealXarm7DemoEnv):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.body_config_list[0].BodyManagerClass = SafeXarm7ArmManager
+        # Define the TCP at +300 mm along the tool z-axis before setting its fence.
         self._check_xarm_code(
             "set_tcp_offset",
-            self.xarm_api.set_tcp_offset([0.0, 0.0, 300.0, 0.0, 0.0, 0.0]),
+            self.xarm_api.set_tcp_offset([0.0, 0.0, 0.0, 0.0, 0.0, 0.0]),
         )
+        self._check_xarm_code(
+            "set_reduced_tcp_boundary",
+            self.xarm_api.set_reduced_tcp_boundary(self.fence_tcp_boundary),
+        )
+        self._check_xarm_code("set_fence_mode", self.xarm_api.set_fence_mode(True))
 
     def get_input_device_kwargs(self, input_device_name):
         if input_device_name == "spacemouse":
@@ -98,7 +106,6 @@ class RealXarm7SafeDemoEnv(RealXarm7DemoEnv):
                     f"set_state(4) code={stop_code}"
                 )
 
-            self._get_obs(measured_eef_pose)  # for safety check
             xarm_code = self.xarm_api.set_position(
                 *self.reset_eef_position,
                 speed=self.reset_eef_speed,
@@ -114,20 +121,3 @@ class RealXarm7SafeDemoEnv(RealXarm7DemoEnv):
         time.sleep(4.0)
 
         super()._reset_robot()
-
-    def _get_obs(self, measured_eef_pose=None):
-        obs = super()._get_obs()
-
-        if measured_eef_pose is None:
-            xarm_code, measured_eef_pose = self.xarm_api.get_position(is_radian=False)
-            self._check_xarm_code("get_position", xarm_code)
-        measured_eef_z = measured_eef_pose[2]  # [mm]
-        if measured_eef_z < self.min_eef_z:
-            stop_code = self.xarm_api.set_state(4)
-            raise RuntimeError(
-                f"[{self.__class__.__name__}] Measured EEF z is below the lower limit: "
-                f"measured={measured_eef_z:.6f} mm, limit={self.min_eef_z:.6f} mm; "
-                f"set_state(4) code={stop_code}"
-            )
-
-        return obs
