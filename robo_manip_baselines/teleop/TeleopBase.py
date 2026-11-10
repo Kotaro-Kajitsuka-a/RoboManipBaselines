@@ -254,8 +254,8 @@ class TeleopBase(OperationDataMixin, ABC):
                     "but no tactile sensor with intensity output was found."
                 )
 
-        if self.env.unwrapped.sheet_tactile_names:
-            self.tactile_sheet_plots = {}
+        if self.env.unwrapped.pressure_sensor_names:
+            self.pressure_sensor_plots = {}
 
         # Setup input device
         if self.args.input_device_config is None:
@@ -486,8 +486,8 @@ class TeleopBase(OperationDataMixin, ABC):
             if self.args.plot_tactile:
                 self.draw_tactile()
 
-            if self.env.unwrapped.sheet_tactile_names:
-                self.draw_tactile_sheet()
+            if self.env.unwrapped.pressure_sensor_names:
+                self.draw_pressure_sensor_data()
 
             self.phase_manager.post_update()
 
@@ -521,8 +521,8 @@ class TeleopBase(OperationDataMixin, ABC):
             for input_device in self.input_device_list:
                 input_device.close()
 
-        if self.env.unwrapped.sheet_tactile_names:
-            for fig, _ in self.tactile_sheet_plots.values():
+        if self.env.unwrapped.pressure_sensor_names:
+            for fig, _ in self.pressure_sensor_plots.values():
                 plt.close(fig)
 
         # self.env.close()
@@ -699,14 +699,16 @@ class TeleopBase(OperationDataMixin, ABC):
         plt.draw()
         plt.pause(0.001)
 
-    def draw_tactile_sheet(self):
-        for tactile_name, matrix in self.info.get("sheet_tactile", {}).items():
+    def draw_pressure_sensor_data(self):
+        for pressure_sensor_name, matrix in self.info.get(
+            "pressure_sensor_data", {}
+        ).items():
             if matrix is None:
                 continue
 
             display_matrix = matrix[::-1, :]
-            if tactile_name not in self.tactile_sheet_plots:
-                fig, ax = plt.subplots(num=f"Tactile sheet: {tactile_name}")
+            if pressure_sensor_name not in self.pressure_sensor_plots:
+                fig, ax = plt.subplots(num=f"Pressure sensor: {pressure_sensor_name}")
                 image = ax.imshow(
                     display_matrix,
                     cmap="turbo",
@@ -715,12 +717,12 @@ class TeleopBase(OperationDataMixin, ABC):
                     interpolation="nearest",
                 )
                 fig.colorbar(image, ax=ax)
-                ax.set_title(tactile_name)
+                ax.set_title(pressure_sensor_name)
                 ax.set_xlabel("Column")
                 ax.set_ylabel("Row")
-                self.tactile_sheet_plots[tactile_name] = (fig, image)
+                self.pressure_sensor_plots[pressure_sensor_name] = (fig, image)
             else:
-                fig, image = self.tactile_sheet_plots[tactile_name]
+                fig, image = self.pressure_sensor_plots[pressure_sensor_name]
                 image.set_data(display_matrix)
 
             fig.canvas.draw_idle()

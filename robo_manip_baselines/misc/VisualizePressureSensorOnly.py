@@ -12,7 +12,7 @@ def parse_argument():
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     parser.add_argument("rmb_filename", type=str)
-    parser.add_argument("--sheet_key", type=str, default="sheet")
+    parser.add_argument("--pressure_sensor_key", type=str, default="pressure_sensor")
     parser.add_argument("--skip", type=int, default=1)
     parser.add_argument("--interval", type=float, default=0.1)
     return parser.parse_args()
@@ -26,14 +26,18 @@ def main():
         raise ValueError("--interval must be non-negative.")
 
     data_manager = DataManager(env=None)
-    data_manager.load_data(args.rmb_filename, load_keys=[args.sheet_key, DataKey.TIME])
-    if args.sheet_key not in data_manager.all_data_seq:
-        raise KeyError(f"Sheet key '{args.sheet_key}' was not found in the RMB data.")
+    data_manager.load_data(
+        args.rmb_filename, load_keys=[args.pressure_sensor_key, DataKey.TIME]
+    )
+    if args.pressure_sensor_key not in data_manager.all_data_seq:
+        raise KeyError(
+            f"Pressure sensor key '{args.pressure_sensor_key}' was not found in the RMB data."
+        )
 
-    matrices = np.asarray(data_manager.get_data_seq(args.sheet_key))
+    matrices = np.asarray(data_manager.get_data_seq(args.pressure_sensor_key))
     if matrices.ndim != 3 or len(matrices) == 0:
         raise ValueError(
-            f"Expected '{args.sheet_key}' to contain a non-empty sequence of 2D matrices."
+            f"Expected '{args.pressure_sensor_key}' to contain a non-empty sequence of 2D matrices."
         )
     times = data_manager.all_data_seq.get(DataKey.TIME)
     if times is not None and len(times) != len(matrices):

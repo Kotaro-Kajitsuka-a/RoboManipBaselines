@@ -44,7 +44,7 @@ class DummyRealEnv(RealEnvBase):
 
         self.setup_sanwa_keyboard(sanwa_keyboard_ids)
 
-        self.setup_pressure_sensor(pressure_sensor_ids)
+        self.setup_pressure_sensors(pressure_sensor_ids)
 
     def _reset_robot(self, *args, **kwargs):
         pass
@@ -202,7 +202,7 @@ class TestRealEnvBaseGetInfo(unittest.TestCase):
             cv2.waitKey(0)
             cv2.destroyAllWindows()
 
-    def show_sheet_loop(self, dummy_real_env):
+    def show_pressure_sensor_loop(self, dummy_real_env):
         import matplotlib.pyplot as plt
 
         fig, ax = plt.subplots()
@@ -210,9 +210,11 @@ class TestRealEnvBaseGetInfo(unittest.TestCase):
         try:
             while True:
                 info = dummy_real_env._get_info()
-                if "sheet_tactile" not in info:
+                if "pressure_sensor_data" not in info:
                     continue
-                matrix = info["sheet_tactile"][dummy_real_env.sheet_tactile_names[0]]
+                matrix = info["pressure_sensor_data"][
+                    dummy_real_env.pressure_sensor_names[0]
+                ]
 
                 if img is None:
                     img = ax.imshow(
@@ -234,11 +236,11 @@ class TestRealEnvBaseGetInfo(unittest.TestCase):
 
         finally:
             # センサー停止
-            dummy_real_env.sheet_tactiles[
-                dummy_real_env.sheet_tactile_names[0]
+            dummy_real_env.pressure_sensors[
+                dummy_real_env.pressure_sensor_names[0]
             ].send_command("STOP")
-            dummy_real_env.sheet_tactiles[
-                dummy_real_env.sheet_tactile_names[0]
+            dummy_real_env.pressure_sensors[
+                dummy_real_env.pressure_sensor_names[0]
             ].ser.close()
             plt.ioff()
 
@@ -338,9 +340,11 @@ class TestRealEnvBaseGetInfo(unittest.TestCase):
         self.show_intensity_loop(dummy_real_env)
 
     @unittest.skip("Skipping.")
-    def test_sheet(self):
-        dummy_real_env = DummyRealEnv(pressure_sensor_ids={"sheet": "/dev/ttyACM0"})
-        self.show_sheet_loop(dummy_real_env)
+    def test_pressure_sensor(self):
+        dummy_real_env = DummyRealEnv(
+            pressure_sensor_ids={"pressure_sensor": "/dev/ttyACM0"}
+        )
+        self.show_pressure_sensor_loop(dummy_real_env)
 
 
 if __name__ == "__main__":

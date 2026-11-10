@@ -142,10 +142,10 @@ class RealXarm7EnvBase(RealEnvBase):
         # Connect to RealSense
         self.setup_realsense(camera_ids)
         self.setup_gelsight(gelsight_ids)
-        self.setup_pressure_sensor(pressure_sensor_ids)
+        self.setup_pressure_sensors(pressure_sensor_ids)
 
     def close(self):
-        if self.sheet_tactiles:
+        if self.pressure_sensors:
             self.close_pressure_sensors()
         self.xarm_api.disconnect()
 

@@ -46,18 +46,21 @@ $ python ./DisplayCameraImage.py --camera_name RealSense --crop_size 280 280
 
 A camera can also be specified by `--camera_id` instead of `--camera_name`.
 
-### Visualize sheet tactile data
-Replay sheet tactile data alongside the camera images and other data in the standard
-RMB visualization layout. The tactile image uses the same color map and orientation
+### Visualize pressure sensor data
+Replay pressure sensor data alongside the camera images and other data in the standard
+RMB visualization layout. The pressure sensor image uses the same color map and orientation
 as the live viewer. Use the on-screen controls or the left/right arrow keys to step
 through frames, the slider to seek, and Space to play or pause.
 ```console
-$ python ./VisualizeSheetTactileData.py <rmb_file> [--sheet_key sheet]
+$ python ./VisualizePressureSensorData.py <rmb_file> [--pressure_sensor_key pressure_sensor]
 ```
 
-For a sheet-only view without the camera and robot plots:
+The `--pressure_sensor_key` option selects the sensor name stored in the RMB file
+(default: `pressure_sensor`).
+
+To display only the pressure sensor data, without the camera and robot plots:
 ```console
-$ python ./VisualizeSheetTactileOnly.py <rmb_file> [--sheet_key sheet]
+$ python ./VisualizePressureSensorOnly.py <rmb_file> [--pressure_sensor_key pressure_sensor]
 ```
 
 ## Video utilities

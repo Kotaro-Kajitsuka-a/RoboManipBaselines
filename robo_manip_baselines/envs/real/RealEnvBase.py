@@ -32,8 +32,8 @@ class RealEnvBase(EnvDataMixin, gym.Env, ABC):
         self.pointcloud_cameras = {}
         self.rgb_tactiles = {}
         self.intensity_tactiles = {}
-        self.sheet_tactiles = {}
-        self.sheet_tactile_bufs = {}
+        self.pressure_sensors = {}
+        self.pressure_sensor_bufs = {}
 
     def setup_realsense(self, camera_ids):
         if camera_ids is None:
@@ -206,20 +206,20 @@ class RealEnvBase(EnvDataMixin, gym.Env, ABC):
 
             self.intensity_tactiles[intensity_tactile_name] = intensity_tactile
 
-    def setup_pressure_sensor(self, pressure_sensor_ids):
+    def setup_pressure_sensors(self, pressure_sensor_ids):
         if pressure_sensor_ids is None:
             return
 
         from flexible_pressure_sensor_sample.serial_reader import SerialReader
 
-        for sheet_tactile_name, port in pressure_sensor_ids.items():
+        for pressure_sensor_name, port in pressure_sensor_ids.items():
             serial_reader = SerialReader(port, timeout=0.1)
             serial_reader.send_command("START")
 
-            self.sheet_tactiles[sheet_tactile_name] = serial_reader
+            self.pressure_sensors[pressure_sensor_name] = serial_reader
 
     def close_pressure_sensors(self):
-        for serial_reader in self.sheet_tactiles.values():
+        for serial_reader in self.pressure_sensors.values():
             serial_reader.send_command("STOP")
             serial_reader.ser.close()
 
@@ -330,7 +330,7 @@ class RealEnvBase(EnvDataMixin, gym.Env, ABC):
             + len(self.pointcloud_camera_names)
             + len(self.rgb_tactile_names)
             + len(self.intensity_tactile_names)
-            + len(self.sheet_tactile_names)
+            + len(self.pressure_sensor_names)
             == 0
         ):
             return info
@@ -377,13 +377,13 @@ class RealEnvBase(EnvDataMixin, gym.Env, ABC):
                     )
                 ] = intensity_tactile_name
 
-            for sheet_tactile_name, serial_reader in self.sheet_tactiles.items():
+            for pressure_sensor_name, serial_reader in self.pressure_sensors.items():
                 future = executor.submit(
-                    self.get_sheet_tactile_data,
-                    sheet_tactile_name,
+                    self.get_pressure_sensor_data,
+                    pressure_sensor_name,
                     serial_reader,
                 )
-                futures[future] = sheet_tactile_name
+                futures[future] = pressure_sensor_name
 
             for future in concurrent.futures.as_completed(futures):
                 name, result = future.result()
@@ -513,26 +513,26 @@ class RealEnvBase(EnvDataMixin, gym.Env, ABC):
         intensity_tactile_buf[...] = intensity_tactile_value
         return intensity_tactile_name, {"intensity_tactile": intensity_tactile_value}
 
-    def get_sheet_tactile_data(self, sheet_tactile_name, serial_reader):
+    def get_pressure_sensor_data(self, pressure_sensor_name, serial_reader):
         frame = serial_reader.read_frame()
         if frame is None:
-            if sheet_tactile_name not in self.sheet_tactile_bufs:
+            if pressure_sensor_name not in self.pressure_sensor_bufs:
                 raise TimeoutError(
                     f"[{self.__class__.__name__}] No pressure sensor frame has "
-                    f"been received yet for '{sheet_tactile_name}'. "
+                    f"been received yet for '{pressure_sensor_name}'. "
                     "This may happen because 0.1 seconds is a short time for the sensor. "
                     "Please check that the serial reader timeout is set to 0.1 seconds."
                 )
             print(
-                "\033[31mTactile sensor communication did not complete within "
+                "\033[31mPressure sensor communication did not complete within "
                 "0.1 seconds. Using the most recent data instead.\033[0m"
             )
-            matrix = self.sheet_tactile_bufs[sheet_tactile_name]
-            return sheet_tactile_name, {"sheet_tactile": matrix}
+            matrix = self.pressure_sensor_bufs[pressure_sensor_name]
+            return pressure_sensor_name, {"pressure_sensor_data": matrix}
         else:
             _, matrix = serial_reader.parse_frame(frame)
-            self.sheet_tactile_bufs[sheet_tactile_name] = matrix
-            return sheet_tactile_name, {"sheet_tactile": matrix}
+            self.pressure_sensor_bufs[pressure_sensor_name] = matrix
+            return pressure_sensor_name, {"pressure_sensor_data": matrix}
 
     def get_joint_pos_from_obs(self, obs):
         """Get joint position from observation."""
@@ -588,9 +588,9 @@ class RealEnvBase(EnvDataMixin, gym.Env, ABC):
         return list(self.intensity_tactiles.keys())
 
     @property
-    def sheet_tactile_names(self):
-        """Get names of tactile sensors with sheet output."""
-        return list(self.sheet_tactiles.keys())
+    def pressure_sensor_names(self):
+        """Get pressure sensor names."""
+        return list(self.pressure_sensors.keys())
 
     def get_camera_fovy(self, camera_name):
         """Get vertical field-of-view of the camera."""

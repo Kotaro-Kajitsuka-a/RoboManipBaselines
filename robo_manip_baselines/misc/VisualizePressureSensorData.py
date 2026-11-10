@@ -37,47 +37,51 @@ def parse_argument():
         help="Display the point cloud stored in the log file.",
     )
     parser.add_argument(
-        "--sheet_key",
+        "--pressure_sensor_key",
         type=str,
-        default="sheet",
-        help="Data key of the recorded sheet tactile sensor.",
+        default="pressure_sensor",
+        help="Data key of the recorded pressure sensor.",
     )
     return parser.parse_args()
 
 
-class VisualizeSheetTactileData(VisualizeData):
-    def __init__(self, sheet_key="sheet", **kwargs):
-        self.sheet_key = sheet_key
+class VisualizePressureSensorData(VisualizeData):
+    def __init__(self, pressure_sensor_key="pressure_sensor", **kwargs):
+        self.pressure_sensor_key = pressure_sensor_key
         super().__init__(**kwargs)
 
     def setup_plot(self):
         super().setup_plot()
         if not self.camera_names:
             raise ValueError(
-                "Sheet visualization needs at least one camera row for the tactile image."
+                "Pressure sensor visualization needs at least one camera row for the sensor image."
             )
 
-        if self.sheet_key not in self.data_manager.all_data_seq:
+        if self.pressure_sensor_key not in self.data_manager.all_data_seq:
             raise KeyError(
-                f"Sheet key '{self.sheet_key}' was not found in the RMB data."
+                f"Pressure sensor key '{self.pressure_sensor_key}' was not found in the RMB data."
             )
 
-        sheet_data = self.data_manager.get_data_seq(self.sheet_key)
-        if sheet_data.ndim != 3 or len(sheet_data) == 0:
+        pressure_sensor_data = self.data_manager.get_data_seq(self.pressure_sensor_key)
+        if pressure_sensor_data.ndim != 3 or len(pressure_sensor_data) == 0:
             raise ValueError(
-                f"Expected '{self.sheet_key}' to contain a non-empty sequence of 2D matrices."
+                f"Expected '{self.pressure_sensor_key}' to contain a non-empty sequence of 2D matrices."
             )
-        self.sheet_image = None
-        self.sheet_ax = self.fig.add_subplot(len(self.camera_names) + 1, 4, 4 * (1 + 1))
-        self.ax[1, 3] = self.sheet_ax
-        self.sheet_ax.set_title(f"{self.sheet_key} tactile", fontsize=12)
+        self.pressure_sensor_image = None
+        self.pressure_sensor_ax = self.fig.add_subplot(
+            len(self.camera_names) + 1, 4, 4 * (1 + 1)
+        )
+        self.ax[1, 3] = self.pressure_sensor_ax
+        self.pressure_sensor_ax.set_title(
+            f"{self.pressure_sensor_key} pressure sensor", fontsize=12
+        )
 
         self.fig.set_layout_engine(None)
         self.fig.subplots_adjust(bottom=0.14)
         self.is_playing = True
         self.current_frame_idx = 0
         self.pending_frame_idx = None
-        self.frame_count = len(sheet_data)
+        self.frame_count = len(pressure_sensor_data)
         self.play_button_ax = self.fig.add_axes([0.43, 0.035, 0.12, 0.045])
         self.prev_button_ax = self.fig.add_axes([0.30, 0.035, 0.10, 0.045])
         self.next_button_ax = self.fig.add_axes([0.58, 0.035, 0.10, 0.045])
@@ -176,28 +180,32 @@ class VisualizeSheetTactileData(VisualizeData):
     def handle_rgb_image(self, camera_idx, time_idx, rgb_key):
         rgb_image = super().handle_rgb_image(camera_idx, time_idx, rgb_key)
         if camera_idx == 0:
-            if self.sheet_image is None:
-                self.sheet_image = self.sheet_ax.imshow(
-                    self.data_manager.get_single_data(self.sheet_key, time_idx)[
-                        ::-1, :
-                    ],
+            if self.pressure_sensor_image is None:
+                self.pressure_sensor_image = self.pressure_sensor_ax.imshow(
+                    self.data_manager.get_single_data(
+                        self.pressure_sensor_key, time_idx
+                    )[::-1, :],
                     cmap="turbo",
                     vmin=0,
                     vmax=255,
                     interpolation="nearest",
                 )
-                self.fig.colorbar(self.sheet_image, ax=self.sheet_ax)
+                self.fig.colorbar(
+                    self.pressure_sensor_image, ax=self.pressure_sensor_ax
+                )
             else:
-                self.sheet_image.set_data(
-                    self.data_manager.get_single_data(self.sheet_key, time_idx)[::-1, :]
+                self.pressure_sensor_image.set_data(
+                    self.data_manager.get_single_data(
+                        self.pressure_sensor_key, time_idx
+                    )[::-1, :]
                 )
         return rgb_image
 
 
 def main():
     args = vars(parse_argument())
-    sheet_key = args.pop("sheet_key")
-    viz = VisualizeSheetTactileData(sheet_key=sheet_key, **args)
+    pressure_sensor_key = args.pop("pressure_sensor_key")
+    viz = VisualizePressureSensorData(pressure_sensor_key=pressure_sensor_key, **args)
     viz.plot()
 
 
