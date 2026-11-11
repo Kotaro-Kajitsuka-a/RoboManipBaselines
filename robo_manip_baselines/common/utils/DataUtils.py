@@ -45,6 +45,15 @@ def convert_data_to_policy(data, key):
     """Convert data from RMB/env representation to policy representation."""
     if key in (DataKey.MEASURED_EEF_POSE, DataKey.COMMAND_EEF_POSE):
         return get_pose9_from_pose7(data)
+    if key == DataKey.MAIN_PRESSURE_SENSOR:
+        if data.ndim == 3:  # Training: (time, rows, columns)
+            return data.reshape(data.shape[0], -1)
+        elif data.ndim == 2:  # Rollout: (rows, columns)
+            return data.flatten()
+        else:
+            raise ValueError(
+                f"Expected pressure sensor data with 2 or 3 dimensions, got {data.shape}."
+            )
     return data
 
 

@@ -62,6 +62,9 @@ class DataKey:
     # Command end-effector wrench (fx, fy, fz, nx, ny, nz)
     COMMAND_EEF_WRENCH = "command_eef_wrench"
 
+    # Main pressure sensor cell values (2D matrix)
+    MAIN_PRESSURE_SENSOR = "main_pressure_sensor"
+
     # Measured velocity of omni-directional mobile base
     MEASURED_MOBILE_OMNI_VEL = "measured_mobile_omni_vel"
     # Command velocity of omni-directional mobile base

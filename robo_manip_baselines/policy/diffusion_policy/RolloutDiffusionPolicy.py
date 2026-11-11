@@ -176,7 +176,10 @@ class RolloutDiffusionPolicy(RolloutBase):
         state = np.concatenate(
             [
                 convert_data_to_policy(
-                    self.motion_manager.get_data(state_key, self.obs), state_key
+                    self.info["pressure_sensor_data"][state_key]
+                    if state_key == DataKey.MAIN_PRESSURE_SENSOR
+                    else self.motion_manager.get_data(state_key, self.obs),
+                    state_key,
                 )
                 for state_key in self.state_keys
             ]
