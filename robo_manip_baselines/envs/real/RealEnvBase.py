@@ -34,6 +34,8 @@ class RealEnvBase(EnvDataMixin, gym.Env, ABC):
         self.intensity_tactiles = {}
         self.pressure_sensors = {}
         self.pressure_sensor_bufs = {}
+        self.pressure_sensor_missing_frame_counts = {}
+        self._is_pressure_sensor_timed_out = False
         self._is_pressure_sensor_over_threshold = False
 
     def setup_realsense(self, camera_ids):
@@ -324,7 +326,8 @@ class RealEnvBase(EnvDataMixin, gym.Env, ABC):
         pass
 
     def _get_info(self):
-        # Any pressure sensor can set this flag during the following reads.
+        # Any pressure sensor can set these flags during the following reads.
+        self._is_pressure_sensor_timed_out = False
         self._is_pressure_sensor_over_threshold = False
         info = {}
 
@@ -399,6 +402,10 @@ class RealEnvBase(EnvDataMixin, gym.Env, ABC):
                     info[key][name] = value
 
         # Run robot-specific hooks on the main thread, after sensor reads finish.
+        if self._is_pressure_sensor_timed_out:
+            raise TimeoutError(
+                "A pressure sensor received no frame for 4 consecutive reads."
+            )
         if self._is_pressure_sensor_over_threshold:
             self.retreat_and_stop_for_pressure_sensor()
         return info
@@ -533,13 +540,28 @@ class RealEnvBase(EnvDataMixin, gym.Env, ABC):
                     "This may happen because 0.1 seconds is a short time for the sensor. "
                     "Please check that the serial reader timeout is set to 0.1 seconds."
                 )
-            print(
-                "\033[31mPressure sensor communication did not complete within "
-                "0.1 seconds. Using the most recent data instead.\033[0m"
+            count = (
+                self.pressure_sensor_missing_frame_counts.get(pressure_sensor_name, 0)
+                + 1
             )
+            self.pressure_sensor_missing_frame_counts[pressure_sensor_name] = count
+            if count >= 4:
+                self._is_pressure_sensor_timed_out = True
+            if count == 1:
+                print(
+                    "\033[31mPressure sensor communication did not complete within "
+                    "0.1 seconds. Using the most recent data instead.\033[0m"
+                )
+            elif count in (2, 3):
+                color = "\033[34m" if count == 2 else "\033[32m"
+                print(
+                    f"{color}Pressure sensor '{pressure_sensor_name}': "
+                    f"no frame received for {count} consecutive reads.\033[0m"
+                )
             matrix = self.pressure_sensor_bufs[pressure_sensor_name]
         else:
             _, matrix = serial_reader.parse_frame(frame)
+            self.pressure_sensor_missing_frame_counts[pressure_sensor_name] = 0
             previous_matrix = self.pressure_sensor_bufs.get(pressure_sensor_name)
             max_value = np.max(matrix)
             threshold_reached = max_value >= threshold and (
