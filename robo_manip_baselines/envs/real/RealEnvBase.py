@@ -34,6 +34,7 @@ class RealEnvBase(EnvDataMixin, gym.Env, ABC):
         self.intensity_tactiles = {}
         self.pressure_sensors = {}
         self.pressure_sensor_bufs = {}
+        self._is_pressure_sensor_over_threshold = False
 
     def setup_realsense(self, camera_ids):
         if camera_ids is None:
@@ -323,6 +324,8 @@ class RealEnvBase(EnvDataMixin, gym.Env, ABC):
         pass
 
     def _get_info(self):
+        # Any pressure sensor can set this flag during the following reads.
+        self._is_pressure_sensor_over_threshold = False
         info = {}
 
         if (
@@ -396,16 +399,11 @@ class RealEnvBase(EnvDataMixin, gym.Env, ABC):
                     info[key][name] = value
 
         # Run robot-specific hooks on the main thread, after sensor reads finish.
-        for name, is_over_threshold in info.pop(
-            "_is_pressure_sensor_over_threshold", {}
-        ).items():
-            if is_over_threshold:
-                self.retreat_and_stop_for_pressure_sensor(
-                    name, np.max(info["pressure_sensor_data"][name])
-                )
+        if self._is_pressure_sensor_over_threshold:
+            self.retreat_and_stop_for_pressure_sensor()
         return info
 
-    def retreat_and_stop_for_pressure_sensor(self, pressure_sensor_name, max_value):
+    def retreat_and_stop_for_pressure_sensor(self):
         pass
 
     def get_camera_data(self, camera_name, camera):
@@ -553,10 +551,9 @@ class RealEnvBase(EnvDataMixin, gym.Env, ABC):
                     f"reached the threshold: max={max_value}, threshold={threshold}"
                 )
             self.pressure_sensor_bufs[pressure_sensor_name] = matrix
-        return pressure_sensor_name, {
-            "pressure_sensor_data": matrix,
-            "_is_pressure_sensor_over_threshold": bool(np.max(matrix) >= threshold),
-        }
+        if np.max(matrix) >= threshold:
+            self._is_pressure_sensor_over_threshold = True
+        return pressure_sensor_name, {"pressure_sensor_data": matrix}
 
     def get_joint_pos_from_obs(self, obs):
         """Get joint position from observation."""
