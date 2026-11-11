@@ -146,9 +146,10 @@ class RealXarm7EnvBase(RealEnvBase):
         self.setup_pressure_sensors(pressure_sensor_ids)
 
     def close(self):
-        if self.pressure_sensors:
-            self.close_pressure_sensors()
-        self.xarm_api.disconnect()
+        try:
+            super().close()
+        finally:
+            self.xarm_api.disconnect()
 
     def _check_xarm_code(self, name, code):
         if isinstance(code, int):

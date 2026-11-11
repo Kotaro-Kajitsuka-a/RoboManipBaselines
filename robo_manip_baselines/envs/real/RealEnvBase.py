@@ -33,10 +33,6 @@ class RealEnvBase(EnvDataMixin, gym.Env, ABC):
         self.rgb_tactiles = {}
         self.intensity_tactiles = {}
         self.pressure_sensors = {}
-        self._pressure_sensors_running = False
-        self.pressure_sensor_bufs = {}
-        self.pressure_sensor_missing_frame_counts = {}
-        self._is_pressure_sensor_timed_out = False
         self._is_pressure_sensor_over_threshold = False
 
     def setup_realsense(self, camera_ids):
@@ -214,30 +210,14 @@ class RealEnvBase(EnvDataMixin, gym.Env, ABC):
         if pressure_sensor_ids is None:
             return
 
-        from flexible_pressure_sensor_sample.serial_reader import SerialReader
+        from flexible_pressure_sensor_sample.pressure_sensor_server import (
+            PressureSensorServer,
+        )
 
         for pressure_sensor_name, port in pressure_sensor_ids.items():
-            serial_reader = SerialReader(port, timeout=0.1)
-            self.pressure_sensors[pressure_sensor_name] = serial_reader
-        self.start_pressure_sensors()
-
-    def start_pressure_sensors(self):
-        self.pressure_sensor_bufs.clear()
-        self.pressure_sensor_missing_frame_counts.clear()
-        for serial_reader in self.pressure_sensors.values():
-            serial_reader.ser.reset_input_buffer()
-            serial_reader.send_command("START")
-        self._pressure_sensors_running = True
-
-    def stop_pressure_sensors(self):
-        for serial_reader in self.pressure_sensors.values():
-            serial_reader.send_command("STOP")
-        self._pressure_sensors_running = False
-
-    def close_pressure_sensors(self):
-        self.stop_pressure_sensors()
-        for serial_reader in self.pressure_sensors.values():
-            serial_reader.ser.close()
+            server = PressureSensorServer(port, timeout=0.1)
+            self.pressure_sensors[pressure_sensor_name] = server
+            server.start()
 
     def get_input_device_kwargs(self, input_device_name):
         return {}
@@ -248,7 +228,6 @@ class RealEnvBase(EnvDataMixin, gym.Env, ABC):
         super().reset(seed=seed)
 
         self._reset_robot()
-        self.start_pressure_sensors()
 
         observation = self._get_obs()
         info = self._get_info()
@@ -267,7 +246,8 @@ class RealEnvBase(EnvDataMixin, gym.Env, ABC):
         return observation, reward, terminated, False, info
 
     def close(self):
-        pass
+        for server in self.pressure_sensors.values():
+            server.close()
 
     @abstractmethod
     def _reset_robot(self):
@@ -340,8 +320,6 @@ class RealEnvBase(EnvDataMixin, gym.Env, ABC):
         pass
 
     def _get_info(self):
-        # Any pressure sensor can set these flags during the following reads.
-        self._is_pressure_sensor_timed_out = False
         self._is_pressure_sensor_over_threshold = False
         info = {}
 
@@ -397,11 +375,11 @@ class RealEnvBase(EnvDataMixin, gym.Env, ABC):
                     )
                 ] = intensity_tactile_name
 
-            for pressure_sensor_name, serial_reader in self.pressure_sensors.items():
+            for pressure_sensor_name, server in self.pressure_sensors.items():
                 future = executor.submit(
                     self.get_pressure_sensor_data,
                     pressure_sensor_name,
-                    serial_reader,
+                    server,
                 )
                 futures[future] = pressure_sensor_name
 
@@ -416,10 +394,6 @@ class RealEnvBase(EnvDataMixin, gym.Env, ABC):
                     info[key][name] = value
 
         # Run robot-specific hooks on the main thread, after sensor reads finish.
-        if self._is_pressure_sensor_timed_out:
-            raise TimeoutError(
-                "A pressure sensor received no frame for 4 consecutive reads."
-            )
         if self._is_pressure_sensor_over_threshold:
             self.retreat_and_stop_for_pressure_sensor()
         return info
@@ -543,57 +517,27 @@ class RealEnvBase(EnvDataMixin, gym.Env, ABC):
         intensity_tactile_buf[...] = intensity_tactile_value
         return intensity_tactile_name, {"intensity_tactile": intensity_tactile_value}
 
-    def get_pressure_sensor_data(self, pressure_sensor_name, serial_reader):
-        if not self._pressure_sensors_running:
-            return pressure_sensor_name, {
-                "pressure_sensor_data": self.pressure_sensor_bufs.get(
-                    pressure_sensor_name
-                )
-            }
+    def get_pressure_sensor_data(self, pressure_sensor_name, server):
+        latest_frame = server.get_latest_frame()
+        if not server.is_alive():
+            raise TimeoutError(
+                f"[{self.__class__.__name__}] Pressure sensor server stopped for "
+                f"'{pressure_sensor_name}': {server.stop_reason or 'unknown reason'}"
+            )
+        if latest_frame is None:
+            raise TimeoutError(
+                f"[{self.__class__.__name__}] No pressure sensor frame received for "
+                f"'{pressure_sensor_name}'."
+            )
+
+        _, matrix = latest_frame
         threshold = 256  # Raw sensor value (0..255).
-        frame = serial_reader.read_frame()
-        if frame is None:
-            if pressure_sensor_name not in self.pressure_sensor_bufs:
-                raise TimeoutError(
-                    f"[{self.__class__.__name__}] No pressure sensor frame has "
-                    f"been received yet for '{pressure_sensor_name}'. "
-                    "This may happen because 0.1 seconds is a short time for the sensor. "
-                    "Please check that the serial reader timeout is set to 0.1 seconds."
-                )
-            count = (
-                self.pressure_sensor_missing_frame_counts.get(pressure_sensor_name, 0)
-                + 1
+        max_value = np.max(matrix)
+        if max_value >= threshold:
+            print(
+                f"[{self.__class__.__name__}] Pressure sensor '{pressure_sensor_name}' "
+                f"reached the threshold: max={max_value}, threshold={threshold}"
             )
-            self.pressure_sensor_missing_frame_counts[pressure_sensor_name] = count
-            if count >= 4:
-                self._is_pressure_sensor_timed_out = True
-            if count == 1:
-                print(
-                    "\033[31mPressure sensor communication did not complete within "
-                    "0.1 seconds. Using the most recent data instead.\033[0m"
-                )
-            elif count in (2, 3):
-                color = "\033[34m" if count == 2 else "\033[32m"
-                print(
-                    f"{color}Pressure sensor '{pressure_sensor_name}': "
-                    f"no frame received for {count} consecutive reads.\033[0m"
-                )
-            matrix = self.pressure_sensor_bufs[pressure_sensor_name]
-        else:
-            _, matrix = serial_reader.parse_frame(frame)
-            self.pressure_sensor_missing_frame_counts[pressure_sensor_name] = 0
-            previous_matrix = self.pressure_sensor_bufs.get(pressure_sensor_name)
-            max_value = np.max(matrix)
-            threshold_reached = max_value >= threshold and (
-                previous_matrix is None or np.max(previous_matrix) < threshold
-            )
-            if threshold_reached:
-                print(
-                    f"[{self.__class__.__name__}] Pressure sensor '{pressure_sensor_name}' "
-                    f"reached the threshold: max={max_value}, threshold={threshold}"
-                )
-            self.pressure_sensor_bufs[pressure_sensor_name] = matrix
-        if np.max(matrix) >= threshold:
             self._is_pressure_sensor_over_threshold = True
         return pressure_sensor_name, {"pressure_sensor_data": matrix}
 

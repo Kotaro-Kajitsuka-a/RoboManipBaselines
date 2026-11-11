@@ -49,7 +49,7 @@ class RealXarm7SafeDemoEnv(RealXarm7DemoEnv):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.dt = 0.05  # [s]
+        self.dt = 0.02  # [s]
         self.body_config_list[0].BodyManagerClass = SafeXarm7ArmManager
         # Define the TCP before setting its fence.
         self._check_xarm_code(
