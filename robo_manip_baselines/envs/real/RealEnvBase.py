@@ -33,6 +33,7 @@ class RealEnvBase(EnvDataMixin, gym.Env, ABC):
         self.rgb_tactiles = {}
         self.intensity_tactiles = {}
         self.pressure_sensors = {}
+        self._pressure_sensors_running = False
         self.pressure_sensor_bufs = {}
         self.pressure_sensor_missing_frame_counts = {}
         self._is_pressure_sensor_timed_out = False
@@ -217,13 +218,25 @@ class RealEnvBase(EnvDataMixin, gym.Env, ABC):
 
         for pressure_sensor_name, port in pressure_sensor_ids.items():
             serial_reader = SerialReader(port, timeout=0.1)
-            serial_reader.send_command("START")
-
             self.pressure_sensors[pressure_sensor_name] = serial_reader
+        self.start_pressure_sensors()
 
-    def close_pressure_sensors(self):
+    def start_pressure_sensors(self):
+        self.pressure_sensor_bufs.clear()
+        self.pressure_sensor_missing_frame_counts.clear()
+        for serial_reader in self.pressure_sensors.values():
+            serial_reader.ser.reset_input_buffer()
+            serial_reader.send_command("START")
+        self._pressure_sensors_running = True
+
+    def stop_pressure_sensors(self):
         for serial_reader in self.pressure_sensors.values():
             serial_reader.send_command("STOP")
+        self._pressure_sensors_running = False
+
+    def close_pressure_sensors(self):
+        self.stop_pressure_sensors()
+        for serial_reader in self.pressure_sensors.values():
             serial_reader.ser.close()
 
     def get_input_device_kwargs(self, input_device_name):
@@ -235,6 +248,7 @@ class RealEnvBase(EnvDataMixin, gym.Env, ABC):
         super().reset(seed=seed)
 
         self._reset_robot()
+        self.start_pressure_sensors()
 
         observation = self._get_obs()
         info = self._get_info()
@@ -530,6 +544,12 @@ class RealEnvBase(EnvDataMixin, gym.Env, ABC):
         return intensity_tactile_name, {"intensity_tactile": intensity_tactile_value}
 
     def get_pressure_sensor_data(self, pressure_sensor_name, serial_reader):
+        if not self._pressure_sensors_running:
+            return pressure_sensor_name, {
+                "pressure_sensor_data": self.pressure_sensor_bufs.get(
+                    pressure_sensor_name
+                )
+            }
         threshold = 256  # Raw sensor value (0..255).
         frame = serial_reader.read_frame()
         if frame is None:

@@ -105,6 +105,8 @@ class TeleopPhase(PhaseBase):
 class EndTeleopPhase(PhaseBase):
     def start(self):
         super().start()
+        if hasattr(self.op.env.unwrapped, "stop_pressure_sensors"):
+            self.op.env.unwrapped.stop_pressure_sensors()
 
         if (not self.op.args.save_success_only) or (self.op.reward >= 1.0):
             print(
@@ -165,6 +167,8 @@ class ReplayPhase(PhaseBase):
 class EndReplayPhase(PhaseBase):
     def start(self):
         super().start()
+        if hasattr(self.op.env.unwrapped, "stop_pressure_sensors"):
+            self.op.env.unwrapped.stop_pressure_sensors()
 
         msg = f"[{self.op.__class__.__name__}] Replay of the log is finished."
         if not self.op.auto_mode:
