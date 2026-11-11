@@ -39,14 +39,14 @@ def parse_argument():
     parser.add_argument(
         "--pressure_sensor_key",
         type=str,
-        default="pressure_sensor",
+        default="main_pressure_sensor",
         help="Data key of the recorded pressure sensor.",
     )
     return parser.parse_args()
 
 
 class VisualizePressureSensorData(VisualizeData):
-    def __init__(self, pressure_sensor_key="pressure_sensor", **kwargs):
+    def __init__(self, pressure_sensor_key="main_pressure_sensor", **kwargs):
         self.pressure_sensor_key = pressure_sensor_key
         super().__init__(**kwargs)
 
@@ -168,7 +168,7 @@ class VisualizePressureSensorData(VisualizeData):
             next_frame_idx = previous_frame_idx + self.skip
 
     def wait_after_frame(self):
-        interval = 0.1
+        interval = 0.001
         elapsed = 0.0
         while self.is_playing and elapsed < interval:
             if not plt.fignum_exists(self.fig.number) or self.quit_flag:

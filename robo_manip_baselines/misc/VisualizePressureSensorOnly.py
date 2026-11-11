@@ -12,7 +12,9 @@ def parse_argument():
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     parser.add_argument("rmb_filename", type=str)
-    parser.add_argument("--pressure_sensor_key", type=str, default="pressure_sensor")
+    parser.add_argument(
+        "--pressure_sensor_key", type=str, default="main_pressure_sensor"
+    )
     parser.add_argument("--skip", type=int, default=1)
     parser.add_argument("--interval", type=float, default=0.1)
     return parser.parse_args()

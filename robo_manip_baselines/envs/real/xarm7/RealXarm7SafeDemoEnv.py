@@ -33,7 +33,7 @@ class SafeXarm7ArmManager(ArmManager):
 class RealXarm7SafeDemoEnv(RealXarm7DemoEnv):
     # [x_max, x_min, y_max, y_min, z_max, z_min] in mm.
     # Keep the other boundaries well outside the robot's reachable workspace.
-    fence_tcp_boundary = [492, 224, 158, -227, 500, 170]
+    fence_tcp_boundary = [492, 150, 158, -227, 500, 160]
 
     # Maximum distance from measured EEF position to commanded EEF position [mm].
     max_eef_position_offset = 50.0
@@ -49,7 +49,7 @@ class RealXarm7SafeDemoEnv(RealXarm7DemoEnv):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.dt = 0.10  # [s]
+        self.dt = 0.05  # [s]
         self.body_config_list[0].BodyManagerClass = SafeXarm7ArmManager
         # Define the TCP before setting its fence.
         self._check_xarm_code(
