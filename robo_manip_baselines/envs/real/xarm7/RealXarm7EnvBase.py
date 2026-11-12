@@ -162,6 +162,12 @@ class RealXarm7EnvBase(RealEnvBase):
             raise RuntimeError("Unexpected xarm code type")
         if code != 0:
             query_code, err_warn = self.xarm_api.get_err_warn_code(show=True)
+            if query_code == 0 and err_warn[0] == 54:
+                print(
+                    f"[{self.__class__.__name__}] get_c54_error_info "
+                    f"(code, [direction, threshold, actual_ft]):"
+                    f"{self.xarm_api.get_c54_error_info()}"
+                )
             servo_query_code, servo_info = self.xarm_api.get_servo_debug_msg()
             raise RuntimeError(
                 f"{name} failed: code={code}; "

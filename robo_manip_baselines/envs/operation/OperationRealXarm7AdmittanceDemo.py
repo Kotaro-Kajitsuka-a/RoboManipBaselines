@@ -21,7 +21,7 @@ class AdmittanceOpenGripperPhase(GraspPhaseBase):
 class AdmittanceGraspPhase(GraspPhaseBase):
     def set_target(self):
         self.gripper_joint_pos = np.array([0.0])
-        self.duration = 4.0  # [s]
+        self.duration = 0.5  # [s]
 
 
 class OperationRealXarm7AdmittanceDemo(OperationRealXarm7Demo):
@@ -36,4 +36,5 @@ class OperationRealXarm7AdmittanceDemo(OperationRealXarm7Demo):
         )
 
     def get_pre_motion_phases(self):
-        return [AdmittanceOpenGripperPhase(self), AdmittanceGraspPhase(self)]
+        # return [AdmittanceOpenGripperPhase(self), AdmittanceGraspPhase(self)]
+        return [AdmittanceGraspPhase(self)]

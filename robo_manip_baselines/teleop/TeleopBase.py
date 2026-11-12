@@ -333,7 +333,11 @@ class TeleopBase(OperationDataMixin, ABC):
             action="store_true",
             help="whether to plot tactile sensor measurements",
         )
-
+        parser.add_argument(
+            "--skip_pressure_sensor_draw",
+            action="store_true",
+            help="whether to stop drawing pressure sensors after their first valid frames",
+        )
         parser.add_argument(
             "--world_idx_list",
             type=int,
@@ -700,6 +704,13 @@ class TeleopBase(OperationDataMixin, ABC):
         plt.pause(0.001)
 
     def draw_pressure_sensor_data(self):
+        if self.args.skip_pressure_sensor_draw and all(
+            name in self.pressure_sensor_plots
+            for name in self.env.unwrapped.pressure_sensor_names
+        ):
+            return
+
+        has_update = False
         for pressure_sensor_name, matrix in self.info.get(
             "pressure_sensor_data", {}
         ).items():
@@ -721,13 +732,18 @@ class TeleopBase(OperationDataMixin, ABC):
                 ax.set_xlabel("Column")
                 ax.set_ylabel("Row")
                 self.pressure_sensor_plots[pressure_sensor_name] = (fig, image)
-            else:
+                has_update = True
+            elif not self.args.skip_pressure_sensor_draw:
                 fig, image = self.pressure_sensor_plots[pressure_sensor_name]
                 image.set_data(display_matrix)
+                has_update = True
+            else:
+                continue
 
             fig.canvas.draw_idle()
 
-        plt.pause(0.001)
+        if has_update or not self.args.skip_pressure_sensor_draw:
+            plt.pause(0.001)
 
     def print_statistics(self):
         print(f"[{self.__class__.__name__}] Statistics on teleoperation")

@@ -33,7 +33,7 @@ class SafeXarm7ArmManager(ArmManager):
 class RealXarm7SafeDemoEnv(RealXarm7DemoEnv):
     # [x_max, x_min, y_max, y_min, z_max, z_min] in mm.
     # Keep the other boundaries well outside the robot's reachable workspace.
-    fence_tcp_boundary = [492, 150, 158, -227, 500, 160]
+    fence_tcp_boundary = [492, 150, 158, -227, 500, 150]
 
     # Maximum distance from measured EEF position to commanded EEF position [mm].
     max_eef_position_offset = 50.0
@@ -66,7 +66,7 @@ class RealXarm7SafeDemoEnv(RealXarm7DemoEnv):
         if input_device_name == "spacemouse":
             return {"pos_scale": 4e-3, "rpy_scale": 5e-3, "gripper_scale": 20.0}
         elif input_device_name == "spacemouse_vel":
-            return {"pos_scale": 3e-2, "gripper_scale": 20.0}
+            return {"pos_scale": 3.5e-2, "rpy_scale": 1e-2, "gripper_scale": 20.0}
         else:
             return super().get_input_device_kwargs(input_device_name)
 
