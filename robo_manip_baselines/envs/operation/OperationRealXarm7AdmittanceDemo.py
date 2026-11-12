@@ -6,10 +6,22 @@ from robo_manip_baselines.common import GraspPhaseBase
 from .OperationRealXarm7Demo import OperationRealXarm7Demo
 
 
+class AdmittanceOpenGripperPhase(GraspPhaseBase):
+    def start(self):
+        super().start()
+        print(f"[{self.op.__class__.__name__}] Press the 'n' key to close the gripper.")
+
+    def set_target(self):
+        self.gripper_joint_pos = np.array([800.0])
+
+    def check_transition(self):
+        return self.op.key == ord("n")
+
+
 class AdmittanceGraspPhase(GraspPhaseBase):
     def set_target(self):
         self.gripper_joint_pos = np.array([0.0])
-        self.duration = 0.5  # [s]
+        self.duration = 4.0  # [s]
 
 
 class OperationRealXarm7AdmittanceDemo(OperationRealXarm7Demo):
@@ -24,4 +36,4 @@ class OperationRealXarm7AdmittanceDemo(OperationRealXarm7Demo):
         )
 
     def get_pre_motion_phases(self):
-        return [AdmittanceGraspPhase(self)]
+        return [AdmittanceOpenGripperPhase(self), AdmittanceGraspPhase(self)]
