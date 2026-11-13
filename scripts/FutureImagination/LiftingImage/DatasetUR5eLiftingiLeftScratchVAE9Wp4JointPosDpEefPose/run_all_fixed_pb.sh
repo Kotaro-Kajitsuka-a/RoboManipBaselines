@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -e
+
+# Run the complete training and rollout pipeline from the repository root.
+bash scripts/FutureImagination/LiftingImage/DatasetUR5eLiftingiLeftScratchVAE9/train_left_image_vae_wp4.sh
+bash scripts/FutureImagination/LiftingImage/DatasetUR5eLiftingiLeftScratchVAE9Wp4JointPosDpEefPose/prepare_datasets.sh
+bash scripts/FutureImagination/LiftingImage/DatasetUR5eLiftingiLeftScratchVAE9Wp4JointPosDpEefPose/train_constant_pb_seed42_52_62.sh
+bash scripts/FutureImagination/LiftingImage/DatasetUR5eLiftingiLeftScratchVAE9Wp4JointPosDpEefPose/rollout_constant_pb_seed42_52_62.sh
+bash scripts/FutureImagination/LiftingImage/DatasetUR5eLiftingiLeftScratchVAE9Wp4JointPosDpEefPose/rollout_initial_pb0_fixed_seed42_52_62.sh
+bash scripts/FutureImagination/LiftingImage/DatasetUR5eLiftingiLeftScratchVAE9Wp4JointPosDpEefPose/rollout_oracle_pb_fixed_seed42_52_62.sh
+
+echo "All scripts finished successfully!"
