@@ -71,6 +71,8 @@ class RealXarm7EnvBase(RealEnvBase):
         self.init_qpos = init_qpos
         self.has_gripper = has_gripper
         self.joint_vel_limit = np.deg2rad(180)  # [rad/s]
+        self._joint_command_warning_count = 0
+        self._joint_command_overwrite_sum = 0.0
         self.body_config_list = [
             ArmConfig(
                 arm_urdf_path=path.join(
@@ -206,6 +208,13 @@ class RealXarm7EnvBase(RealEnvBase):
 
     def _reset_robot(self):
         print(
+            f"[{self.__class__.__name__}] Joint command overwrite since last reset: "
+            f"warnings={self._joint_command_warning_count}, "
+            f"total_abs_correction={self._joint_command_overwrite_sum:.6f} rad"
+        )
+        self._joint_command_warning_count = 0
+        self._joint_command_overwrite_sum = 0.0
+        print(
             f"[{self.__class__.__name__}] Start moving the robot to the reset position."
         )
         self._set_action(
@@ -229,6 +238,20 @@ class RealXarm7EnvBase(RealEnvBase):
     def _zero_ft_sensor(self):
         self.xarm_api.ft_sensor_set_zero()
         time.sleep(0.2)
+
+    def overwrite_command_for_safety(self, action, duration, joint_vel_limit_scale):
+        action_before = action.copy()
+        action, duration = super().overwrite_command_for_safety(
+            action, duration, joint_vel_limit_scale
+        )
+        self._joint_command_overwrite_sum += np.abs((action - action_before)).sum()
+        if np.abs((action - action_before)).max() > 1e-3:
+            self._joint_command_warning_count += 1
+            print(
+                f"\033[33m[{self.__class__.__name__}] "
+                "Joint command was clipped by the velocity limit.\033[0m"
+            )
+        return action, duration
 
     def _set_action(self, action, duration=None, joint_vel_limit_scale=0.5, wait=False):
         start_time = time.time()
