@@ -65,7 +65,7 @@ class RealXarm7SafeDemoEnv(RealXarm7DemoEnv):
     def get_input_device_kwargs(self, input_device_name):
         if input_device_name == "spacemouse":
             return {"pos_scale": 4e-3, "rpy_scale": 5e-3, "gripper_scale": 20.0}
-        elif input_device_name == "spacemouse_vel":
+        elif input_device_name in ("spacemouse_vel", "spacemouse_vel_all"):
             return {"pos_scale": 3.5e-2, "rpy_scale": 1e-2, "gripper_scale": 20.0}
         else:
             return super().get_input_device_kwargs(input_device_name)

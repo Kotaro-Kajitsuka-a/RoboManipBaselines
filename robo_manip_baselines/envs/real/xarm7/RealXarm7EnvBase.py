@@ -10,6 +10,7 @@ from robo_manip_baselines.teleop import (
     GelloInputDevice,
     KeyboardInputDevice,
     SpacemouseInputDevice,
+    SpacemouseVelocityAllInputDevice,
     SpacemouseVelocityInputDevice,
 )
 
@@ -180,6 +181,8 @@ class RealXarm7EnvBase(RealEnvBase):
             InputDeviceClass = SpacemouseInputDevice
         elif input_device_name == "spacemouse_vel":
             InputDeviceClass = SpacemouseVelocityInputDevice
+        elif input_device_name == "spacemouse_vel_all":
+            InputDeviceClass = SpacemouseVelocityAllInputDevice
         elif input_device_name == "gello":
             InputDeviceClass = GelloInputDevice
         elif input_device_name == "keyboard":

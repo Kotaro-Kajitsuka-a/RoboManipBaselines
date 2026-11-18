@@ -16,11 +16,11 @@ class RealXarm7AdmittanceDemoEnv(RealXarm7SafeDemoEnv):
 
     # override
     def get_input_device_kwargs(self, input_device_name):
-        if input_device_name == "spacemouse_vel":
+        if input_device_name in ("spacemouse_vel", "spacemouse_vel_all"):
             return super().get_input_device_kwargs(input_device_name)
         else:
             raise ValueError(
-                f"For admittance control, only 'spacemouse_vel' is supported. Requested config: {input_device_name}"
+                f"For admittance control, only 'spacemouse_vel' and 'spacemouse_vel_all' are supported. Requested config: {input_device_name}"
             )
 
     def setup_admittance_control(self):

@@ -312,7 +312,14 @@ class TeleopBase(OperationDataMixin, ABC):
             "--input_device",
             type=str,
             default="spacemouse",
-            choices=["spacemouse", "spacemouse_vel", "keyboard", "gello", "vive"],
+            choices=[
+                "spacemouse",
+                "spacemouse_vel",
+                "spacemouse_vel_all",
+                "keyboard",
+                "gello",
+                "vive",
+            ],
             help="input device for teleoperation",
         )
         parser.add_argument(
