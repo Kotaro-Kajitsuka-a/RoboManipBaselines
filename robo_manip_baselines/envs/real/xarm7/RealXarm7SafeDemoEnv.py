@@ -33,7 +33,7 @@ class SafeXarm7ArmManager(ArmManager):
 class RealXarm7SafeDemoEnv(RealXarm7DemoEnv):
     # [x_max, x_min, y_max, y_min, z_max, z_min] in mm.
     # Keep the other boundaries well outside the robot's reachable workspace.
-    fence_tcp_boundary = [492, 150, 158, -227, 500, 150]
+    fence_tcp_boundary = [550, 150, 250, -327, 500, 150]
 
     # Maximum distance from measured EEF position to commanded EEF position [mm].
     max_eef_position_offset = 50.0
@@ -66,7 +66,7 @@ class RealXarm7SafeDemoEnv(RealXarm7DemoEnv):
         if input_device_name == "spacemouse":
             return {"pos_scale": 4e-3, "rpy_scale": 5e-3, "gripper_scale": 20.0}
         elif input_device_name in ("spacemouse_vel", "spacemouse_vel_all"):
-            return {"pos_scale": 3.5e-2, "rpy_scale": 1e-2, "gripper_scale": 20.0}
+            return {"pos_scale": 4e-2, "rpy_scale": 2e-2, "gripper_scale": 20.0}
         else:
             return super().get_input_device_kwargs(input_device_name)
 
@@ -111,13 +111,13 @@ class RealXarm7SafeDemoEnv(RealXarm7DemoEnv):
             if position_reached and orientation_reached:
                 break
 
-            if time.time() - start_time >= 20.0:
+            if time.time() - start_time >= 40.0:
                 stop_code = self.xarm_api.set_state(4)
                 position_errors = [
                     measured_eef_pose[i] - self.reset_eef_position[i] for i in range(3)
                 ]
                 raise TimeoutError(
-                    f"Reset EEF pose timeout after 20 seconds. "
+                    f"Reset EEF pose timeout after 40 seconds. "
                     f"Position errors (mm): {position_errors}, "
                     f"Orientation errors (degrees): {orientation_errors}, "
                     f"Measured pose: {measured_eef_pose}, "
