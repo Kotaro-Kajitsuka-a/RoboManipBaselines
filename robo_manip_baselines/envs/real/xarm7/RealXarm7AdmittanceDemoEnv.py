@@ -1,11 +1,24 @@
 import time
 
-from .RealXarm7SafeDemoEnv import RealXarm7SafeDemoEnv
+import numpy as np
+
+from .RealXarm7SafeDemoEnv import RealXarm7SafeDemoEnv, SafeXarm7ArmManager
+
+
+class AdmittanceXarm7ArmManager(SafeXarm7ArmManager):
+    def inverse_kinematics(self):
+        # Start IK from the measured joints, including displacement by admittance.
+        self.arm_joint_pos = np.asarray(
+            self.env.unwrapped.arm_joint_pos_actual, dtype=np.float64
+        ).copy()
+        self.forward_kinematics()
+        super().inverse_kinematics()
 
 
 class RealXarm7AdmittanceDemoEnv(RealXarm7SafeDemoEnv):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self.body_config_list[0].BodyManagerClass = AdmittanceXarm7ArmManager
         time.sleep(0.2)
         self.setup_admittance_control()
 
